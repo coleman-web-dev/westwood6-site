@@ -1,0 +1,76 @@
+---
+import Base from '../layouts/Base.astro';
+import Schema from '../components/Schema.astro';
+---
+
+<Base
+  title="About — Business Name"
+  description="Learn about Business Name — our story, mission, and what sets us apart."
+>
+  <Schema
+    type="Organization"
+    name="Business Name"
+    description="About this business."
+    breadcrumbs={[
+      { name: 'Home', url: '/' },
+      { name: 'About', url: '/about' },
+    ]}
+  />
+
+  <section class="section">
+    <div class="container about">
+      <h1>About Us</h1>
+      <p class="about__lead">
+        A brief introduction to the business — who they are, what they do, and why they do it.
+        This should be 2-3 sentences that capture the essence of the business.
+      </p>
+
+      <div class="about__content">
+        <div class="about__text">
+          <h2>Our Story</h2>
+          <p>
+            Share the origin story — how the business started, what motivated the founder,
+            and what drives the team today. Keep it personal and authentic.
+          </p>
+          <p>
+            Add more detail about the business's growth, milestones, or approach.
+            What makes them different from competitors?
+          </p>
+
+          <h2>Our Mission</h2>
+          <p>
+            State the company's mission clearly. What problem do they solve?
+            What do they believe in? What do clients get from working with them?
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .about h1 {
+    margin-bottom: 1rem;
+  }
+
+  .about__lead {
+    font-size: 1.2rem;
+    color: var(--color-text-muted);
+    max-width: 40rem;
+    margin-bottom: 3rem;
+  }
+
+  .about__text h2 {
+    margin-top: 2.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .about__text h2:first-child {
+    margin-top: 0;
+  }
+
+  .about__text p {
+    color: var(--color-text-muted);
+    max-width: 40rem;
+  }
+</style>

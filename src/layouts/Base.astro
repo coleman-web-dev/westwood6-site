@@ -1,0 +1,53 @@
+---
+import '../styles/global.css';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+import SEO from '../components/SEO.astro';
+
+interface Props {
+  title: string;
+  description: string;
+  ogImage?: string;
+  noindex?: boolean;
+}
+
+const { title, description, ogImage, noindex } = Astro.props;
+
+// ============================================================
+// CLIENT CONFIG — Update these for each client project
+// ============================================================
+const BUSINESS_NAME = 'Business Name';
+const PHONE = '(555) 123-4567';
+const EMAIL = 'hello@example.com';
+const ADDRESS = '123 Main St, City, ST 12345';
+
+const NAV_ITEMS = [
+  { label: 'Home', href: '/' },
+  { label: 'About', href: '/about' },
+  { label: 'Contact', href: '/contact' },
+];
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <SEO title={title} description={description} ogImage={ogImage} noindex={noindex} />
+  </head>
+  <body>
+    <Nav brandName={BUSINESS_NAME} items={NAV_ITEMS} />
+
+    <main>
+      <slot />
+    </main>
+
+    <Footer
+      businessName={BUSINESS_NAME}
+      phone={PHONE}
+      email={EMAIL}
+      address={ADDRESS}
+    />
+  </body>
+</html>

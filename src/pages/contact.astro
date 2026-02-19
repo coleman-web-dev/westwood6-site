@@ -1,0 +1,106 @@
+---
+import Base from '../layouts/Base.astro';
+import Schema from '../components/Schema.astro';
+import ContactForm from '../components/ContactForm.astro';
+---
+
+<Base
+  title="Contact — Business Name"
+  description="Get in touch with Business Name. Call, email, or fill out the form and we'll get back to you."
+>
+  <Schema
+    type="LocalBusiness"
+    name="Business Name"
+    phone="(555) 123-4567"
+    email="hello@example.com"
+    address={{
+      street: '123 Main St',
+      city: 'City',
+      state: 'ST',
+      zip: '12345',
+    }}
+    breadcrumbs={[
+      { name: 'Home', url: '/' },
+      { name: 'Contact', url: '/contact' },
+    ]}
+  />
+
+  <section class="section">
+    <div class="container contact">
+      <h1>Contact Us</h1>
+      <p class="contact__intro">
+        Have a question or want to work together? Reach out using the form below
+        or contact us directly.
+      </p>
+
+      <div class="contact__grid">
+        <div class="contact__form-wrapper">
+          <ContactForm />
+        </div>
+
+        <div class="contact__info">
+          <div class="contact__detail">
+            <h3>Phone</h3>
+            <a href="tel:5551234567">(555) 123-4567</a>
+          </div>
+          <div class="contact__detail">
+            <h3>Email</h3>
+            <a href="mailto:hello@example.com">hello@example.com</a>
+          </div>
+          <div class="contact__detail">
+            <h3>Address</h3>
+            <p>123 Main St<br />City, ST 12345</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .contact h1 {
+    margin-bottom: 0.75rem;
+  }
+
+  .contact__intro {
+    color: var(--color-text-muted);
+    max-width: 40rem;
+    margin-bottom: 3rem;
+  }
+
+  .contact__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4rem;
+    align-items: start;
+  }
+
+  .contact__info {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  .contact__detail h3 {
+    font-size: 1rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .contact__detail a,
+  .contact__detail p {
+    color: var(--color-text-muted);
+    text-decoration: none;
+    font-size: 0.95rem;
+  }
+
+  .contact__detail a:hover {
+    color: var(--color-primary);
+  }
+
+  @media (max-width: 768px) {
+    .contact__grid {
+      grid-template-columns: 1fr;
+      gap: 3rem;
+    }
+  }
+</style>
