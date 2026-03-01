@@ -5,9 +5,10 @@ import {
   ResponsiveGridLayout,
   useContainerWidth,
   type Layout,
+  type LayoutItem,
+  type ResponsiveLayouts,
+  verticalCompactor,
 } from 'react-grid-layout';
-
-type Layouts = { [P: string]: Layout[] };
 import { useTheme } from 'next-themes';
 import 'react-grid-layout/css/styles.css';
 import {
@@ -86,7 +87,7 @@ const CARD_IDS = [
   'conversion',
 ];
 
-const DEFAULT_LAYOUTS: Layouts = {
+const DEFAULT_LAYOUTS: ResponsiveLayouts = {
   lg: [
     { i: 'credit-card',  x: 0, y: 0, w: 4, h: 5 },
     { i: 'card-info',    x: 4, y: 0, w: 4, h: 6 },
@@ -151,7 +152,7 @@ function renderCard(id: string) {
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [layouts, setLayouts] = useState<Layouts>(DEFAULT_LAYOUTS);
+  const [layouts, setResponsiveLayouts] = useState<ResponsiveLayouts>(DEFAULT_LAYOUTS);
   const [currentBreakpoint, setCurrentBreakpoint] = useState('lg');
   const { resolvedTheme, setTheme } = useTheme();
   const { containerRef: gridRef, width: gridWidth } = useContainerWidth();
@@ -164,7 +165,7 @@ export default function DashboardPage() {
         const parsed = JSON.parse(saved);
         // Only use saved layouts if they have all breakpoints
         if (parsed.lg && parsed.md && parsed.sm) {
-          setLayouts(parsed);
+          setResponsiveLayouts(parsed);
         }
       }
     } catch {
@@ -172,9 +173,9 @@ export default function DashboardPage() {
     }
   }, []);
 
-  const onLayoutChange = useCallback((_current: Layout[], allLayouts: Layouts) => {
-    setLayouts(allLayouts);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(allLayouts));
+  const onLayoutChange = useCallback((_current: Layout, allResponsiveLayouts: ResponsiveLayouts) => {
+    setResponsiveLayouts(allResponsiveLayouts);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(allResponsiveLayouts));
   }, []);
 
   const onBreakpointChange = useCallback((newBreakpoint: string) => {
@@ -304,10 +305,9 @@ export default function DashboardPage() {
               cols={{ lg: 12, md: 12, sm: 12 }}
               rowHeight={30}
               margin={currentBreakpoint === 'sm' ? [12, 12] : [18, 18]}
-              compactType="vertical"
-              isDraggable={isDraggable}
-              isResizable={false}
-              draggableHandle=".drag-handle"
+              compactor={verticalCompactor}
+              dragConfig={{ enabled: isDraggable, handle: '.drag-handle' }}
+              resizeConfig={{ enabled: false }}
               onLayoutChange={onLayoutChange}
               onBreakpointChange={onBreakpointChange}
             >
