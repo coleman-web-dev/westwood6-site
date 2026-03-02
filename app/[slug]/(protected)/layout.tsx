@@ -30,7 +30,7 @@ export default function ProtectedLayout({
   }
 
   return (
-    <div className="min-h-screen flex bg-surface-light dark:bg-surface-dark">
+    <div className="min-h-screen flex">
       <AppSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* Sidebar overlay (mobile) */}
@@ -42,7 +42,7 @@ export default function ProtectedLayout({
       )}
 
       {/* Main area */}
-      <div className="flex-1 flex flex-col min-h-screen bg-canvas-light dark:bg-canvas-dark rounded-l-app-frame">
+      <div className="flex-1 flex flex-col min-h-screen">
         <DashboardTopbar onMenuClick={() => setSidebarOpen(true)} />
         <main className="flex-1 p-3 sm:p-app-padding">
           {children}
