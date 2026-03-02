@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { DashboardCardShell } from './dashboard-card-shell';
-import { CreditCard } from 'lucide-react';
 
 export function BalanceCard() {
   const { unit } = useCommunity();
@@ -35,7 +34,7 @@ export function BalanceCard() {
   }, [unit]);
 
   return (
-    <DashboardCardShell title="Account Balance" icon={<CreditCard className="h-4 w-4 text-secondary-500" />}>
+    <DashboardCardShell title="Account Balance">
       {loading ? (
         <div className="animate-pulse h-8 w-24 rounded bg-muted" />
       ) : (

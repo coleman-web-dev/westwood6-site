@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { DashboardCardShell } from './dashboard-card-shell';
-import { Building2 } from 'lucide-react';
 import type { Amenity } from '@/lib/types/database';
 
 export function AmenitiesCard() {
@@ -31,7 +30,7 @@ export function AmenitiesCard() {
   }, [community.id]);
 
   return (
-    <DashboardCardShell title="Amenities" icon={<Building2 className="h-4 w-4 text-secondary-500" />}>
+    <DashboardCardShell title="Amenities">
       {loading ? (
         <div className="space-y-2">
           {[1, 2].map((i) => <div key={i} className="animate-pulse h-5 rounded bg-muted" />)}

@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { DashboardCardShell } from './dashboard-card-shell';
-import { Wrench } from 'lucide-react';
 import { Badge } from '@/components/shared/ui/badge';
 import type { MaintenanceRequest } from '@/lib/types/database';
 
@@ -41,7 +40,7 @@ export function MaintenanceCard() {
   }, [unit]);
 
   return (
-    <DashboardCardShell title="Maintenance Requests" icon={<Wrench className="h-4 w-4 text-secondary-500" />}>
+    <DashboardCardShell title="Maintenance Requests">
       {loading ? (
         <div className="space-y-2">
           {[1, 2].map((i) => <div key={i} className="animate-pulse h-5 rounded bg-muted" />)}

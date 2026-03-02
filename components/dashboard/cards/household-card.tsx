@@ -2,14 +2,13 @@
 
 import { useCommunity } from '@/lib/providers/community-provider';
 import { DashboardCardShell } from './dashboard-card-shell';
-import { Users } from 'lucide-react';
 import { Badge } from '@/components/shared/ui/badge';
 
 export function HouseholdCard() {
   const { householdMembers, unit } = useCommunity();
 
   return (
-    <DashboardCardShell title="Household Members" icon={<Users className="h-4 w-4 text-secondary-500" />}>
+    <DashboardCardShell title="Household Members">
       {!unit ? (
         <p className="text-body text-text-muted-light dark:text-text-muted-dark">No unit assigned.</p>
       ) : householdMembers.length === 0 ? (

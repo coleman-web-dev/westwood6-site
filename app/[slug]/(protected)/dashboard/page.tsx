@@ -1,10 +1,9 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { ResponsiveGridLayout, useContainerWidth } from 'react-grid-layout';
 import type { Layout, ResponsiveLayouts } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
-import 'react-resizable/css/styles.css';
 
 import { useCommunity } from '@/lib/providers/community-provider';
 import { useUserPreferences } from '@/lib/hooks/use-user-preferences';
@@ -12,6 +11,7 @@ import { CARD_COMPONENTS } from '@/components/dashboard/cards';
 import { CARD_REGISTRY } from '@/lib/config/dashboard-cards';
 import {
   GRID_MARGIN,
+  GRID_MARGIN_SM,
   GRID_CONTAINER_PADDING,
   GRID_BREAKPOINTS,
   GRID_COLS,
@@ -41,20 +41,21 @@ function generateDefaultLayouts(cards: DashboardCardId[]): ResponsiveLayouts<Gri
       i: cardId,
       x: 0,
       y: index * config.defaultH,
-      w: 6,
+      w: 12,
       h: config.defaultH,
       minW: config.minW,
       minH: config.minH,
     };
   });
 
-  return { lg, md: lg, sm, xs: sm, xxs: sm };
+  return { lg, md: lg, sm };
 }
 
 export default function DashboardPage() {
-  const { visibleCards, member } = useCommunity();
+  const { visibleCards } = useCommunity();
   const { prefs, loaded, setDashboardLayout } = useUserPreferences();
   const { width, containerRef, mounted } = useContainerWidth();
+  const [currentBreakpoint, setCurrentBreakpoint] = useState('lg');
 
   const layouts = useMemo(() => {
     if (loaded && prefs.dashboard_layout && Object.keys(prefs.dashboard_layout).length > 0) {
@@ -70,30 +71,33 @@ export default function DashboardPage() {
     [setDashboardLayout],
   );
 
+  const handleBreakpointChange = useCallback((newBreakpoint: string) => {
+    setCurrentBreakpoint(newBreakpoint);
+  }, []);
+
+  const isDraggable = currentBreakpoint !== 'sm';
+
   return (
     <div ref={containerRef}>
-      <h1 className="text-page-title mb-6">
-        Welcome back, {member?.first_name}
-      </h1>
-
-      {mounted && (
+      {mounted && width > 0 && (
         <ResponsiveGridLayout
           width={width}
           layouts={layouts}
           breakpoints={GRID_BREAKPOINTS}
           cols={GRID_COLS}
           rowHeight={GRID_ROW_HEIGHT}
-          margin={GRID_MARGIN}
+          margin={currentBreakpoint === 'sm' ? GRID_MARGIN_SM : GRID_MARGIN}
           containerPadding={GRID_CONTAINER_PADDING}
           onLayoutChange={handleLayoutChange}
-          dragConfig={{ enabled: true, handle: '.cursor-grab' }}
-          resizeConfig={{ enabled: true }}
+          onBreakpointChange={handleBreakpointChange}
+          dragConfig={{ enabled: isDraggable, handle: '.drag-handle' }}
+          resizeConfig={{ enabled: false }}
         >
           {visibleCards.map((cardId) => {
             const CardComponent = CARD_COMPONENTS[cardId];
             if (!CardComponent) return null;
             return (
-              <div key={cardId}>
+              <div key={cardId} className="h-full overflow-hidden">
                 <CardComponent />
               </div>
             );

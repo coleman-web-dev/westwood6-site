@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { DashboardCardShell } from './dashboard-card-shell';
-import { Calendar } from 'lucide-react';
 import type { Event } from '@/lib/types/database';
 
 export function EventsCard() {
@@ -32,7 +31,7 @@ export function EventsCard() {
   }, [community.id]);
 
   return (
-    <DashboardCardShell title="Upcoming Events" icon={<Calendar className="h-4 w-4 text-secondary-500" />}>
+    <DashboardCardShell title="Upcoming Events">
       {loading ? (
         <div className="space-y-2">
           {[1, 2].map((i) => <div key={i} className="animate-pulse h-5 rounded bg-muted" />)}

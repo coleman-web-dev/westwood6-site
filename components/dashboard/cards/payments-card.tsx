@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { DashboardCardShell } from './dashboard-card-shell';
-import { Receipt } from 'lucide-react';
 import type { Payment } from '@/lib/types/database';
 
 export function PaymentsCard() {
@@ -33,7 +32,7 @@ export function PaymentsCard() {
   }, [unit]);
 
   return (
-    <DashboardCardShell title="Recent Payments" icon={<Receipt className="h-4 w-4 text-secondary-500" />}>
+    <DashboardCardShell title="Recent Payments">
       {loading ? (
         <div className="space-y-2">
           {[1, 2].map((i) => <div key={i} className="animate-pulse h-5 rounded bg-muted" />)}

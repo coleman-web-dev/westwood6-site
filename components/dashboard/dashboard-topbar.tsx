@@ -1,13 +1,15 @@
 'use client';
 
-import { SidebarTrigger } from '@/components/shared/ui/sidebar';
-import { Separator } from '@/components/shared/ui/separator';
 import ThemeSwitch from '@/components/shared/ThemeSwitch';
 import { useCommunity } from '@/lib/providers/community-provider';
-import { SearchIcon, BellIcon, MailIcon } from 'lucide-react';
+import { SearchIcon, BellIcon, MailIcon, MenuIcon } from 'lucide-react';
 
-export function DashboardTopbar() {
-  const { member, community } = useCommunity();
+interface DashboardTopbarProps {
+  onMenuClick: () => void;
+}
+
+export function DashboardTopbar({ onMenuClick }: DashboardTopbarProps) {
+  const { member } = useCommunity();
 
   const initials = [member?.first_name?.[0], member?.last_name?.[0]]
     .filter(Boolean)
@@ -15,10 +17,19 @@ export function DashboardTopbar() {
     .toUpperCase();
 
   return (
-    <header className="sticky top-0 z-30 flex h-topbar items-center gap-2 sm:gap-4 px-3 sm:px-app-padding border-b border-stroke-light dark:border-stroke-dark bg-canvas-light/80 dark:bg-canvas-dark/80 backdrop-blur-xl">
-      <SidebarTrigger className="-ml-1 text-text-secondary-light dark:text-text-secondary-dark" />
-      <Separator orientation="vertical" className="mx-1 h-4 bg-stroke-light dark:bg-stroke-dark" />
-      <span className="text-card-title text-text-primary-light dark:text-text-primary-dark">{community.name}</span>
+    <header className="sticky top-0 z-30 h-topbar flex items-center gap-2 sm:gap-4 px-3 sm:px-app-padding border-b border-stroke-light dark:border-stroke-dark bg-canvas-light/80 dark:bg-canvas-dark/80 backdrop-blur-xl">
+      {/* Mobile hamburger */}
+      <button
+        onClick={onMenuClick}
+        className="lg:hidden p-2 -ml-2 rounded-inner-card text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors"
+      >
+        <MenuIcon className="w-5 h-5" />
+      </button>
+
+      {/* Title */}
+      <h1 className="text-page-title text-text-primary-light dark:text-text-primary-dark">
+        Dashboard
+      </h1>
 
       {/* Search (centered) */}
       <div className="hidden sm:flex flex-1 justify-center">

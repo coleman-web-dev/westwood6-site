@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { DashboardCardShell } from './dashboard-card-shell';
-import { Megaphone } from 'lucide-react';
 import { Badge } from '@/components/shared/ui/badge';
 import type { Announcement } from '@/lib/types/database';
 
@@ -32,7 +31,7 @@ export function AnnouncementsCard() {
   }, [community.id]);
 
   return (
-    <DashboardCardShell title="Announcements" icon={<Megaphone className="h-4 w-4 text-secondary-500" />}>
+    <DashboardCardShell title="Announcements">
       {loading ? (
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
