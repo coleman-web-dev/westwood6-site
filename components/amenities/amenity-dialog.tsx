@@ -277,67 +277,74 @@ export function AmenityDialog({
     }
 
     setSubmitting(true);
-    const supabase = createClient();
 
-    const hasTimeSlots = reservable && bookingType !== 'full_day';
+    try {
+      const supabase = createClient();
 
-    const payload = {
-      name: trimmedName,
-      icon: icon || null,
-      public_description: publicDescription.trim() || null,
-      description: description.trim() || null,
-      capacity: capacityNum,
-      operating_hours: hoursToRecord(hours),
-      rules_text: rulesText.trim() || null,
-      active,
-      reservable,
-      booking_type: reservable ? bookingType : 'full_day',
-      slot_duration_minutes: hasTimeSlots ? 30 : null,
-      min_booking_minutes: hasTimeSlots ? parseInt(minBooking, 10) : null,
-      max_booking_minutes: hasTimeSlots ? parseInt(maxBooking, 10) : null,
-      blocked_days: reservable ? blockedDays : [],
-      fee: feeCents,
-      deposit: depositCents,
-      requires_payment: reservable ? requiresPayment : false,
-      auto_approve: reservable ? autoApprove : true,
-    };
+      const hasTimeSlots = reservable && bookingType !== 'full_day';
 
-    if (isEditing) {
-      const { error } = await supabase
-        .from('amenities')
-        .update(payload)
-        .eq('id', editingAmenity.id);
+      const payload = {
+        name: trimmedName,
+        icon: icon || null,
+        public_description: publicDescription.trim() || null,
+        description: description.trim() || null,
+        capacity: capacityNum,
+        operating_hours: hoursToRecord(hours),
+        rules_text: rulesText.trim() || null,
+        active,
+        reservable,
+        booking_type: reservable ? bookingType : 'full_day',
+        slot_duration_minutes: hasTimeSlots ? 30 : null,
+        min_booking_minutes: hasTimeSlots ? parseInt(minBooking, 10) : null,
+        max_booking_minutes: hasTimeSlots ? parseInt(maxBooking, 10) : null,
+        blocked_days: reservable ? blockedDays : [],
+        fee: feeCents,
+        deposit: depositCents,
+        requires_payment: reservable ? requiresPayment : false,
+        auto_approve: reservable ? autoApprove : true,
+      };
 
-      setSubmitting(false);
+      if (isEditing) {
+        const { error } = await supabase
+          .from('amenities')
+          .update(payload)
+          .eq('id', editingAmenity.id);
 
-      if (error) {
-        console.error('Amenity update error:', error);
-        toast.error(`Failed to update amenity: ${error.message}`);
-        return;
+        setSubmitting(false);
+
+        if (error) {
+          console.error('Amenity update error:', error);
+          toast.error(`Failed to update amenity: ${error.message}`);
+          return;
+        }
+
+        toast.success('Amenity updated.');
+      } else {
+        const { error } = await supabase.from('amenities').insert({
+          ...payload,
+          community_id: communityId,
+        });
+
+        setSubmitting(false);
+
+        if (error) {
+          console.error('Amenity create error:', error);
+          toast.error(`Failed to create amenity: ${error.message}`);
+          return;
+        }
+
+        toast.success('Amenity created.');
       }
 
-      toast.success('Amenity updated.');
-    } else {
-      const { error } = await supabase.from('amenities').insert({
-        ...payload,
-        community_id: communityId,
-      });
-
+      formTouched.current = false;
+      resetForm();
+      onOpenChange(false);
+      onSuccess();
+    } catch (err) {
       setSubmitting(false);
-
-      if (error) {
-        console.error('Amenity create error:', error);
-        toast.error(`Failed to create amenity: ${error.message}`);
-        return;
-      }
-
-      toast.success('Amenity created.');
+      console.error('Amenity submit error:', err);
+      toast.error('An unexpected error occurred. Check the browser console for details.');
     }
-
-    formTouched.current = false;
-    resetForm();
-    onOpenChange(false);
-    onSuccess();
   }
 
   return (
