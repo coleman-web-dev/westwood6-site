@@ -13,6 +13,7 @@ import {
   endOfMonth,
   addDays,
   subDays,
+  getDay,
 } from 'date-fns';
 import type { Amenity, BlockedDateRange } from '@/lib/types/database';
 
@@ -79,9 +80,20 @@ export function AmenityCalendar({
     return { blockedDays: blocked, eventDays: events, partialDays: partial };
   }, [blockedRanges, amenity.booking_type]);
 
-  // Disabled dates: past + fully blocked (for full_day type)
+  // Map day names to JS day indices (0=Sun, 1=Mon, ... 6=Sat)
+  const blockedDayIndices = useMemo(() => {
+    const dayMap: Record<string, number> = {
+      sunday: 0, monday: 1, tuesday: 2, wednesday: 3,
+      thursday: 4, friday: 5, saturday: 6,
+    };
+    return (amenity.blocked_days ?? [])
+      .map((d) => dayMap[d])
+      .filter((i) => i !== undefined);
+  }, [amenity.blocked_days]);
+
+  // Disabled dates: past + fully blocked + blocked days of week
   const disabledDates = useMemo(() => {
-    const matchers: Array<Date | { before: Date }> = [
+    const matchers: Array<Date | { before: Date } | ((date: Date) => boolean)> = [
       { before: today },
     ];
 
@@ -89,8 +101,13 @@ export function AmenityCalendar({
       matchers.push(...blockedDays);
     }
 
+    // Block specific days of the week
+    if (blockedDayIndices.length > 0) {
+      matchers.push((date: Date) => blockedDayIndices.includes(getDay(date)));
+    }
+
     return matchers;
-  }, [today, blockedDays, amenity.booking_type]);
+  }, [today, blockedDays, amenity.booking_type, blockedDayIndices]);
 
   return (
     <div className="relative">

@@ -166,6 +166,7 @@ export interface Amenity {
   requires_payment: boolean;
   booking_type: BookingType;
   slot_duration_minutes: number | null;
+  blocked_days: string[];
   active: boolean;
   created_at: string;
 }

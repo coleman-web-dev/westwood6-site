@@ -114,6 +114,7 @@ export function AmenityDialog({
   const [deposit, setDeposit] = useState('');
   const [requiresPayment, setRequiresPayment] = useState(false);
   const [autoApprove, setAutoApprove] = useState(true);
+  const [blockedDays, setBlockedDays] = useState<string[]>([]);
   const [rulesText, setRulesText] = useState('');
   const [active, setActive] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -131,6 +132,7 @@ export function AmenityDialog({
       setDeposit(editingAmenity.deposit ? (editingAmenity.deposit / 100).toFixed(2) : '');
       setRequiresPayment(editingAmenity.requires_payment);
       setAutoApprove(editingAmenity.auto_approve);
+      setBlockedDays(editingAmenity.blocked_days ?? []);
       setRulesText(editingAmenity.rules_text ?? '');
       setActive(editingAmenity.active);
     } else {
@@ -149,6 +151,7 @@ export function AmenityDialog({
     setDeposit('');
     setRequiresPayment(false);
     setAutoApprove(true);
+    setBlockedDays([]);
     setRulesText('');
     setActive(true);
   }
@@ -202,6 +205,7 @@ export function AmenityDialog({
       deposit: depositCents,
       requires_payment: requiresPayment,
       auto_approve: autoApprove,
+      blocked_days: blockedDays,
       rules_text: rulesText.trim() || null,
       active,
     };
@@ -376,6 +380,44 @@ export function AmenityDialog({
               </div>
             </CollapsibleContent>
           </Collapsible>
+
+          {/* Blocked days of the week */}
+          <div className="space-y-1.5">
+            <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+              Blocked days
+              <span className="ml-1 text-text-muted-light dark:text-text-muted-dark font-normal">
+                (optional)
+              </span>
+            </label>
+            <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+              Select days when this amenity cannot be reserved.
+            </p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              {DAYS.map((d) => {
+                const isBlocked = blockedDays.includes(d.key);
+                return (
+                  <button
+                    key={d.key}
+                    type="button"
+                    onClick={() =>
+                      setBlockedDays((prev) =>
+                        isBlocked
+                          ? prev.filter((day) => day !== d.key)
+                          : [...prev, d.key],
+                      )
+                    }
+                    className={`px-3 py-1.5 rounded-pill text-body border transition-colors ${
+                      isBlocked
+                        ? 'bg-primary-200 dark:bg-primary-700 border-primary-300 dark:border-primary-600 text-text-primary-light dark:text-text-primary-dark'
+                        : 'bg-surface-light dark:bg-surface-dark border-stroke-light dark:border-stroke-dark text-text-muted-light dark:text-text-muted-dark hover:border-primary-300 dark:hover:border-primary-600'
+                    }`}
+                  >
+                    {d.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           {/* Capacity */}
           <div className="space-y-1.5">
