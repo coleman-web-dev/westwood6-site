@@ -97,7 +97,7 @@ export default function DashboardPage() {
             const CardComponent = CARD_COMPONENTS[cardId];
             if (!CardComponent) return null;
             return (
-              <div key={cardId} className="h-full overflow-hidden">
+              <div key={cardId} className="h-full">
                 <CardComponent />
               </div>
             );
