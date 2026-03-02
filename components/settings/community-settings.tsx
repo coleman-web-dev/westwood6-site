@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Button } from '@/components/shared/ui/button';
@@ -14,7 +14,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/shared/ui/select';
+import { Collapsible, CollapsibleContent } from '@/components/shared/ui/collapsible';
 import { toast } from 'sonner';
+import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes';
+import { UnsavedChangesDialog } from '@/components/settings/unsaved-changes-dialog';
 import type { PaymentFrequency } from '@/lib/types/database';
 
 export function CommunitySettings() {
@@ -47,6 +50,27 @@ export function CommunitySettings() {
       setDefaultFrequency(community.theme?.payment_settings?.default_frequency ?? 'quarterly');
     }
   }, [community]);
+
+  const isDirty = useMemo(() => {
+    if (!community) return false;
+    return (
+      name !== community.name ||
+      address !== (community.address ?? '') ||
+      phone !== (community.phone ?? '') ||
+      email !== (community.email ?? '') ||
+      canReserveAmenities !== (community.tenant_permissions?.can_reserve_amenities ?? false) ||
+      canAttendEvents !== (community.tenant_permissions?.can_attend_events ?? false) ||
+      canSubmitRequests !== (community.tenant_permissions?.can_submit_requests ?? false) ||
+      canViewDirectory !== (community.tenant_permissions?.can_view_directory ?? false) ||
+      allowFlexibleFrequency !== (community.theme?.payment_settings?.allow_flexible_frequency ?? false) ||
+      defaultFrequency !== (community.theme?.payment_settings?.default_frequency ?? 'quarterly')
+    );
+  }, [
+    name, address, phone, email,
+    canReserveAmenities, canAttendEvents, canSubmitRequests, canViewDirectory,
+    allowFlexibleFrequency, defaultFrequency,
+    community,
+  ]);
 
   async function handleSave() {
     if (!community) return;
@@ -93,6 +117,8 @@ export function CommunitySettings() {
 
     toast.success('Community settings updated.');
   }
+
+  const unsaved = useUnsavedChanges({ isDirty, onSave: handleSave });
 
   return (
     <div className="space-y-6">
@@ -272,29 +298,33 @@ export function CommunitySettings() {
             />
           </div>
 
-          <div className="border-t border-stroke-light dark:border-stroke-dark" />
+          <Collapsible open={allowFlexibleFrequency}>
+            <CollapsibleContent className="overflow-hidden transition-all data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+              <div className="border-t border-stroke-light dark:border-stroke-dark mt-4" />
 
-          <div className="space-y-1.5">
-            <label className="text-body text-text-primary-light dark:text-text-primary-dark">
-              Default payment frequency
-            </label>
-            <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-              Used when generating invoices for units that have not chosen a preference
-            </p>
-            <div className="max-w-xs mt-2">
-              <Select value={defaultFrequency} onValueChange={(v) => setDefaultFrequency(v as PaymentFrequency)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                  <SelectItem value="quarterly">Quarterly</SelectItem>
-                  <SelectItem value="semi_annual">Semi-Annual</SelectItem>
-                  <SelectItem value="annual">Annual</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+              <div className="space-y-1.5 pt-4">
+                <label className="text-body text-text-primary-light dark:text-text-primary-dark">
+                  Default payment frequency
+                </label>
+                <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                  Used when generating invoices for units that have not chosen a preference
+                </p>
+                <div className="max-w-xs mt-2">
+                  <Select value={defaultFrequency} onValueChange={(v) => setDefaultFrequency(v as PaymentFrequency)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="quarterly">Quarterly</SelectItem>
+                      <SelectItem value="semi_annual">Semi-Annual</SelectItem>
+                      <SelectItem value="annual">Annual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         </div>
       </div>
 
@@ -304,6 +334,8 @@ export function CommunitySettings() {
           {saving ? 'Saving...' : 'Save Changes'}
         </Button>
       </div>
+
+      <UnsavedChangesDialog {...unsaved} />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Button } from '@/components/shared/ui/button';
@@ -8,6 +8,8 @@ import { Input } from '@/components/shared/ui/input';
 import { Label } from '@/components/shared/ui/label';
 import { Switch } from '@/components/shared/ui/switch';
 import { toast } from 'sonner';
+import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes';
+import { UnsavedChangesDialog } from '@/components/settings/unsaved-changes-dialog';
 
 export function ProfileSettings() {
   const { member } = useCommunity();
@@ -29,6 +31,17 @@ export function ProfileSettings() {
       setShowInDirectory(member.show_in_directory);
     }
   }, [member]);
+
+  const isDirty = useMemo(() => {
+    if (!member) return false;
+    return (
+      firstName !== member.first_name ||
+      lastName !== member.last_name ||
+      email !== (member.email ?? '') ||
+      phone !== (member.phone ?? '') ||
+      showInDirectory !== member.show_in_directory
+    );
+  }, [firstName, lastName, email, phone, showInDirectory, member]);
 
   async function handleSave() {
     if (!member) return;
@@ -64,6 +77,8 @@ export function ProfileSettings() {
 
     toast.success('Profile updated.');
   }
+
+  const unsaved = useUnsavedChanges({ isDirty, onSave: handleSave });
 
   if (!member) return null;
 
@@ -159,6 +174,8 @@ export function ProfileSettings() {
           </Button>
         </div>
       </div>
+
+      <UnsavedChangesDialog {...unsaved} />
     </div>
   );
 }

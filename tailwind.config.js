@@ -242,6 +242,14 @@ module.exports = {
           from: { height: 'var(--radix-accordion-content-height)' },
           to: { height: 0 },
         },
+        'collapsible-down': {
+          from: { height: '0' },
+          to: { height: 'var(--radix-collapsible-content-height)' },
+        },
+        'collapsible-up': {
+          from: { height: 'var(--radix-collapsible-content-height)' },
+          to: { height: '0' },
+        },
         'fade-in-down': {
           '0%': {
             opacity: '0',
@@ -284,6 +292,8 @@ module.exports = {
         tilt: 'tilt 10s linear infinite',
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
+        'collapsible-down': 'collapsible-down 0.2s ease-out',
+        'collapsible-up': 'collapsible-up 0.2s ease-out',
         wiggle: 'wiggle 1s ease-in-out infinite',
         'fade-in-down-snail': 'fade-in-down 5s ease-in forwards',
         'fade-in-down-slower': 'fade-in-down 1.2s ease-in-out forwards',
