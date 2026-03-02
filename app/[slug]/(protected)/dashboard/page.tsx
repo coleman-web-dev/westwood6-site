@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import { ResponsiveGridLayout, useContainerWidth } from 'react-grid-layout';
-import type { Layout, ResponsiveLayouts } from 'react-grid-layout';
+import type { Layout, LayoutItem, ResponsiveLayouts } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 
 import { useCommunity } from '@/lib/providers/community-provider';
@@ -23,7 +23,7 @@ type GridBreakpoint = keyof typeof GRID_BREAKPOINTS;
 
 function generateDefaultLayouts(cards: DashboardCardId[]): ResponsiveLayouts<GridBreakpoint> {
   // Build lg layout: 2-column grid, track cumulative row heights
-  const lg: Layout[] = [];
+  const lg: LayoutItem[] = [];
   let lgY = 0;
   for (let i = 0; i < cards.length; i += 2) {
     const left = CARD_REGISTRY[cards[i]];
@@ -56,7 +56,7 @@ function generateDefaultLayouts(cards: DashboardCardId[]): ResponsiveLayouts<Gri
   }
 
   // Build sm layout: single column, stack vertically
-  const sm: Layout[] = [];
+  const sm: LayoutItem[] = [];
   let smY = 0;
   for (const cardId of cards) {
     const config = CARD_REGISTRY[cardId];
