@@ -78,4 +78,13 @@ export const CARD_REGISTRY: Record<DashboardCardId, DashboardCardConfig> = {
     defaultW: 6,
     defaultH: 5,
   },
+  'amenity-calendar': {
+    id: 'amenity-calendar',
+    title: 'Amenity Calendar',
+    icon: 'CalendarDays',
+    minW: 3,
+    minH: 7,
+    defaultW: 6,
+    defaultH: 10,
+  },
 };
