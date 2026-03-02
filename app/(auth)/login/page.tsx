@@ -4,17 +4,6 @@ import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { Button } from '@/components/shared/ui/button';
-import { Input } from '@/components/shared/ui/input';
-import { Label } from '@/components/shared/ui/label';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/shared/ui/card';
 
 export default function LoginPage() {
   return (
@@ -50,7 +39,6 @@ function LoginForm() {
       return;
     }
 
-    // Look up the user's community to redirect to their dashboard
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -77,7 +65,6 @@ function LoginForm() {
       }
     }
 
-    // No approved membership found
     setError(
       'Your account is pending approval. You will be notified when access is granted.',
     );
@@ -85,67 +72,86 @@ function LoginForm() {
   }
 
   return (
-    <Card>
-      <CardHeader className="text-center">
-        <CardTitle className="text-2xl">Welcome back</CardTitle>
-        <CardDescription>Sign in to your household account</CardDescription>
-      </CardHeader>
+    <div className="rounded-panel p-card-padding bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark surface-elevation">
+      <div className="text-center mb-6">
+        <h1 className="text-page-title text-text-primary-light dark:text-text-primary-dark">
+          Welcome back
+        </h1>
+        <p className="text-body text-text-muted-light dark:text-text-muted-dark mt-1">
+          Sign in to your household account
+        </p>
+      </div>
 
-      <form onSubmit={handleLogin}>
-        <CardContent className="space-y-4">
-          {error && (
-            <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
-              {error}
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-            />
+      <form onSubmit={handleLogin} className="space-y-4">
+        {error && (
+          <div className="rounded-inner-card bg-surface-light-2 dark:bg-surface-dark-2 border border-warning-dot/20 p-3 text-body text-warning-dot">
+            {error}
           </div>
+        )}
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password">Password</Label>
-              <Link
-                href="/reset-password"
-                className="text-sm text-text-secondary-light hover:underline dark:text-text-secondary-dark"
-              >
-                Forgot password?
-              </Link>
-            </div>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-            />
-          </div>
-        </CardContent>
+        <div>
+          <label
+            htmlFor="email"
+            className="text-label text-text-secondary-light dark:text-text-secondary-dark block mb-1.5"
+          >
+            Email
+          </label>
+          <input
+            id="email"
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoComplete="email"
+            className="w-full h-10 px-3 rounded-pill bg-surface-light-2 dark:bg-surface-dark-2 border border-stroke-light dark:border-stroke-dark text-body text-text-primary-light dark:text-text-primary-dark placeholder:text-text-muted-light dark:placeholder:text-text-muted-dark focus:outline-none focus:ring-2 focus:ring-secondary-400/30 transition-all"
+          />
+        </div>
 
-        <CardFooter className="flex flex-col gap-4">
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Signing in...' : 'Sign in'}
-          </Button>
-
-          <p className="text-center text-sm text-text-secondary-light dark:text-text-secondary-dark">
-            Need an account?{' '}
-            <Link href="/signup" className="font-medium hover:underline">
-              Request access
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label
+              htmlFor="password"
+              className="text-label text-text-secondary-light dark:text-text-secondary-dark"
+            >
+              Password
+            </label>
+            <Link
+              href="/reset-password"
+              className="text-meta text-secondary-500 dark:text-secondary-400 hover:text-secondary-600 dark:hover:text-secondary-300 transition-colors"
+            >
+              Forgot password?
             </Link>
-          </p>
-        </CardFooter>
+          </div>
+          <input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            autoComplete="current-password"
+            className="w-full h-10 px-3 rounded-pill bg-surface-light-2 dark:bg-surface-dark-2 border border-stroke-light dark:border-stroke-dark text-body text-text-primary-light dark:text-text-primary-dark focus:outline-none focus:ring-2 focus:ring-secondary-400/30 transition-all"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full h-10 rounded-pill bg-secondary-400 text-label font-semibold text-primary-900 hover:bg-secondary-300 active:bg-secondary-500 focus:outline-none focus:ring-2 focus:ring-secondary-300/40 transition-all shadow-lg shadow-secondary-400/20 disabled:opacity-50 disabled:pointer-events-none"
+        >
+          {loading ? 'Signing in...' : 'Sign in'}
+        </button>
+
+        <p className="text-center text-meta text-text-muted-light dark:text-text-muted-dark">
+          Need an account?{' '}
+          <Link
+            href="/signup"
+            className="text-secondary-500 dark:text-secondary-400 hover:text-secondary-600 dark:hover:text-secondary-300 font-medium transition-colors"
+          >
+            Request access
+          </Link>
+        </p>
       </form>
-    </Card>
+    </div>
   );
 }

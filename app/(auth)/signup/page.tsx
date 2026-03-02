@@ -4,17 +4,6 @@ import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { Button } from '@/components/shared/ui/button';
-import { Input } from '@/components/shared/ui/input';
-import { Label } from '@/components/shared/ui/label';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/shared/ui/card';
 
 export default function SignupPage() {
   return (
@@ -45,7 +34,6 @@ function SignupForm() {
 
     const supabase = createClient();
 
-    // Look up the community by slug
     const { data: community, error: communityError } = await supabase
       .from('communities')
       .select('id')
@@ -60,7 +48,6 @@ function SignupForm() {
       return;
     }
 
-    // Create the auth account
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -72,7 +59,6 @@ function SignupForm() {
       return;
     }
 
-    // Create a signup request for board approval
     const { error: requestError } = await supabase
       .from('signup_requests')
       .insert({
@@ -97,142 +83,176 @@ function SignupForm() {
 
   if (success) {
     return (
-      <Card>
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Request submitted</CardTitle>
-          <CardDescription>
+      <div className="rounded-panel p-card-padding bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark surface-elevation">
+        <div className="text-center mb-6">
+          <h1 className="text-page-title text-text-primary-light dark:text-text-primary-dark">
+            Request submitted
+          </h1>
+          <p className="text-body text-text-muted-light dark:text-text-muted-dark mt-2">
             Your request has been sent to the community board for review. You
             will receive an email once your account is approved.
-          </CardDescription>
-        </CardHeader>
-        <CardFooter className="justify-center">
-          <Link href="/login">
-            <Button variant="outline">Back to login</Button>
+          </p>
+        </div>
+        <div className="flex justify-center">
+          <Link
+            href="/login"
+            className="h-10 px-8 rounded-pill border border-stroke-light dark:border-stroke-dark text-label text-secondary-500 dark:text-secondary-400 hover:bg-secondary-50 dark:hover:bg-surface-dark-2 transition-colors inline-flex items-center justify-center"
+          >
+            Back to login
           </Link>
-        </CardFooter>
-      </Card>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Card>
-      <CardHeader className="text-center">
-        <CardTitle className="text-2xl">Request access</CardTitle>
-        <CardDescription>
+    <div className="rounded-panel p-card-padding bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark surface-elevation">
+      <div className="text-center mb-6">
+        <h1 className="text-page-title text-text-primary-light dark:text-text-primary-dark">
+          Request access
+        </h1>
+        <p className="text-body text-text-muted-light dark:text-text-muted-dark mt-1">
           Submit your information for board approval
-        </CardDescription>
-      </CardHeader>
+        </p>
+      </div>
 
-      <form onSubmit={handleSignup}>
-        <CardContent className="space-y-4">
-          {error && (
-            <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
-              {error}
-            </div>
-          )}
-
-          {!communitySlug && (
-            <div className="rounded-md bg-yellow-50 p-3 text-sm text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300">
-              No community specified. Please use the signup link provided by
-              your HOA.
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="firstName">First name</Label>
-              <Input
-                id="firstName"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Last name</Label>
-              <Input
-                id="lastName"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                required
-              />
-            </div>
+      <form onSubmit={handleSignup} className="space-y-4">
+        {error && (
+          <div className="rounded-inner-card bg-surface-light-2 dark:bg-surface-dark-2 border border-warning-dot/20 p-3 text-body text-warning-dot">
+            {error}
           </div>
+        )}
 
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+        {!communitySlug && (
+          <div className="rounded-inner-card bg-surface-light-2 dark:bg-surface-dark-2 border border-secondary-400/20 p-3 text-body text-secondary-500 dark:text-secondary-400">
+            No community specified. Please use the signup link provided by
+            your HOA.
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-grid-gap">
+          <div>
+            <label
+              htmlFor="firstName"
+              className="text-label text-text-secondary-light dark:text-text-secondary-dark block mb-1.5"
+            >
+              First name
+            </label>
+            <input
+              id="firstName"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
               required
-              autoComplete="email"
+              className="w-full h-10 px-3 rounded-pill bg-surface-light-2 dark:bg-surface-dark-2 border border-stroke-light dark:border-stroke-dark text-body text-text-primary-light dark:text-text-primary-dark focus:outline-none focus:ring-2 focus:ring-secondary-400/30 transition-all"
             />
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+          <div>
+            <label
+              htmlFor="lastName"
+              className="text-label text-text-secondary-light dark:text-text-secondary-dark block mb-1.5"
+            >
+              Last name
+            </label>
+            <input
+              id="lastName"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
               required
-              minLength={8}
-              autoComplete="new-password"
+              className="w-full h-10 px-3 rounded-pill bg-surface-light-2 dark:bg-surface-dark-2 border border-stroke-light dark:border-stroke-dark text-body text-text-primary-light dark:text-text-primary-dark focus:outline-none focus:ring-2 focus:ring-secondary-400/30 transition-all"
             />
           </div>
+        </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="unitNumber">
-              Unit / address number{' '}
-              <span className="text-text-muted-light dark:text-text-muted-dark">
-                (optional)
-              </span>
-            </Label>
-            <Input
-              id="unitNumber"
-              value={unitNumber}
-              onChange={(e) => setUnitNumber(e.target.value)}
-              placeholder="e.g. 204, Lot 12, 123 Oak St"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="phone">
-              Phone{' '}
-              <span className="text-text-muted-light dark:text-text-muted-dark">
-                (optional)
-              </span>
-            </Label>
-            <Input
-              id="phone"
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-            />
-          </div>
-        </CardContent>
-
-        <CardFooter className="flex flex-col gap-4">
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={loading || !communitySlug}
+        <div>
+          <label
+            htmlFor="email"
+            className="text-label text-text-secondary-light dark:text-text-secondary-dark block mb-1.5"
           >
-            {loading ? 'Submitting...' : 'Submit request'}
-          </Button>
+            Email
+          </label>
+          <input
+            id="email"
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoComplete="email"
+            className="w-full h-10 px-3 rounded-pill bg-surface-light-2 dark:bg-surface-dark-2 border border-stroke-light dark:border-stroke-dark text-body text-text-primary-light dark:text-text-primary-dark placeholder:text-text-muted-light dark:placeholder:text-text-muted-dark focus:outline-none focus:ring-2 focus:ring-secondary-400/30 transition-all"
+          />
+        </div>
 
-          <p className="text-center text-sm text-text-secondary-light dark:text-text-secondary-dark">
-            Already have an account?{' '}
-            <Link href="/login" className="font-medium hover:underline">
-              Sign in
-            </Link>
-          </p>
-        </CardFooter>
+        <div>
+          <label
+            htmlFor="password"
+            className="text-label text-text-secondary-light dark:text-text-secondary-dark block mb-1.5"
+          >
+            Password
+          </label>
+          <input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={8}
+            autoComplete="new-password"
+            className="w-full h-10 px-3 rounded-pill bg-surface-light-2 dark:bg-surface-dark-2 border border-stroke-light dark:border-stroke-dark text-body text-text-primary-light dark:text-text-primary-dark focus:outline-none focus:ring-2 focus:ring-secondary-400/30 transition-all"
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="unitNumber"
+            className="text-label text-text-secondary-light dark:text-text-secondary-dark block mb-1.5"
+          >
+            Unit / address number{' '}
+            <span className="text-text-muted-light dark:text-text-muted-dark">(optional)</span>
+          </label>
+          <input
+            id="unitNumber"
+            value={unitNumber}
+            onChange={(e) => setUnitNumber(e.target.value)}
+            placeholder="e.g. 204, Lot 12, 123 Oak St"
+            className="w-full h-10 px-3 rounded-pill bg-surface-light-2 dark:bg-surface-dark-2 border border-stroke-light dark:border-stroke-dark text-body text-text-primary-light dark:text-text-primary-dark placeholder:text-text-muted-light dark:placeholder:text-text-muted-dark focus:outline-none focus:ring-2 focus:ring-secondary-400/30 transition-all"
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="phone"
+            className="text-label text-text-secondary-light dark:text-text-secondary-dark block mb-1.5"
+          >
+            Phone{' '}
+            <span className="text-text-muted-light dark:text-text-muted-dark">(optional)</span>
+          </label>
+          <input
+            id="phone"
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="w-full h-10 px-3 rounded-pill bg-surface-light-2 dark:bg-surface-dark-2 border border-stroke-light dark:border-stroke-dark text-body text-text-primary-light dark:text-text-primary-dark focus:outline-none focus:ring-2 focus:ring-secondary-400/30 transition-all"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading || !communitySlug}
+          className="w-full h-10 rounded-pill bg-secondary-400 text-label font-semibold text-primary-900 hover:bg-secondary-300 active:bg-secondary-500 focus:outline-none focus:ring-2 focus:ring-secondary-300/40 transition-all shadow-lg shadow-secondary-400/20 disabled:opacity-50 disabled:pointer-events-none"
+        >
+          {loading ? 'Submitting...' : 'Submit request'}
+        </button>
+
+        <p className="text-center text-meta text-text-muted-light dark:text-text-muted-dark">
+          Already have an account?{' '}
+          <Link
+            href="/login"
+            className="text-secondary-500 dark:text-secondary-400 hover:text-secondary-600 dark:hover:text-secondary-300 font-medium transition-colors"
+          >
+            Sign in
+          </Link>
+        </p>
       </form>
-    </Card>
+    </div>
   );
 }
