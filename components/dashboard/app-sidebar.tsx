@@ -59,7 +59,6 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
         w-sidebar flex flex-col items-center
         py-4 gap-3.5
         bg-surface-light dark:bg-surface-dark
-        border-r border-stroke-light dark:border-stroke-dark
         transform transition-transform duration-300
         ${open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}
