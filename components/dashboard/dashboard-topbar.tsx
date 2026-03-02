@@ -17,7 +17,7 @@ export function DashboardTopbar({ onMenuClick }: DashboardTopbarProps) {
     .toUpperCase();
 
   return (
-    <header className="sticky top-0 z-30 h-topbar flex items-center gap-2 sm:gap-4 px-3 sm:px-app-padding border-b border-stroke-light dark:border-stroke-dark bg-canvas-light/80 dark:bg-canvas-dark/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-30 h-topbar flex items-center gap-2 sm:gap-4 px-3 sm:px-app-padding border-b border-stroke-light dark:border-stroke-dark bg-canvas-light/80 dark:bg-canvas-dark/80 backdrop-blur-xl rounded-tl-app-frame">
       {/* Mobile hamburger */}
       <button
         onClick={onMenuClick}
