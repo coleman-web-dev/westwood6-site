@@ -34,11 +34,11 @@ export default function ProtectedLayout({
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="bg-canvas-light dark:bg-canvas-dark">
         <DashboardTopbar />
-        <main className="flex-1 p-app-padding">
+        <div className="flex-1 p-app-padding">
           {children}
-        </main>
+        </div>
       </SidebarInset>
     </SidebarProvider>
   );

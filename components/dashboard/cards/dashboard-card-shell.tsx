@@ -11,17 +11,19 @@ interface DashboardCardShellProps {
 
 export function DashboardCardShell({ title, icon, children }: DashboardCardShellProps) {
   return (
-    <Card className="h-full overflow-hidden rounded-inner-card shadow-surface-light dark:shadow-surface-dark">
-      <CardHeader className="flex flex-row items-center gap-2 p-card-padding pb-2">
-        <div className="cursor-grab active:cursor-grabbing">
-          <GripVertical className="h-4 w-4 text-text-muted-light dark:text-text-muted-dark" />
+    <Card className="h-full overflow-hidden rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark surface-elevation">
+      <CardHeader className="flex flex-row items-center gap-3 p-card-padding pb-3">
+        <div className="cursor-grab active:cursor-grabbing text-text-muted-light dark:text-text-muted-dark hover:text-text-secondary-light dark:hover:text-text-secondary-dark transition-colors">
+          <GripVertical className="h-3.5 w-3.5" />
         </div>
-        <div className="flex items-center gap-2">
-          {icon}
-          <CardTitle className="text-card-title">{title}</CardTitle>
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-icon-glow">
+            {icon}
+          </div>
+          <CardTitle className="text-card-title text-text-primary-light dark:text-text-primary-dark">{title}</CardTitle>
         </div>
       </CardHeader>
-      <CardContent className="p-card-padding pt-0">
+      <CardContent className="px-card-padding pb-card-padding pt-0">
         {children}
       </CardContent>
     </Card>
