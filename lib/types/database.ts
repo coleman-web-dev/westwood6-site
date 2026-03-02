@@ -138,6 +138,7 @@ export interface Invoice {
   notes: string | null;
   bounced_from_invoice_id: string | null;
   assessment_id: string | null;
+  amount_paid: number;
   created_at: string;
 }
 
@@ -199,6 +200,7 @@ export interface Reservation {
   deposit_amount: number;
   stripe_payment_id: string | null;
   deposit_refunded: boolean;
+  deposit_return_method: 'check' | 'wallet' | null;
   deposit_paid: boolean;
   deposit_paid_at: string | null;
   admin_notes: string | null;
@@ -220,7 +222,7 @@ export interface Event {
   created_at: string;
 }
 
-export type WalletTransactionType = 'overpayment' | 'manual_credit' | 'manual_debit' | 'payment_applied' | 'refund' | 'bounced_reversal';
+export type WalletTransactionType = 'overpayment' | 'manual_credit' | 'manual_debit' | 'payment_applied' | 'refund' | 'bounced_reversal' | 'deposit_return';
 
 export interface UnitWallet {
   id: string;

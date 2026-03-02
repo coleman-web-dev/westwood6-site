@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Badge } from '@/components/shared/ui/badge';
 import { Button } from '@/components/shared/ui/button';
+import { DepositReturnDialog } from '@/components/amenities/deposit-return-dialog';
 import { toast } from 'sonner';
 import type { Reservation, ReservationStatus } from '@/lib/types/database';
 
@@ -14,7 +15,10 @@ interface MyReservationsProps {
   refreshKey: number;
 }
 
-type ReservationWithAmenity = Reservation & { amenities: { name: string } };
+type ReservationWithAmenity = Reservation & {
+  amenities: { name: string };
+  units: { unit_number: string };
+};
 
 const STATUS_BADGE: Record<ReservationStatus, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
   pending: { variant: 'outline', label: 'Pending' },
@@ -27,6 +31,8 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
   const { community, unit, isBoard } = useCommunity();
   const [reservations, setReservations] = useState<ReservationWithAmenity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [returningReservation, setReturningReservation] = useState<ReservationWithAmenity | null>(null);
+  const [unitOwnerMap, setUnitOwnerMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!unit && !isBoard) {
@@ -39,7 +45,7 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
     async function fetch() {
       let query = supabase
         .from('reservations')
-        .select('*, amenities(name)')
+        .select('*, amenities(name), units(unit_number)')
         .order('start_datetime', { ascending: false })
         .limit(20);
 
@@ -55,6 +61,23 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
 
       const { data } = await query;
       setReservations((data as ReservationWithAmenity[]) ?? []);
+
+      // Load unit owners for deposit return dialog (board only)
+      if (isBoard) {
+        const { data: owners } = await supabase
+          .from('members')
+          .select('unit_id, first_name, last_name')
+          .eq('community_id', community.id)
+          .eq('member_role', 'owner')
+          .is('parent_member_id', null);
+
+        const ownerMap: Record<string, string> = {};
+        for (const o of (owners ?? []) as { unit_id: string | null; first_name: string; last_name: string }[]) {
+          if (o.unit_id) ownerMap[o.unit_id] = `${o.first_name} ${o.last_name}`;
+        }
+        setUnitOwnerMap(ownerMap);
+      }
+
       setLoading(false);
     }
 
@@ -101,24 +124,28 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
     );
   }
 
-  async function handleDepositRefund(reservationId: string) {
+  function handleDepositReturnSuccess() {
+    // Refetch reservations to get updated deposit status
     const supabase = createClient();
-    const { error } = await supabase
+    let query = supabase
       .from('reservations')
-      .update({ deposit_refunded: true })
-      .eq('id', reservationId);
+      .select('*, amenities(name), units(unit_number)')
+      .order('start_datetime', { ascending: false })
+      .limit(20);
 
-    if (error) {
-      toast.error('Failed to refund deposit.');
-      return;
+    if (isBoard) {
+      query = query.eq('community_id', community.id);
+    } else if (unit) {
+      query = query.eq('unit_id', unit.id);
     }
 
-    toast.success('Deposit refunded.');
-    setReservations((prev) =>
-      prev.map((r) =>
-        r.id === reservationId ? { ...r, deposit_refunded: true } : r
-      )
-    );
+    if (amenityId) {
+      query = query.eq('amenity_id', amenityId);
+    }
+
+    query.then(({ data }) => {
+      setReservations((data as ReservationWithAmenity[]) ?? []);
+    });
   }
 
   if (loading) {
@@ -176,7 +203,9 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
                   <span className="ml-2">
                     {r.deposit_paid
                       ? r.deposit_refunded
-                        ? '(deposit refunded)'
+                        ? r.deposit_return_method === 'wallet'
+                          ? '(deposit → wallet)'
+                          : '(deposit refunded)'
                         : '(deposit paid)'
                       : `(deposit: $${(r.deposit_amount / 100).toFixed(2)})`}
                   </span>
@@ -209,15 +238,24 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => handleDepositRefund(r.id)}
+                  onClick={() => setReturningReservation(r)}
                 >
-                  Refund Deposit
+                  Return Deposit
                 </Button>
               )}
             </div>
           </div>
         );
       })}
+
+      {/* Deposit return dialog */}
+      <DepositReturnDialog
+        reservation={returningReservation}
+        unitOwnerName={returningReservation ? unitOwnerMap[returningReservation.unit_id] ?? '' : ''}
+        open={returningReservation !== null}
+        onOpenChange={(open) => { if (!open) setReturningReservation(null); }}
+        onSuccess={handleDepositReturnSuccess}
+      />
     </div>
   );
 }

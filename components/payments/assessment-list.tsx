@@ -7,6 +7,7 @@ import { Button } from '@/components/shared/ui/button';
 import { Badge } from '@/components/shared/ui/badge';
 import { toast } from 'sonner';
 import { generateInvoicesForAssessment } from '@/lib/utils/generate-assessment-invoices';
+import { applyWalletToInvoiceBatch } from '@/lib/utils/apply-wallet-to-invoices';
 import type { Assessment, Unit, PaymentFrequency } from '@/lib/types/database';
 
 interface AssessmentListProps {
@@ -16,7 +17,7 @@ interface AssessmentListProps {
 }
 
 export function AssessmentList({ assessments, loading, onAssessmentUpdated }: AssessmentListProps) {
-  const { community } = useCommunity();
+  const { community, member } = useCommunity();
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
 
@@ -48,16 +49,35 @@ export function AssessmentList({ assessments, loading, onAssessmentUpdated }: As
       return;
     }
 
-    const { error } = await supabase.from('invoices').insert(invoices);
+    const { data: inserted, error } = await supabase
+      .from('invoices')
+      .insert(invoices)
+      .select('id, amount, unit_id, title');
 
-    setGeneratingId(null);
-
-    if (error) {
+    if (error || !inserted) {
+      setGeneratingId(null);
       toast.error('Failed to generate invoices. Please try again.');
       return;
     }
 
-    toast.success(`${invoices.length} invoices generated for ${units.length} units.`);
+    // Auto-apply wallet balances to new invoices
+    const walletResult = await applyWalletToInvoiceBatch(
+      supabase,
+      inserted as { id: string; amount: number; unit_id: string; title: string }[],
+      community.id,
+      member?.id ?? null
+    );
+
+    setGeneratingId(null);
+
+    if (walletResult.totalApplied > 0) {
+      const appliedDollars = (walletResult.totalApplied / 100).toFixed(2);
+      toast.success(
+        `${invoices.length} invoices generated for ${units.length} units. $${appliedDollars} applied from wallet credits (${walletResult.unitsAffected} unit${walletResult.unitsAffected !== 1 ? 's' : ''}).`
+      );
+    } else {
+      toast.success(`${invoices.length} invoices generated for ${units.length} units.`);
+    }
     onAssessmentUpdated();
   }
 

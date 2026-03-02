@@ -162,6 +162,7 @@ export function HouseholdLedger({ refreshKey }: HouseholdLedgerProps) {
     overpayment: { variant: 'secondary', label: 'Overpayment' },
     payment_applied: { variant: 'secondary', label: 'Applied' },
     refund: { variant: 'outline', label: 'Refund' },
+    deposit_return: { variant: 'secondary', label: 'Deposit Return' },
     bounced_reversal: { variant: 'destructive', label: 'Bounced' },
   };
 

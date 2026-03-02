@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
+import { applyWalletToInvoice } from '@/lib/utils/apply-wallet-to-invoices';
 import type { Unit } from '@/lib/types/database';
 
 interface CreateInvoiceDialogProps {
@@ -36,7 +37,7 @@ export function CreateInvoiceDialog({
   onOpenChange,
   onSuccess,
 }: CreateInvoiceDialogProps) {
-  const { community } = useCommunity();
+  const { community, member } = useCommunity();
   const [units, setUnits] = useState<Unit[]>([]);
   const [unitId, setUnitId] = useState('');
   const [title, setTitle] = useState('');
@@ -98,7 +99,7 @@ export function CreateInvoiceDialog({
     setSubmitting(true);
     const supabase = createClient();
 
-    const { error } = await supabase.from('invoices').insert({
+    const { data: inserted, error } = await supabase.from('invoices').insert({
       community_id: community.id,
       unit_id: unitId,
       title: title.trim(),
@@ -107,16 +108,37 @@ export function CreateInvoiceDialog({
       amount: amountCents,
       due_date: dueDate,
       status: 'pending',
-    });
+    }).select('id').single();
 
-    setSubmitting(false);
-
-    if (error) {
+    if (error || !inserted) {
+      setSubmitting(false);
       toast.error('Failed to create invoice. Please try again.');
       return;
     }
 
-    toast.success('Invoice created.');
+    // Auto-apply wallet balance
+    const result = await applyWalletToInvoice(
+      supabase,
+      inserted.id,
+      amountCents,
+      title.trim(),
+      unitId,
+      community.id,
+      member?.id ?? null
+    );
+
+    setSubmitting(false);
+
+    if (result.applied > 0) {
+      const appliedDollars = (result.applied / 100).toFixed(2);
+      if (result.invoiceStatus === 'paid') {
+        toast.success(`Invoice created and paid from household wallet ($${appliedDollars}).`);
+      } else {
+        toast.success(`Invoice created. $${appliedDollars} applied from household wallet.`);
+      }
+    } else {
+      toast.success('Invoice created.');
+    }
     resetForm();
     onOpenChange(false);
     onSuccess();

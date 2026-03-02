@@ -96,7 +96,7 @@ export function InvoiceList({
 
     const { error } = await supabase
       .from('invoices')
-      .update({ status: 'paid', paid_at: new Date().toISOString() })
+      .update({ status: 'paid', paid_at: new Date().toISOString(), amount_paid: invoice.amount })
       .eq('id', invoice.id);
 
     setUpdatingId(null);
@@ -351,6 +351,16 @@ export function InvoiceList({
                   <p className="text-metric-l tabular-nums text-text-primary-light dark:text-text-primary-dark">
                     ${(invoice.amount / 100).toFixed(2)}
                   </p>
+                  {invoice.amount_paid > 0 && invoice.status === 'partial' && (
+                    <p className="text-meta tabular-nums text-green-600 dark:text-green-400">
+                      ${(invoice.amount_paid / 100).toFixed(2)} paid
+                    </p>
+                  )}
+                  {invoice.amount_paid > 0 && invoice.status === 'partial' && (
+                    <p className="text-meta tabular-nums text-text-muted-light dark:text-text-muted-dark">
+                      ${((invoice.amount - invoice.amount_paid) / 100).toFixed(2)} remaining
+                    </p>
+                  )}
                 </div>
               </div>
 
