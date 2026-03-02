@@ -16,6 +16,7 @@ import {
 import { AmenityDialog } from '@/components/amenities/amenity-dialog';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { getAmenityIcon } from '@/lib/amenity-icons';
 import type { Amenity } from '@/lib/types/database';
 
 interface AmenityListProps {
@@ -134,6 +135,10 @@ export function AmenityList({ communityId }: AmenityListProps) {
               className="flex items-center justify-between gap-3 rounded-inner-card border border-stroke-light dark:border-stroke-dark px-dense-row-x py-dense-row-y"
             >
               <div className="flex items-center gap-2 min-w-0">
+                {(() => {
+                  const Icon = getAmenityIcon(amenity.icon);
+                  return Icon ? <Icon className="w-4 h-4 shrink-0 text-text-secondary-light dark:text-text-secondary-dark" /> : null;
+                })()}
                 <span className="text-body text-text-primary-light dark:text-text-primary-dark truncate">
                   {amenity.name}
                 </span>

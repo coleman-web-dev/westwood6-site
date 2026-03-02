@@ -17,6 +17,7 @@ import { useCommunity } from '@/lib/providers/community-provider';
 import { Calendar } from '@/components/shared/ui/calendar';
 import { DashboardCardShell } from './dashboard-card-shell';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
+import { getAmenityIcon } from '@/lib/amenity-icons';
 import type { Amenity, BlockedDateRange } from '@/lib/types/database';
 
 export function AmenityCalendarCard() {
@@ -150,7 +151,11 @@ export function AmenityCalendarCard() {
             >
               <ChevronLeftIcon className="w-4 h-4" />
             </button>
-            <span className="text-label font-medium text-text-primary-light dark:text-text-primary-dark truncate">
+            <span className="text-label font-medium text-text-primary-light dark:text-text-primary-dark truncate flex items-center gap-1.5">
+              {(() => {
+                const Icon = selectedAmenity ? getAmenityIcon(selectedAmenity.icon) : null;
+                return Icon ? <Icon className="w-3.5 h-3.5 shrink-0" /> : null;
+              })()}
               {selectedAmenity?.name}
             </span>
             <button

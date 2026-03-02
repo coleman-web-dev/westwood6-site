@@ -156,6 +156,7 @@ export interface Amenity {
   id: string;
   community_id: string;
   name: string;
+  icon: string | null;
   description: string | null;
   capacity: number | null;
   fee: number;

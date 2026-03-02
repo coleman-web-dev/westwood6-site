@@ -24,6 +24,7 @@ import {
 import { Switch } from '@/components/shared/ui/switch';
 import { Collapsible, CollapsibleContent } from '@/components/shared/ui/collapsible';
 import { toast } from 'sonner';
+import { AMENITY_ICON_LIST } from '@/lib/amenity-icons';
 import type { Amenity, BookingType } from '@/lib/types/database';
 
 interface AmenityDialogProps {
@@ -113,6 +114,7 @@ export function AmenityDialog({
   const isEditing = editingAmenity !== null;
 
   const [name, setName] = useState('');
+  const [icon, setIcon] = useState('');
   const [description, setDescription] = useState('');
   const [bookingType, setBookingType] = useState<BookingType>('full_day');
   const [slotDuration, setSlotDuration] = useState('60');
@@ -133,6 +135,7 @@ export function AmenityDialog({
   useEffect(() => {
     if (editingAmenity) {
       setName(editingAmenity.name);
+      setIcon(editingAmenity.icon ?? '');
       setDescription(editingAmenity.description ?? '');
       setBookingType(editingAmenity.booking_type);
       setSlotDuration(String(editingAmenity.slot_duration_minutes ?? 60));
@@ -154,6 +157,7 @@ export function AmenityDialog({
 
   function resetForm() {
     setName('');
+    setIcon('');
     setDescription('');
     setBookingType('full_day');
     setSlotDuration('60');
@@ -210,6 +214,7 @@ export function AmenityDialog({
 
     const payload = {
       name: trimmedName,
+      icon: icon || null,
       description: description.trim() || null,
       booking_type: bookingType,
       slot_duration_minutes: bookingType === 'time_slot' ? parseInt(slotDuration, 10) : null,
@@ -285,6 +290,37 @@ export function AmenityDialog({
               onChange={(e) => setName(e.target.value)}
               maxLength={100}
             />
+          </div>
+
+          {/* Icon picker */}
+          <div className="space-y-1.5">
+            <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+              Icon
+              <span className="ml-1 text-text-muted-light dark:text-text-muted-dark font-normal">
+                (optional)
+              </span>
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {AMENITY_ICON_LIST.map((item) => {
+                const Icon = item.icon;
+                const isSelected = icon === item.key;
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    title={item.label}
+                    onClick={() => setIcon(isSelected ? '' : item.key)}
+                    className={`w-9 h-9 flex items-center justify-center rounded-inner-card border transition-colors ${
+                      isSelected
+                        ? 'bg-secondary-400/15 border-secondary-400 text-secondary-500 dark:text-secondary-400'
+                        : 'bg-surface-light dark:bg-surface-dark border-stroke-light dark:border-stroke-dark text-text-muted-light dark:text-text-muted-dark hover:border-secondary-400/50 hover:text-text-primary-light dark:hover:text-text-primary-dark'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Description */}

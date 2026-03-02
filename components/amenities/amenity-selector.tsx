@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/shared/ui/select';
+import { getAmenityIcon } from '@/lib/amenity-icons';
 import type { Amenity } from '@/lib/types/database';
 
 interface AmenitySelectorProps {
@@ -67,22 +68,26 @@ export function AmenitySelector({ selectedId, onSelect }: AmenitySelectorProps) 
     <>
       {/* Desktop: pill tabs */}
       <div className="hidden sm:flex flex-wrap gap-2">
-        {amenities.map((amenity) => (
-          <button
-            key={amenity.id}
-            onClick={() => onSelect(amenity)}
-            className={`
-              px-4 h-9 rounded-pill text-label transition-colors
-              ${
-                selectedId === amenity.id
-                  ? 'bg-secondary-400/15 text-secondary-500 dark:text-secondary-400'
-                  : 'bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark text-text-secondary-light dark:text-text-secondary-dark hover:border-secondary-400/50'
-              }
-            `}
-          >
-            {amenity.name}
-          </button>
-        ))}
+        {amenities.map((amenity) => {
+          const Icon = getAmenityIcon(amenity.icon);
+          return (
+            <button
+              key={amenity.id}
+              onClick={() => onSelect(amenity)}
+              className={`
+                px-4 h-9 rounded-pill text-label transition-colors flex items-center gap-1.5
+                ${
+                  selectedId === amenity.id
+                    ? 'bg-secondary-400/15 text-secondary-500 dark:text-secondary-400'
+                    : 'bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark text-text-secondary-light dark:text-text-secondary-dark hover:border-secondary-400/50'
+                }
+              `}
+            >
+              {Icon && <Icon className="w-3.5 h-3.5" />}
+              {amenity.name}
+            </button>
+          );
+        })}
       </div>
 
       {/* Mobile: select dropdown */}
@@ -98,11 +103,17 @@ export function AmenitySelector({ selectedId, onSelect }: AmenitySelectorProps) 
             <SelectValue placeholder="Select an amenity" />
           </SelectTrigger>
           <SelectContent>
-            {amenities.map((amenity) => (
-              <SelectItem key={amenity.id} value={amenity.id}>
-                {amenity.name}
-              </SelectItem>
-            ))}
+            {amenities.map((amenity) => {
+              const Icon = getAmenityIcon(amenity.icon);
+              return (
+                <SelectItem key={amenity.id} value={amenity.id}>
+                  <span className="flex items-center gap-1.5">
+                    {Icon && <Icon className="w-3.5 h-3.5" />}
+                    {amenity.name}
+                  </span>
+                </SelectItem>
+              );
+            })}
           </SelectContent>
         </Select>
       </div>
