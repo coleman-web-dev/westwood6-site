@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import {
   Dialog,
@@ -11,6 +11,15 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/shared/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogCancel,
+} from '@/components/shared/ui/alert-dialog';
 import { Button } from '@/components/shared/ui/button';
 import { Input } from '@/components/shared/ui/input';
 import { Textarea } from '@/components/shared/ui/textarea';
@@ -139,6 +148,29 @@ export function AmenityDialog({
   const [autoApprove, setAutoApprove] = useState(true);
 
   const [submitting, setSubmitting] = useState(false);
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+  const formTouched = useRef(false);
+
+  // Mark form as touched when any input changes
+  function touch() {
+    formTouched.current = true;
+  }
+
+  // Guard dialog close: show confirmation if form has been touched
+  function handleOpenChange(newOpen: boolean) {
+    if (!newOpen && formTouched.current) {
+      setConfirmCloseOpen(true);
+      return;
+    }
+    onOpenChange(newOpen);
+  }
+
+  function handleConfirmClose() {
+    setConfirmCloseOpen(false);
+    formTouched.current = false;
+    resetForm();
+    onOpenChange(false);
+  }
 
   // Pre-fill when editing, reset when creating
   useEffect(() => {
@@ -183,6 +215,7 @@ export function AmenityDialog({
     setDeposit('');
     setRequiresPayment(false);
     setAutoApprove(true);
+    formTouched.current = false;
   }
 
   // Auto-adjust max booking when min changes
@@ -278,7 +311,8 @@ export function AmenityDialog({
       setSubmitting(false);
 
       if (error) {
-        toast.error('Failed to update amenity. Please try again.');
+        console.error('Amenity update error:', error);
+        toast.error(`Failed to update amenity: ${error.message}`);
         return;
       }
 
@@ -292,21 +326,35 @@ export function AmenityDialog({
       setSubmitting(false);
 
       if (error) {
-        toast.error('Failed to create amenity. Please try again.');
+        console.error('Amenity create error:', error);
+        toast.error(`Failed to create amenity: ${error.message}`);
         return;
       }
 
       toast.success('Amenity created.');
     }
 
+    formTouched.current = false;
     resetForm();
     onOpenChange(false);
     onSuccess();
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto">
+    <>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent
+        className="sm:max-w-xl max-h-[85vh] overflow-y-auto"
+        onInteractOutside={(e) => {
+          if (formTouched.current) e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => {
+          if (formTouched.current) {
+            e.preventDefault();
+            setConfirmCloseOpen(true);
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit Amenity' : 'New Amenity'}</DialogTitle>
           <DialogDescription>
@@ -316,7 +364,8 @@ export function AmenityDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+        <div className="space-y-4 py-2" onChangeCapture={touch}>
           {/* ── BASIC INFO ── */}
 
           {/* Name */}
@@ -349,7 +398,7 @@ export function AmenityDialog({
                     key={item.key}
                     type="button"
                     title={item.label}
-                    onClick={() => setIcon(isSelected ? '' : item.key)}
+                    onClick={() => { touch(); setIcon(isSelected ? '' : item.key); }}
                     className={`w-9 h-9 flex items-center justify-center rounded-inner-card border transition-colors ${
                       isSelected
                         ? 'bg-secondary-400/15 border-secondary-400 text-secondary-500 dark:text-secondary-400'
@@ -494,7 +543,7 @@ export function AmenityDialog({
                   Enable to let members book this amenity through the portal
                 </p>
               </div>
-              <Switch checked={reservable} onCheckedChange={setReservable} />
+              <Switch checked={reservable} onCheckedChange={(v) => { touch(); setReservable(v); }} />
             </div>
           </div>
 
@@ -509,7 +558,7 @@ export function AmenityDialog({
                   </label>
                   <Select
                     value={bookingType}
-                    onValueChange={(v) => setBookingType(v as BookingType)}
+                    onValueChange={(v) => { touch(); setBookingType(v as BookingType); }}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -530,7 +579,7 @@ export function AmenityDialog({
                         <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
                           Min booking
                         </label>
-                        <Select value={minBooking} onValueChange={setMinBooking}>
+                        <Select value={minBooking} onValueChange={(v) => { touch(); setMinBooking(v); }}>
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
@@ -547,7 +596,7 @@ export function AmenityDialog({
                         <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
                           Max booking
                         </label>
-                        <Select value={maxBooking} onValueChange={setMaxBooking}>
+                        <Select value={maxBooking} onValueChange={(v) => { touch(); setMaxBooking(v); }}>
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
@@ -582,13 +631,14 @@ export function AmenityDialog({
                         <button
                           key={d.key}
                           type="button"
-                          onClick={() =>
+                          onClick={() => {
+                            touch();
                             setBlockedDays((prev) =>
                               isBlocked
                                 ? prev.filter((day) => day !== d.key)
                                 : [...prev, d.key],
-                            )
-                          }
+                            );
+                          }}
                           className={`px-3 py-1.5 rounded-pill text-body border transition-colors ${
                             isBlocked
                               ? 'bg-primary-200 dark:bg-primary-700 border-primary-300 dark:border-primary-600 text-text-primary-light dark:text-text-primary-dark'
@@ -643,7 +693,7 @@ export function AmenityDialog({
                         Collect fee before confirming reservation
                       </p>
                     </div>
-                    <Switch checked={requiresPayment} onCheckedChange={setRequiresPayment} />
+                    <Switch checked={requiresPayment} onCheckedChange={(v) => { touch(); setRequiresPayment(v); }} />
                   </div>
 
                   <div className="flex items-center justify-between">
@@ -655,7 +705,7 @@ export function AmenityDialog({
                         Skip board review for booking requests
                       </p>
                     </div>
-                    <Switch checked={autoApprove} onCheckedChange={setAutoApprove} />
+                    <Switch checked={autoApprove} onCheckedChange={(v) => { touch(); setAutoApprove(v); }} />
                   </div>
                 </div>
               </div>
@@ -692,7 +742,7 @@ export function AmenityDialog({
                   Visible in the directory and available for use
                 </p>
               </div>
-              <Switch checked={active} onCheckedChange={setActive} />
+              <Switch checked={active} onCheckedChange={(v) => { touch(); setActive(v); }} />
             </div>
           )}
         </div>
@@ -713,5 +763,24 @@ export function AmenityDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Unsaved changes confirmation */}
+    <AlertDialog open={confirmCloseOpen} onOpenChange={setConfirmCloseOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Unsaved changes</AlertDialogTitle>
+          <AlertDialogDescription>
+            You have unsaved changes. Are you sure you want to close without saving?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Keep editing</AlertDialogCancel>
+          <Button variant="destructive" onClick={handleConfirmClose}>
+            Discard changes
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
