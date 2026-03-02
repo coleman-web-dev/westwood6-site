@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { DashboardCardShell } from './dashboard-card-shell';
@@ -29,6 +30,8 @@ export function AmenitiesCard() {
     fetch();
   }, [community.id]);
 
+  const amenitiesHref = `/${community.slug}/amenities`;
+
   return (
     <DashboardCardShell title="Amenities">
       {loading ? (
@@ -38,18 +41,31 @@ export function AmenitiesCard() {
       ) : amenities.length === 0 ? (
         <p className="text-body text-text-muted-light dark:text-text-muted-dark">No amenities available.</p>
       ) : (
-        <ul className="space-y-2">
-          {amenities.map((a) => (
-            <li key={a.id} className="flex items-center justify-between">
-              <span className="text-body">{a.name}</span>
-              {a.fee > 0 && (
-                <span className="text-meta text-text-secondary-light dark:text-text-secondary-dark tabular-nums">
-                  ${(a.fee / 100).toFixed(2)}
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
+        <div className="space-y-3">
+          <ul className="space-y-2">
+            {amenities.map((a) => (
+              <li key={a.id} className="flex items-center justify-between">
+                <Link
+                  href={amenitiesHref}
+                  className="text-body text-text-primary-light dark:text-text-primary-dark hover:text-secondary-500 dark:hover:text-secondary-400 transition-colors"
+                >
+                  {a.name}
+                </Link>
+                {a.fee > 0 && (
+                  <span className="text-meta text-text-secondary-light dark:text-text-secondary-dark tabular-nums">
+                    ${(a.fee / 100).toFixed(2)}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+          <Link
+            href={amenitiesHref}
+            className="block text-center text-label text-secondary-500 dark:text-secondary-400 hover:text-secondary-600 dark:hover:text-secondary-300 transition-colors"
+          >
+            Reserve an amenity
+          </Link>
+        </div>
       )}
     </DashboardCardShell>
   );

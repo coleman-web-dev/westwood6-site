@@ -6,6 +6,7 @@ export type UnitStatus = 'active' | 'inactive';
 export type RequestStatus = 'open' | 'in_progress' | 'resolved' | 'closed';
 export type InvoiceStatus = 'pending' | 'paid' | 'overdue' | 'partial' | 'waived';
 export type ReservationStatus = 'pending' | 'approved' | 'denied' | 'cancelled';
+export type BookingType = 'full_day' | 'time_slot';
 export type EventVisibility = 'public' | 'private';
 export type DocCategory = 'rules' | 'financial' | 'meeting_minutes' | 'forms' | 'other';
 export type AnnouncementPriority = 'normal' | 'important' | 'urgent';
@@ -149,11 +150,21 @@ export interface Amenity {
   fee: number;
   deposit: number;
   rules_text: string | null;
-  operating_hours: Record<string, unknown> | null;
+  operating_hours: Record<string, { open: string; close: string }> | null;
   auto_approve: boolean;
   requires_payment: boolean;
+  booking_type: BookingType;
+  slot_duration_minutes: number | null;
   active: boolean;
   created_at: string;
+}
+
+export interface BlockedDateRange {
+  start_datetime: string;
+  end_datetime: string;
+  block_type: 'reservation' | 'event';
+  event_title: string | null;
+  event_description: string | null;
 }
 
 export interface Reservation {

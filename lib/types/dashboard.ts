@@ -21,8 +21,8 @@ export interface DashboardCardConfig {
 }
 
 export const DEFAULT_CARD_VISIBILITY: Record<MemberRole, DashboardCardId[]> = {
-  owner: ['balance', 'announcements', 'maintenance', 'payments', 'events', 'household', 'documents'],
-  member: ['balance', 'announcements', 'maintenance', 'payments', 'events', 'documents'],
-  tenant: ['announcements', 'maintenance', 'events'],
+  owner: ['balance', 'announcements', 'maintenance', 'payments', 'events', 'amenities', 'household', 'documents'],
+  member: ['balance', 'announcements', 'maintenance', 'payments', 'events', 'amenities', 'documents'],
+  tenant: ['announcements', 'maintenance', 'events', 'amenities'],
   minor: ['announcements', 'events'],
 };
