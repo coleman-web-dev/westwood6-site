@@ -132,13 +132,45 @@ export function CreateEventDialog({
     setVisibility('public');
   }
 
+  // Auto-set end date/time to 1 hour after start when start changes
+  function handleStartDateChange(date: string) {
+    setStartDate(date);
+    // If end date isn't set yet, default it to same day
+    if (!endDate) setEndDate(date);
+  }
+
+  function handleStartTimeChange(time: string) {
+    setStartTime(time);
+    // Auto-set end time to 1 hour later if end time isn't set or end date matches start
+    if (!endTime || endDate === startDate || !endDate) {
+      const [hours, minutes] = time.split(':').map(Number);
+      const endHour = (hours + 1) % 24;
+      const newEndTime = `${String(endHour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+      setEndTime(newEndTime);
+      // If rolling past midnight, bump end date to next day
+      if (endHour < hours) {
+        const nextDay = new Date(`${startDate || endDate}T00:00:00`);
+        nextDay.setDate(nextDay.getDate() + 1);
+        setEndDate(format(nextDay, 'yyyy-MM-dd'));
+      } else if (!endDate && startDate) {
+        setEndDate(startDate);
+      }
+    }
+  }
+
+  function isLocationValid(): boolean {
+    if (locationType === 'amenity') return !!selectedAmenityId;
+    if (locationType === 'other') return !!customLocation.trim();
+    return false; // 'none' is not valid since location is required
+  }
+
   function isFormValid(): boolean {
-    return !!(title.trim() && startDate && startTime && endDate && endTime);
+    return !!(title.trim() && startDate && startTime && endDate && endTime && isLocationValid());
   }
 
   async function handleSubmit() {
     if (!isFormValid()) {
-      toast.error('Title, start date/time, and end date/time are required.');
+      toast.error('Title, location, start date/time, and end date/time are required.');
       return;
     }
 
@@ -258,10 +290,7 @@ export function CreateEventDialog({
           {/* Location */}
           <div className="space-y-1.5">
             <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-              Location
-              <span className="ml-1 text-text-muted-light dark:text-text-muted-dark font-normal">
-                (optional)
-              </span>
+              Location <span className="text-destructive">*</span>
             </label>
             <Select
               value={
@@ -269,14 +298,10 @@ export function CreateEventDialog({
                   ? selectedAmenityId
                   : locationType === 'other'
                     ? '__other__'
-                    : 'none'
+                    : ''
               }
               onValueChange={(v) => {
-                if (v === 'none') {
-                  setLocationType('none');
-                  setSelectedAmenityId('');
-                  setCustomLocation('');
-                } else if (v === '__other__') {
+                if (v === '__other__') {
                   setLocationType('other');
                   setSelectedAmenityId('');
                 } else {
@@ -288,10 +313,9 @@ export function CreateEventDialog({
               }}
             >
               <SelectTrigger>
-                <SelectValue placeholder="No location" />
+                <SelectValue placeholder="Select a location" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">No location</SelectItem>
                 {amenities.map((a) => {
                   const Icon = getAmenityIcon(a.icon);
                   return (
@@ -346,13 +370,13 @@ export function CreateEventDialog({
               <input
                 type="date"
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={(e) => handleStartDateChange(e.target.value)}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               />
               <input
                 type="time"
                 value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
+                onChange={(e) => handleStartTimeChange(e.target.value)}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               />
             </div>

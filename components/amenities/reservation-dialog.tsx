@@ -24,6 +24,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/shared/ui/select';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/shared/ui/popover';
+import {
+  Command,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+} from '@/components/shared/ui/command';
+import { Check, ChevronsUpDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { Amenity, Member, Unit } from '@/lib/types/database';
 
@@ -56,6 +71,7 @@ export function ReservationDialog({
   const [unitMembers, setUnitMembers] = useState<Member[]>([]);
   const [selectedUnitId, setSelectedUnitId] = useState('');
   const [selectedMemberId, setSelectedMemberId] = useState('');
+  const [unitSearchOpen, setUnitSearchOpen] = useState(false);
   const [unitOwnerMap, setUnitOwnerMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -202,19 +218,55 @@ export function ReservationDialog({
                 <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
                   Unit
                 </label>
-                <Select value={selectedUnitId} onValueChange={setSelectedUnitId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a unit" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allUnits.map((u) => (
-                      <SelectItem key={u.id} value={u.id}>
-                        Unit {u.unit_number}
-                        {unitOwnerMap[u.id] ? ` - ${unitOwnerMap[u.id]}` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={unitSearchOpen} onOpenChange={setUnitSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={unitSearchOpen}
+                      className="w-full justify-between font-normal"
+                    >
+                      {selectedUnitId
+                        ? (() => {
+                            const u = allUnits.find((u) => u.id === selectedUnitId);
+                            return u
+                              ? `Unit ${u.unit_number}${unitOwnerMap[u.id] ? ` - ${unitOwnerMap[u.id]}` : ''}`
+                              : 'Select a unit';
+                          })()
+                        : 'Select a unit'}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search units..." />
+                      <CommandList>
+                        <CommandEmpty>No unit found.</CommandEmpty>
+                        <CommandGroup>
+                          {allUnits.map((u) => (
+                            <CommandItem
+                              key={u.id}
+                              value={`Unit ${u.unit_number} ${unitOwnerMap[u.id] ?? ''}`}
+                              onSelect={() => {
+                                setSelectedUnitId(u.id);
+                                setUnitSearchOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  'mr-2 h-4 w-4',
+                                  selectedUnitId === u.id ? 'opacity-100' : 'opacity-0'
+                                )}
+                              />
+                              Unit {u.unit_number}
+                              {unitOwnerMap[u.id] ? ` - ${unitOwnerMap[u.id]}` : ''}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               {unitMembers.length > 0 && (
