@@ -18,6 +18,7 @@ import { Collapsible, CollapsibleContent } from '@/components/shared/ui/collapsi
 import { toast } from 'sonner';
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes';
 import { UnsavedChangesDialog } from '@/components/settings/unsaved-changes-dialog';
+import { AmenityList } from '@/components/amenities/amenity-list';
 import type { PaymentFrequency } from '@/lib/types/database';
 
 export function CommunitySettings() {
@@ -219,6 +220,17 @@ export function CommunitySettings() {
               onCheckedChange={setCanReserveAmenities}
             />
           </div>
+
+          {community && (
+            <Collapsible open={canReserveAmenities}>
+              <CollapsibleContent className="overflow-hidden transition-all data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                <div className="border-t border-stroke-light dark:border-stroke-dark mt-4" />
+                <div className="pt-4">
+                  <AmenityList communityId={community.id} />
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
 
           <div className="border-t border-stroke-light dark:border-stroke-dark" />
 
