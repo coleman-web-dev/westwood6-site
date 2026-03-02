@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useMemo } from 'react';
-import { ResponsiveGridLayout, useContainerWidth, noCompactor } from 'react-grid-layout';
+import { ResponsiveGridLayout, useContainerWidth } from 'react-grid-layout';
 import type { Layout, ResponsiveLayouts } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 
@@ -162,7 +162,6 @@ export default function DashboardPage() {
           containerPadding={GRID_CONTAINER_PADDING}
           onLayoutChange={handleLayoutChange}
           onBreakpointChange={handleBreakpointChange}
-          compactor={noCompactor}
           dragConfig={{ enabled: isDraggable, handle: '.drag-handle' }}
           resizeConfig={{ enabled: false }}
         >

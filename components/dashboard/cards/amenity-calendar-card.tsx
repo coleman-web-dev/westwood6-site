@@ -16,13 +16,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Calendar } from '@/components/shared/ui/calendar';
 import { DashboardCardShell } from './dashboard-card-shell';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/shared/ui/select';
+import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import type { Amenity, BlockedDateRange } from '@/lib/types/database';
 
 export function AmenityCalendarCard() {
@@ -30,10 +24,12 @@ export function AmenityCalendarCard() {
   const router = useRouter();
 
   const [amenities, setAmenities] = useState<Amenity[]>([]);
-  const [selectedAmenity, setSelectedAmenity] = useState<Amenity | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const [blockedRanges, setBlockedRanges] = useState<BlockedDateRange[]>([]);
   const [loading, setLoading] = useState(true);
   const [calendarLoading, setCalendarLoading] = useState(false);
+
+  const selectedAmenity = amenities[selectedIndex] ?? null;
 
   // Fetch amenity list
   useEffect(() => {
@@ -49,10 +45,6 @@ export function AmenityCalendarCard() {
       const list = (data as Amenity[]) ?? [];
       setAmenities(list);
       setLoading(false);
-
-      if (list.length > 0) {
-        setSelectedAmenity(list[0]);
-      }
     }
     fetchAmenities();
   }, [community.id]);
@@ -75,11 +67,12 @@ export function AmenityCalendarCard() {
   }, []);
 
   // Auto-fetch when amenity changes
+  const selectedAmenityId = selectedAmenity?.id;
   useEffect(() => {
-    if (selectedAmenity) {
-      fetchBlockedDates(selectedAmenity.id, new Date());
+    if (selectedAmenityId) {
+      fetchBlockedDates(selectedAmenityId, new Date());
     }
-  }, [selectedAmenity, fetchBlockedDates]);
+  }, [selectedAmenityId, fetchBlockedDates]);
 
   // Compute blocked/event/partial day modifiers (same logic as amenity-calendar.tsx)
   const { blockedDays, eventDays, partialDays } = useMemo(() => {
@@ -148,27 +141,26 @@ export function AmenityCalendarCard() {
         </p>
       ) : (
         <div className="flex flex-col gap-3 h-full">
-          {/* Amenity selector (only if multiple) */}
-          {amenities.length > 1 && (
-            <Select
-              value={selectedAmenity?.id ?? undefined}
-              onValueChange={(id) => {
-                const amenity = amenities.find((a) => a.id === id);
-                if (amenity) setSelectedAmenity(amenity);
-              }}
+          {/* Amenity switcher */}
+          <div className="flex items-center justify-between gap-2">
+            <button
+              onClick={() => setSelectedIndex((i) => (i - 1 + amenities.length) % amenities.length)}
+              className="p-1 rounded-inner-card text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors disabled:opacity-0"
+              disabled={amenities.length <= 1}
             >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select amenity" />
-              </SelectTrigger>
-              <SelectContent>
-                {amenities.map((amenity) => (
-                  <SelectItem key={amenity.id} value={amenity.id}>
-                    {amenity.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+              <ChevronLeftIcon className="w-4 h-4" />
+            </button>
+            <span className="text-label font-medium text-text-primary-light dark:text-text-primary-dark truncate">
+              {selectedAmenity?.name}
+            </span>
+            <button
+              onClick={() => setSelectedIndex((i) => (i + 1) % amenities.length)}
+              className="p-1 rounded-inner-card text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors disabled:opacity-0"
+              disabled={amenities.length <= 1}
+            >
+              <ChevronRightIcon className="w-4 h-4" />
+            </button>
+          </div>
 
           {/* Calendar */}
           {selectedAmenity && (
