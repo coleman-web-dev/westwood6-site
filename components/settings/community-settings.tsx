@@ -212,7 +212,7 @@ export function CommunitySettings() {
                 Reserve amenities
               </p>
               <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                Tenants can book shared spaces and amenities
+                Tenants can book reservable amenities
               </p>
             </div>
             <Switch
@@ -220,17 +220,6 @@ export function CommunitySettings() {
               onCheckedChange={setCanReserveAmenities}
             />
           </div>
-
-          {community && (
-            <Collapsible open={canReserveAmenities}>
-              <CollapsibleContent className="overflow-hidden transition-all data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-                <div className="border-t border-stroke-light dark:border-stroke-dark mt-4" />
-                <div className="pt-4">
-                  <AmenityList communityId={community.id} />
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          )}
 
           <div className="border-t border-stroke-light dark:border-stroke-dark" />
 
@@ -284,6 +273,20 @@ export function CommunitySettings() {
           </div>
         </div>
       </div>
+
+      {/* Amenities */}
+      {community && (
+        <div className="bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark rounded-panel p-card-padding">
+          <h2 className="text-card-title text-text-primary-light dark:text-text-primary-dark mb-1">
+            Amenities
+          </h2>
+          <p className="text-meta text-text-muted-light dark:text-text-muted-dark mb-4">
+            Manage your community&apos;s amenities. These appear in your community directory
+            and, when reservable, in the member booking system.
+          </p>
+          <AmenityList communityId={community.id} />
+        </div>
+      )}
 
       {/* Payment settings */}
       <div className="bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark rounded-panel p-card-padding">

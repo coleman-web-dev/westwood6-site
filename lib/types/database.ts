@@ -158,6 +158,7 @@ export interface Amenity {
   name: string;
   icon: string | null;
   description: string | null;
+  public_description: string | null;
   capacity: number | null;
   fee: number;
   deposit: number;
@@ -165,6 +166,7 @@ export interface Amenity {
   operating_hours: Record<string, { open: string; close: string }> | null;
   auto_approve: boolean;
   requires_payment: boolean;
+  reservable: boolean;
   booking_type: BookingType;
   slot_duration_minutes: number | null;
   min_booking_minutes: number | null;

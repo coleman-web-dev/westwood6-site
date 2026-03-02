@@ -32,6 +32,7 @@ export function AmenitySelector({ selectedId, onSelect }: AmenitySelectorProps) 
         .select('*')
         .eq('community_id', community.id)
         .eq('active', true)
+        .eq('reservable', true)
         .order('name', { ascending: true });
 
       const list = (data as Amenity[]) ?? [];

@@ -142,13 +142,21 @@ export function AmenityList({ communityId }: AmenityListProps) {
                 <span className="text-body text-text-primary-light dark:text-text-primary-dark truncate">
                   {amenity.name}
                 </span>
-                <Badge variant="outline" className="shrink-0 text-[10px] px-1.5 py-0">
-                  {amenity.booking_type === 'full_day' ? 'Full Day' : amenity.booking_type === 'time_slot' ? 'Time Slot' : 'Both'}
-                </Badge>
-                {amenity.fee > 0 && (
-                  <span className="text-meta text-text-muted-light dark:text-text-muted-dark shrink-0">
-                    {formatDollars(amenity.fee)}
-                  </span>
+                {amenity.reservable ? (
+                  <>
+                    <Badge variant="outline" className="shrink-0 text-[10px] px-1.5 py-0">
+                      {amenity.booking_type === 'full_day' ? 'Full Day' : amenity.booking_type === 'time_slot' ? 'Time Slot' : 'Both'}
+                    </Badge>
+                    {amenity.fee > 0 && (
+                      <span className="text-meta text-text-muted-light dark:text-text-muted-dark shrink-0">
+                        {formatDollars(amenity.fee)}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <Badge variant="secondary" className="shrink-0 text-[10px] px-1.5 py-0">
+                    Directory Only
+                  </Badge>
                 )}
                 {!amenity.active && (
                   <Badge variant="secondary" className="shrink-0 text-[10px] px-1.5 py-0">

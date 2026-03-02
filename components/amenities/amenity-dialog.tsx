@@ -94,14 +94,6 @@ function hoursFromAmenity(
   return base;
 }
 
-function formatMinutes(mins: number): string {
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  if (h === 0) return `${m} min`;
-  if (m === 0) return h === 1 ? '1 hour' : `${h} hours`;
-  return `${h} hr ${m} min`;
-}
-
 function hoursToRecord(
   hours: Record<DayKey, DayHours>,
 ): Record<string, { open: string; close: string }> | null {
@@ -125,21 +117,27 @@ export function AmenityDialog({
 }: AmenityDialogProps) {
   const isEditing = editingAmenity !== null;
 
+  // Basic info
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('');
+  const [publicDescription, setPublicDescription] = useState('');
   const [description, setDescription] = useState('');
+  const [capacity, setCapacity] = useState('');
+  const [hours, setHours] = useState<Record<DayKey, DayHours>>(defaultWeekdayHours);
+  const [rulesText, setRulesText] = useState('');
+  const [active, setActive] = useState(true);
+
+  // Reservation config
+  const [reservable, setReservable] = useState(true);
   const [bookingType, setBookingType] = useState<BookingType>('full_day');
   const [minBooking, setMinBooking] = useState('60');
   const [maxBooking, setMaxBooking] = useState('60');
-  const [hours, setHours] = useState<Record<DayKey, DayHours>>(defaultWeekdayHours);
-  const [capacity, setCapacity] = useState('');
+  const [blockedDays, setBlockedDays] = useState<string[]>([]);
   const [fee, setFee] = useState('');
   const [deposit, setDeposit] = useState('');
   const [requiresPayment, setRequiresPayment] = useState(false);
   const [autoApprove, setAutoApprove] = useState(true);
-  const [blockedDays, setBlockedDays] = useState<string[]>([]);
-  const [rulesText, setRulesText] = useState('');
-  const [active, setActive] = useState(true);
+
   const [submitting, setSubmitting] = useState(false);
 
   // Pre-fill when editing, reset when creating
@@ -147,19 +145,21 @@ export function AmenityDialog({
     if (editingAmenity) {
       setName(editingAmenity.name);
       setIcon(editingAmenity.icon ?? '');
+      setPublicDescription(editingAmenity.public_description ?? '');
       setDescription(editingAmenity.description ?? '');
+      setCapacity(editingAmenity.capacity != null ? String(editingAmenity.capacity) : '');
+      setHours(hoursFromAmenity(editingAmenity.operating_hours));
+      setRulesText(editingAmenity.rules_text ?? '');
+      setActive(editingAmenity.active);
+      setReservable(editingAmenity.reservable ?? true);
       setBookingType(editingAmenity.booking_type);
       setMinBooking(String(editingAmenity.min_booking_minutes ?? editingAmenity.slot_duration_minutes ?? 60));
       setMaxBooking(String(editingAmenity.max_booking_minutes ?? editingAmenity.slot_duration_minutes ?? 60));
-      setHours(hoursFromAmenity(editingAmenity.operating_hours));
-      setCapacity(editingAmenity.capacity != null ? String(editingAmenity.capacity) : '');
+      setBlockedDays(editingAmenity.blocked_days ?? []);
       setFee(editingAmenity.fee ? (editingAmenity.fee / 100).toFixed(2) : '');
       setDeposit(editingAmenity.deposit ? (editingAmenity.deposit / 100).toFixed(2) : '');
       setRequiresPayment(editingAmenity.requires_payment);
       setAutoApprove(editingAmenity.auto_approve);
-      setBlockedDays(editingAmenity.blocked_days ?? []);
-      setRulesText(editingAmenity.rules_text ?? '');
-      setActive(editingAmenity.active);
     } else {
       resetForm();
     }
@@ -168,19 +168,21 @@ export function AmenityDialog({
   function resetForm() {
     setName('');
     setIcon('');
+    setPublicDescription('');
     setDescription('');
+    setCapacity('');
+    setHours(defaultWeekdayHours());
+    setRulesText('');
+    setActive(true);
+    setReservable(true);
     setBookingType('full_day');
     setMinBooking('60');
     setMaxBooking('60');
-    setHours(defaultWeekdayHours());
-    setCapacity('');
+    setBlockedDays([]);
     setFee('');
     setDeposit('');
     setRequiresPayment(false);
     setAutoApprove(true);
-    setBlockedDays([]);
-    setRulesText('');
-    setActive(true);
   }
 
   // Auto-adjust max booking when min changes
@@ -207,6 +209,20 @@ export function AmenityDialog({
     }));
   }
 
+  function applyToAll(sourceDay: DayKey) {
+    const source = hours[sourceDay];
+    setHours((prev) => {
+      const updated = { ...prev };
+      for (const d of DAYS) {
+        if (updated[d.key].enabled) {
+          updated[d.key] = { ...updated[d.key], open: source.open, close: source.close };
+        }
+      }
+      return updated;
+    });
+    toast.success('Hours applied to all enabled days.');
+  }
+
   async function handleSubmit() {
     const trimmedName = name.trim();
     if (!trimmedName) {
@@ -214,15 +230,15 @@ export function AmenityDialog({
       return;
     }
 
-    const feeCents = Math.round(parseFloat(fee || '0') * 100);
-    const depositCents = Math.round(parseFloat(deposit || '0') * 100);
+    const feeCents = reservable ? Math.round(parseFloat(fee || '0') * 100) : 0;
+    const depositCents = reservable ? Math.round(parseFloat(deposit || '0') * 100) : 0;
     const capacityNum = capacity ? parseInt(capacity, 10) : null;
 
-    if (isNaN(feeCents) || feeCents < 0) {
+    if (reservable && (isNaN(feeCents) || feeCents < 0)) {
       toast.error('Fee must be a valid dollar amount.');
       return;
     }
-    if (isNaN(depositCents) || depositCents < 0) {
+    if (reservable && (isNaN(depositCents) || depositCents < 0)) {
       toast.error('Deposit must be a valid dollar amount.');
       return;
     }
@@ -230,23 +246,27 @@ export function AmenityDialog({
     setSubmitting(true);
     const supabase = createClient();
 
+    const hasTimeSlots = reservable && bookingType !== 'full_day';
+
     const payload = {
       name: trimmedName,
       icon: icon || null,
+      public_description: publicDescription.trim() || null,
       description: description.trim() || null,
-      booking_type: bookingType,
-      slot_duration_minutes: bookingType !== 'full_day' ? 30 : null,
-      min_booking_minutes: bookingType !== 'full_day' ? parseInt(minBooking, 10) : null,
-      max_booking_minutes: bookingType !== 'full_day' ? parseInt(maxBooking, 10) : null,
-      operating_hours: bookingType !== 'full_day' ? hoursToRecord(hours) : null,
       capacity: capacityNum,
-      fee: feeCents,
-      deposit: depositCents,
-      requires_payment: requiresPayment,
-      auto_approve: autoApprove,
-      blocked_days: blockedDays,
+      operating_hours: hoursToRecord(hours),
       rules_text: rulesText.trim() || null,
       active,
+      reservable,
+      booking_type: reservable ? bookingType : 'full_day',
+      slot_duration_minutes: hasTimeSlots ? 30 : null,
+      min_booking_minutes: hasTimeSlots ? parseInt(minBooking, 10) : null,
+      max_booking_minutes: hasTimeSlots ? parseInt(maxBooking, 10) : null,
+      blocked_days: reservable ? blockedDays : [],
+      fee: feeCents,
+      deposit: depositCents,
+      requires_payment: reservable ? requiresPayment : false,
+      auto_approve: reservable ? autoApprove : true,
     };
 
     if (isEditing) {
@@ -291,12 +311,14 @@ export function AmenityDialog({
           <DialogTitle>{isEditing ? 'Edit Amenity' : 'New Amenity'}</DialogTitle>
           <DialogDescription>
             {isEditing
-              ? 'Update the amenity details below.'
-              : 'Define a new bookable amenity for your community.'}
+              ? 'Update this amenity\'s details and reservation settings.'
+              : 'Add an amenity to your community directory. Enable reservations to let members book it.'}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
+          {/* ── BASIC INFO ── */}
+
           {/* Name */}
           <div className="space-y-1.5">
             <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
@@ -341,173 +363,44 @@ export function AmenityDialog({
             </div>
           </div>
 
-          {/* Description */}
+          {/* Public description */}
           <div className="space-y-1.5">
             <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-              Description
-              <span className="ml-1 text-text-muted-light dark:text-text-muted-dark font-normal">
-                (optional)
-              </span>
-            </label>
-            <Textarea
-              placeholder="Details about this amenity..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="resize-none"
-              rows={2}
-            />
-          </div>
-
-          {/* Booking type */}
-          <div className="space-y-1.5">
-            <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-              Booking type
-            </label>
-            <Select
-              value={bookingType}
-              onValueChange={(v) => setBookingType(v as BookingType)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="full_day">Full Day</SelectItem>
-                <SelectItem value="time_slot">Time Slot</SelectItem>
-                <SelectItem value="both">Both</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Time slot options (collapsible) */}
-          <Collapsible open={bookingType === 'time_slot' || bookingType === 'both'}>
-            <CollapsibleContent className="overflow-hidden transition-all data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-              <div className="space-y-4 pt-1">
-                {/* Min / Max booking duration */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-                      Min booking
-                    </label>
-                    <Select value={minBooking} onValueChange={setMinBooking}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {TIME_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-                      Max booking
-                    </label>
-                    <Select value={maxBooking} onValueChange={setMaxBooking}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {TIME_OPTIONS.filter((opt) => parseInt(opt.value, 10) >= parseInt(minBooking, 10)).map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {/* Operating hours */}
-                <div className="space-y-1.5">
-                  <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-                    Operating hours
-                  </label>
-                  <div className="space-y-2">
-                    {DAYS.map((d) => (
-                      <div key={d.key} className="flex items-center gap-2">
-                        <label className="flex items-center gap-2 w-16 shrink-0 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={hours[d.key].enabled}
-                            onChange={(e) =>
-                              updateDay(d.key, { enabled: e.target.checked })
-                            }
-                            className="h-4 w-4 rounded border-gray-300"
-                          />
-                          <span className="text-body text-text-primary-light dark:text-text-primary-dark">
-                            {d.label}
-                          </span>
-                        </label>
-                        {hours[d.key].enabled && (
-                          <div className="flex items-center gap-1.5">
-                            <input
-                              type="time"
-                              value={hours[d.key].open}
-                              onChange={(e) =>
-                                updateDay(d.key, { open: e.target.value })
-                              }
-                              className="flex h-8 rounded-md border border-input bg-background px-2 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                            />
-                            <span className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                              to
-                            </span>
-                            <input
-                              type="time"
-                              value={hours[d.key].close}
-                              onChange={(e) =>
-                                updateDay(d.key, { close: e.target.value })
-                              }
-                              className="flex h-8 rounded-md border border-input bg-background px-2 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-
-          {/* Blocked days of the week */}
-          <div className="space-y-1.5">
-            <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-              Blocked days
+              Public description
               <span className="ml-1 text-text-muted-light dark:text-text-muted-dark font-normal">
                 (optional)
               </span>
             </label>
             <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-              Select days when this amenity cannot be reserved.
+              Shown on your community's public landing page. Visible to visitors and prospective residents.
             </p>
-            <div className="flex flex-wrap gap-2 pt-1">
-              {DAYS.map((d) => {
-                const isBlocked = blockedDays.includes(d.key);
-                return (
-                  <button
-                    key={d.key}
-                    type="button"
-                    onClick={() =>
-                      setBlockedDays((prev) =>
-                        isBlocked
-                          ? prev.filter((day) => day !== d.key)
-                          : [...prev, d.key],
-                      )
-                    }
-                    className={`px-3 py-1.5 rounded-pill text-body border transition-colors ${
-                      isBlocked
-                        ? 'bg-primary-200 dark:bg-primary-700 border-primary-300 dark:border-primary-600 text-text-primary-light dark:text-text-primary-dark'
-                        : 'bg-surface-light dark:bg-surface-dark border-stroke-light dark:border-stroke-dark text-text-muted-light dark:text-text-muted-dark hover:border-primary-300 dark:hover:border-primary-600'
-                    }`}
-                  >
-                    {d.label}
-                  </button>
-                );
-              })}
-            </div>
+            <Textarea
+              placeholder="Brief description for the public site..."
+              value={publicDescription}
+              onChange={(e) => setPublicDescription(e.target.value)}
+              className="resize-none"
+              rows={2}
+            />
+          </div>
+
+          {/* Community description */}
+          <div className="space-y-1.5">
+            <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+              Community description
+              <span className="ml-1 text-text-muted-light dark:text-text-muted-dark font-normal">
+                (optional)
+              </span>
+            </label>
+            <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+              Shown to logged-in members on the amenities page. Include usage instructions or internal notes.
+            </p>
+            <Textarea
+              placeholder="Details, instructions, or notes for members..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="resize-none"
+              rows={2}
+            />
           </div>
 
           {/* Capacity */}
@@ -528,76 +421,248 @@ export function AmenityDialog({
             />
           </div>
 
-          {/* Fee & Deposit */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-                Fee ($)
-              </label>
-              <Input
-                type="number"
-                min={0}
-                step={0.01}
-                placeholder="0.00"
-                value={fee}
-                onChange={(e) => setFee(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-                Deposit ($)
-              </label>
-              <Input
-                type="number"
-                min={0}
-                step={0.01}
-                placeholder="0.00"
-                value={deposit}
-                onChange={(e) => setDeposit(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Switches */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-body text-text-primary-light dark:text-text-primary-dark">
-                  Requires payment
-                </p>
-                <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                  Collect fee before confirming reservation
-                </p>
-              </div>
-              <Switch checked={requiresPayment} onCheckedChange={setRequiresPayment} />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-body text-text-primary-light dark:text-text-primary-dark">
-                  Auto-approve reservations
-                </p>
-                <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                  Skip board review for booking requests
-                </p>
-              </div>
-              <Switch checked={autoApprove} onCheckedChange={setAutoApprove} />
-            </div>
-
-            {isEditing && (
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-body text-text-primary-light dark:text-text-primary-dark">
-                    Active
-                  </p>
-                  <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                    Visible and available for booking
-                  </p>
+          {/* ── OPERATING HOURS (always visible) ── */}
+          <div className="space-y-1.5">
+            <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+              Hours
+              <span className="ml-1 text-text-muted-light dark:text-text-muted-dark font-normal">
+                (optional)
+              </span>
+            </label>
+            <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+              Set the hours this amenity is open. Displayed to members and on the public landing page.
+            </p>
+            <div className="space-y-2">
+              {DAYS.map((d) => (
+                <div key={d.key} className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 w-16 shrink-0 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={hours[d.key].enabled}
+                      onChange={(e) =>
+                        updateDay(d.key, { enabled: e.target.checked })
+                      }
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                    <span className="text-body text-text-primary-light dark:text-text-primary-dark">
+                      {d.label}
+                    </span>
+                  </label>
+                  {hours[d.key].enabled && (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="time"
+                        value={hours[d.key].open}
+                        onChange={(e) =>
+                          updateDay(d.key, { open: e.target.value })
+                        }
+                        className="flex h-8 rounded-md border border-input bg-background px-2 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      />
+                      <span className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                        to
+                      </span>
+                      <input
+                        type="time"
+                        value={hours[d.key].close}
+                        onChange={(e) =>
+                          updateDay(d.key, { close: e.target.value })
+                        }
+                        className="flex h-8 rounded-md border border-input bg-background px-2 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => applyToAll(d.key)}
+                        className="text-meta text-secondary-500 dark:text-secondary-400 hover:text-secondary-600 dark:hover:text-secondary-300 whitespace-nowrap ml-1"
+                      >
+                        Apply to all
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <Switch checked={active} onCheckedChange={setActive} />
-              </div>
-            )}
+              ))}
+            </div>
           </div>
+
+          {/* ── RESERVABLE TOGGLE ── */}
+          <div className="border-t border-stroke-light dark:border-stroke-dark pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-body text-text-primary-light dark:text-text-primary-dark">
+                  Allow reservations
+                </p>
+                <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                  Enable to let members book this amenity through the portal
+                </p>
+              </div>
+              <Switch checked={reservable} onCheckedChange={setReservable} />
+            </div>
+          </div>
+
+          {/* ── RESERVATION SETTINGS (collapsible) ── */}
+          <Collapsible open={reservable}>
+            <CollapsibleContent className="overflow-hidden transition-all data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+              <div className="space-y-4 pt-1">
+                {/* Booking type */}
+                <div className="space-y-1.5">
+                  <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                    Booking type
+                  </label>
+                  <Select
+                    value={bookingType}
+                    onValueChange={(v) => setBookingType(v as BookingType)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="full_day">Full Day</SelectItem>
+                      <SelectItem value="time_slot">Time Slot</SelectItem>
+                      <SelectItem value="both">Both</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Time slot options (nested collapsible) */}
+                <Collapsible open={bookingType === 'time_slot' || bookingType === 'both'}>
+                  <CollapsibleContent className="overflow-hidden transition-all data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                          Min booking
+                        </label>
+                        <Select value={minBooking} onValueChange={setMinBooking}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TIME_OPTIONS.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                          Max booking
+                        </label>
+                        <Select value={maxBooking} onValueChange={setMaxBooking}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TIME_OPTIONS.filter((opt) => parseInt(opt.value, 10) >= parseInt(minBooking, 10)).map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+
+                {/* Blocked days of the week */}
+                <div className="space-y-1.5">
+                  <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                    Blocked days
+                    <span className="ml-1 text-text-muted-light dark:text-text-muted-dark font-normal">
+                      (optional)
+                    </span>
+                  </label>
+                  <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                    Select days when this amenity cannot be reserved.
+                  </p>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {DAYS.map((d) => {
+                      const isBlocked = blockedDays.includes(d.key);
+                      return (
+                        <button
+                          key={d.key}
+                          type="button"
+                          onClick={() =>
+                            setBlockedDays((prev) =>
+                              isBlocked
+                                ? prev.filter((day) => day !== d.key)
+                                : [...prev, d.key],
+                            )
+                          }
+                          className={`px-3 py-1.5 rounded-pill text-body border transition-colors ${
+                            isBlocked
+                              ? 'bg-primary-200 dark:bg-primary-700 border-primary-300 dark:border-primary-600 text-text-primary-light dark:text-text-primary-dark'
+                              : 'bg-surface-light dark:bg-surface-dark border-stroke-light dark:border-stroke-dark text-text-muted-light dark:text-text-muted-dark hover:border-primary-300 dark:hover:border-primary-600'
+                          }`}
+                        >
+                          {d.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Fee & Deposit */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                      Fee ($)
+                    </label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      placeholder="0.00"
+                      value={fee}
+                      onChange={(e) => setFee(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                      Deposit ($)
+                    </label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      placeholder="0.00"
+                      value={deposit}
+                      onChange={(e) => setDeposit(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Reservation switches */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-body text-text-primary-light dark:text-text-primary-dark">
+                        Requires payment
+                      </p>
+                      <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                        Collect fee before confirming reservation
+                      </p>
+                    </div>
+                    <Switch checked={requiresPayment} onCheckedChange={setRequiresPayment} />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-body text-text-primary-light dark:text-text-primary-dark">
+                        Auto-approve reservations
+                      </p>
+                      <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                        Skip board review for booking requests
+                      </p>
+                    </div>
+                    <Switch checked={autoApprove} onCheckedChange={setAutoApprove} />
+                  </div>
+                </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
+          {/* ── BOTTOM FIELDS ── */}
 
           {/* Rules */}
           <div className="space-y-1.5">
@@ -615,6 +680,21 @@ export function AmenityDialog({
               rows={3}
             />
           </div>
+
+          {/* Active (edit only) */}
+          {isEditing && (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-body text-text-primary-light dark:text-text-primary-dark">
+                  Active
+                </p>
+                <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                  Visible in the directory and available for use
+                </p>
+              </div>
+              <Switch checked={active} onCheckedChange={setActive} />
+            </div>
+          )}
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
