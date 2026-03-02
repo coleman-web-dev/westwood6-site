@@ -9,6 +9,7 @@ import { AmenityCalendar } from '@/components/amenities/amenity-calendar';
 import { TimeSlotPicker } from '@/components/amenities/time-slot-picker';
 import { ReservationDialog } from '@/components/amenities/reservation-dialog';
 import { MyReservations } from '@/components/amenities/my-reservations';
+import { Button } from '@/components/shared/ui/button';
 import type { Amenity, BlockedDateRange } from '@/lib/types/database';
 
 export default function AmenitiesPage() {
@@ -20,6 +21,7 @@ export default function AmenitiesPage() {
   const [blockedRanges, setBlockedRanges] = useState<BlockedDateRange[]>([]);
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [bookingMode, setBookingMode] = useState<'full_day' | 'time_slot'>('full_day');
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Fetch blocked dates for the visible month
@@ -56,6 +58,7 @@ export default function AmenitiesPage() {
     setSelectedSlot(null);
 
     if (selectedAmenity?.booking_type === 'full_day') {
+      setBookingMode('full_day');
       setDialogOpen(true);
     }
   }
@@ -63,6 +66,15 @@ export default function AmenitiesPage() {
   // Handle time slot selection
   function handleSlotSelect(start: Date, end: Date) {
     setSelectedSlot({ start, end });
+    setBookingMode('time_slot');
+    setDialogOpen(true);
+  }
+
+  // Handle "Reserve Full Day" for 'both' booking type
+  function handleFullDayReserve() {
+    if (!selectedDate) return;
+    setSelectedSlot(null);
+    setBookingMode('full_day');
     setDialogOpen(true);
   }
 
@@ -154,7 +166,11 @@ export default function AmenitiesPage() {
                 <div>
                   <span className="text-text-muted-light dark:text-text-muted-dark">Booking: </span>
                   <span className="text-text-primary-light dark:text-text-primary-dark">
-                    {selectedAmenity.booking_type === 'full_day' ? 'Full day' : `${selectedAmenity.slot_duration_minutes ?? 60}-min slots`}
+                    {selectedAmenity.booking_type === 'full_day'
+                      ? 'Full day'
+                      : selectedAmenity.booking_type === 'both'
+                        ? 'Full day or time slots'
+                        : `${selectedAmenity.slot_duration_minutes ?? 60}-min slots`}
                   </span>
                 </div>
               </div>
@@ -171,16 +187,29 @@ export default function AmenitiesPage() {
               )}
             </div>
 
-            {/* Time slot picker (only for time_slot amenities when date selected) */}
-            {selectedAmenity.booking_type === 'time_slot' && selectedDate && (
-              <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding">
-                <TimeSlotPicker
-                  amenity={selectedAmenity}
-                  selectedDate={selectedDate}
-                  blockedRanges={blockedRanges}
-                  selectedSlot={selectedSlot}
-                  onSlotSelect={handleSlotSelect}
-                />
+            {/* Time slot picker (for time_slot and both amenities when date selected) */}
+            {selectedAmenity.booking_type !== 'full_day' && selectedDate && (
+              <div className="space-y-4">
+                {/* Reserve full day button (only for 'both' type) */}
+                {selectedAmenity.booking_type === 'both' && (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleFullDayReserve}
+                  >
+                    Reserve Full Day
+                  </Button>
+                )}
+
+                <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding">
+                  <TimeSlotPicker
+                    amenity={selectedAmenity}
+                    selectedDate={selectedDate}
+                    blockedRanges={blockedRanges}
+                    selectedSlot={selectedSlot}
+                    onSlotSelect={handleSlotSelect}
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -207,6 +236,7 @@ export default function AmenitiesPage() {
           open={dialogOpen}
           onOpenChange={setDialogOpen}
           onSuccess={handleReservationSuccess}
+          bookingMode={bookingMode}
         />
       )}
     </div>

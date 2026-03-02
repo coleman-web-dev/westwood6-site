@@ -97,7 +97,7 @@ export function AmenityCalendarCard() {
         }
         if (selectedAmenity.booking_type === 'full_day') {
           if (!blocked.some((d) => isSameDay(d, day))) blocked.push(day);
-        } else {
+        } else { // time_slot or both
           if (!partial.some((d) => isSameDay(d, day))) partial.push(day);
         }
       }
@@ -186,7 +186,7 @@ export function AmenityCalendarCard() {
                 disabled={disabledDates}
                 modifiers={{
                   blocked: selectedAmenity.booking_type === 'full_day' ? blockedDays : [],
-                  partiallyBooked: selectedAmenity.booking_type === 'time_slot' ? partialDays : [],
+                  partiallyBooked: selectedAmenity.booking_type !== 'full_day' ? partialDays : [],
                   hasEvent: eventDays,
                 }}
                 modifiersClassNames={{

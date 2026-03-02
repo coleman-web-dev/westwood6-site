@@ -34,6 +34,7 @@ interface ReservationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  bookingMode?: 'full_day' | 'time_slot';
 }
 
 export function ReservationDialog({
@@ -43,6 +44,7 @@ export function ReservationDialog({
   open,
   onOpenChange,
   onSuccess,
+  bookingMode,
 }: ReservationDialogProps) {
   const { community, member, unit, isBoard } = useCommunity();
   const [purpose, setPurpose] = useState('');
@@ -117,7 +119,7 @@ export function ReservationDialog({
     loadMembers();
   }, [isBoard, selectedUnitId]);
 
-  const isFullDay = amenity.booking_type === 'full_day';
+  const isFullDay = bookingMode ? bookingMode === 'full_day' : amenity.booking_type === 'full_day';
   const fee = amenity.fee / 100;
   const deposit = amenity.deposit / 100;
   const total = fee + deposit;

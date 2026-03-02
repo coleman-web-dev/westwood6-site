@@ -45,6 +45,18 @@ const DAYS = [
   { key: 'sunday', label: 'Sun' },
 ] as const;
 
+const TIME_OPTIONS = [
+  { value: '30', label: '30 min' },
+  { value: '60', label: '1 hour' },
+  { value: '90', label: '1 hr 30 min' },
+  { value: '120', label: '2 hours' },
+  { value: '180', label: '3 hours' },
+  { value: '240', label: '4 hours' },
+  { value: '300', label: '5 hours' },
+  { value: '360', label: '6 hours' },
+  { value: '480', label: '8 hours' },
+] as const;
+
 type DayKey = (typeof DAYS)[number]['key'];
 
 interface DayHours {
@@ -117,9 +129,8 @@ export function AmenityDialog({
   const [icon, setIcon] = useState('');
   const [description, setDescription] = useState('');
   const [bookingType, setBookingType] = useState<BookingType>('full_day');
-  const [slotDuration, setSlotDuration] = useState('60');
-  const [minBooking, setMinBooking] = useState('');
-  const [maxBooking, setMaxBooking] = useState('');
+  const [minBooking, setMinBooking] = useState('60');
+  const [maxBooking, setMaxBooking] = useState('60');
   const [hours, setHours] = useState<Record<DayKey, DayHours>>(defaultWeekdayHours);
   const [capacity, setCapacity] = useState('');
   const [fee, setFee] = useState('');
@@ -138,9 +149,8 @@ export function AmenityDialog({
       setIcon(editingAmenity.icon ?? '');
       setDescription(editingAmenity.description ?? '');
       setBookingType(editingAmenity.booking_type);
-      setSlotDuration(String(editingAmenity.slot_duration_minutes ?? 60));
-      setMinBooking(editingAmenity.min_booking_minutes != null ? String(editingAmenity.min_booking_minutes) : '');
-      setMaxBooking(editingAmenity.max_booking_minutes != null ? String(editingAmenity.max_booking_minutes) : '');
+      setMinBooking(String(editingAmenity.min_booking_minutes ?? editingAmenity.slot_duration_minutes ?? 60));
+      setMaxBooking(String(editingAmenity.max_booking_minutes ?? editingAmenity.slot_duration_minutes ?? 60));
       setHours(hoursFromAmenity(editingAmenity.operating_hours));
       setCapacity(editingAmenity.capacity != null ? String(editingAmenity.capacity) : '');
       setFee(editingAmenity.fee ? (editingAmenity.fee / 100).toFixed(2) : '');
@@ -160,9 +170,8 @@ export function AmenityDialog({
     setIcon('');
     setDescription('');
     setBookingType('full_day');
-    setSlotDuration('60');
-    setMinBooking('');
-    setMaxBooking('');
+    setMinBooking('60');
+    setMaxBooking('60');
     setHours(defaultWeekdayHours());
     setCapacity('');
     setFee('');
@@ -173,6 +182,15 @@ export function AmenityDialog({
     setRulesText('');
     setActive(true);
   }
+
+  // Auto-adjust max booking when min changes
+  useEffect(() => {
+    const min = parseInt(minBooking, 10);
+    const max = parseInt(maxBooking, 10);
+    if (!isNaN(min) && !isNaN(max) && max < min) {
+      setMaxBooking(minBooking);
+    }
+  }, [minBooking, maxBooking]);
 
   // Auto-set requires_payment when fee changes
   useEffect(() => {
@@ -217,10 +235,10 @@ export function AmenityDialog({
       icon: icon || null,
       description: description.trim() || null,
       booking_type: bookingType,
-      slot_duration_minutes: bookingType === 'time_slot' ? parseInt(slotDuration, 10) : null,
-      min_booking_minutes: bookingType === 'time_slot' && minBooking ? parseInt(minBooking, 10) : null,
-      max_booking_minutes: bookingType === 'time_slot' && maxBooking ? parseInt(maxBooking, 10) : null,
-      operating_hours: bookingType === 'time_slot' ? hoursToRecord(hours) : null,
+      slot_duration_minutes: bookingType !== 'full_day' ? 30 : null,
+      min_booking_minutes: bookingType !== 'full_day' ? parseInt(minBooking, 10) : null,
+      max_booking_minutes: bookingType !== 'full_day' ? parseInt(maxBooking, 10) : null,
+      operating_hours: bookingType !== 'full_day' ? hoursToRecord(hours) : null,
       capacity: capacityNum,
       fee: feeCents,
       deposit: depositCents,
@@ -355,79 +373,48 @@ export function AmenityDialog({
               <SelectContent>
                 <SelectItem value="full_day">Full Day</SelectItem>
                 <SelectItem value="time_slot">Time Slot</SelectItem>
+                <SelectItem value="both">Both</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           {/* Time slot options (collapsible) */}
-          <Collapsible open={bookingType === 'time_slot'}>
+          <Collapsible open={bookingType === 'time_slot' || bookingType === 'both'}>
             <CollapsibleContent className="overflow-hidden transition-all data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
               <div className="space-y-4 pt-1">
-                {/* Slot duration */}
-                <div className="space-y-1.5">
-                  <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-                    Slot duration
-                  </label>
-                  <Select value={slotDuration} onValueChange={setSlotDuration}>
-                    <SelectTrigger className="max-w-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="30">30 minutes</SelectItem>
-                      <SelectItem value="60">60 minutes</SelectItem>
-                      <SelectItem value="90">90 minutes</SelectItem>
-                      <SelectItem value="120">120 minutes</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
                 {/* Min / Max booking duration */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
                       Min booking
-                      <span className="ml-1 text-text-muted-light dark:text-text-muted-dark font-normal">
-                        (optional)
-                      </span>
                     </label>
-                    <Select value={minBooking || 'default'} onValueChange={(v) => setMinBooking(v === 'default' ? '' : v)}>
+                    <Select value={minBooking} onValueChange={setMinBooking}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="default">1 slot (default)</SelectItem>
-                        {[2, 3, 4, 5, 6, 7, 8].map((n) => {
-                          const mins = n * parseInt(slotDuration, 10);
-                          return (
-                            <SelectItem key={n} value={String(mins)}>
-                              {formatMinutes(mins)}
-                            </SelectItem>
-                          );
-                        })}
+                        {TIME_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
                       Max booking
-                      <span className="ml-1 text-text-muted-light dark:text-text-muted-dark font-normal">
-                        (optional)
-                      </span>
                     </label>
-                    <Select value={maxBooking || 'default'} onValueChange={(v) => setMaxBooking(v === 'default' ? '' : v)}>
+                    <Select value={maxBooking} onValueChange={setMaxBooking}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="default">1 slot (default)</SelectItem>
-                        {[2, 3, 4, 5, 6, 7, 8].map((n) => {
-                          const mins = n * parseInt(slotDuration, 10);
-                          return (
-                            <SelectItem key={n} value={String(mins)}>
-                              {formatMinutes(mins)}
-                            </SelectItem>
-                          );
-                        })}
+                        {TIME_OPTIONS.filter((opt) => parseInt(opt.value, 10) >= parseInt(minBooking, 10)).map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>

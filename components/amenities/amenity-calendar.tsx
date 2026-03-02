@@ -64,7 +64,7 @@ export function AmenityCalendar({
             blocked.push(day);
           }
         } else {
-          // For time_slot amenities, check if the entire day is blocked
+          // For time_slot and both amenities, check if the entire day is blocked
           // A day is only partially blocked if some slots remain
           if (!partial.some((d) => isSameDay(d, day))) {
             partial.push(day);
@@ -128,7 +128,7 @@ export function AmenityCalendar({
         disabled={disabledDates}
         modifiers={{
           blocked: amenity.booking_type === 'full_day' ? blockedDays : [],
-          partiallyBooked: amenity.booking_type === 'time_slot' ? partialDays : [],
+          partiallyBooked: amenity.booking_type !== 'full_day' ? partialDays : [],
           hasEvent: eventDays,
         }}
         modifiersClassNames={{
