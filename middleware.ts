@@ -16,13 +16,20 @@ const PUBLIC_ROUTES = new Set([
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Allow public routes and static assets
+  // Static public routes + auth callback
   if (PUBLIC_ROUTES.has(pathname) || pathname.startsWith('/auth/')) {
     const { supabaseResponse } = await updateSession(request);
     return supabaseResponse;
   }
 
-  // All other routes (including /[slug]/*) require auth
+  // Community landing pages: single-segment paths like /westwood6 are public
+  const segments = pathname.split('/').filter(Boolean);
+  if (segments.length === 1) {
+    const { supabaseResponse } = await updateSession(request);
+    return supabaseResponse;
+  }
+
+  // All other routes (dashboard sub-pages) require auth
   const { user, supabaseResponse } = await updateSession(request);
 
   if (!user) {
@@ -37,7 +44,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Match all routes except static files and Next.js internals
     '/((?!_next/static|_next/image|favicon.ico|static/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 };

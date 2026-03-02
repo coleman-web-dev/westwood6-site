@@ -21,7 +21,7 @@ const metadata = {
   mastodon: '',
   author: 'DuesIQ',
   language: 'en-us',
-  theme: 'dark',
+  theme: 'light',
   locale: 'en-US',
 };
 

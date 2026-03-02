@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { MoonIcon, SunIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useThemeSwitch } from '@/components/shared/useThemeSwitch';
+import { DarkModeTooltip } from '@/components/shared/DarkModeTooltip';
 
 export const ThemeSwitch = () => {
   const [mounted, setMounted] = useState(false);
@@ -27,29 +28,33 @@ export const ThemeSwitch = () => {
   }
 
   return (
-    <button
-      aria-label="Toggle Dark Mode"
-      onClick={updateTheme}
-      className="relative w-6 h-6"
-    >
-      {currentTheme === 'dark' ? (
-        <motion.div
-          {...animation}
-          key="dark"
-          className="absolute left-0 top-0 w-6 h-6"
-        >
-          <MoonIcon />
-        </motion.div>
-      ) : (
-        <motion.div
-          {...animation}
-          key="light"
-          className="absolute left-0 top-0 w-6 h-6"
-        >
-          <SunIcon />
-        </motion.div>
-      )}
-    </button>
+    <div className="relative">
+      <button
+        aria-label="Toggle Dark Mode"
+        onClick={updateTheme}
+        className="relative w-6 h-6"
+      >
+        {currentTheme === 'dark' ? (
+          <motion.div
+            {...animation}
+            key="dark"
+            className="absolute left-0 top-0 w-6 h-6"
+          >
+            <MoonIcon />
+          </motion.div>
+        ) : (
+          <motion.div
+            {...animation}
+            key="light"
+            className="absolute left-0 top-0 w-6 h-6"
+          >
+            <SunIcon />
+          </motion.div>
+        )}
+      </button>
+
+      <DarkModeTooltip />
+    </div>
   );
 };
 

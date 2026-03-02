@@ -71,7 +71,7 @@ function LoginForm() {
           .single();
 
         if (community?.slug) {
-          router.push(redirect || `/${community.slug}`);
+          router.push(redirect || `/${community.slug}/dashboard`);
           return;
         }
       }

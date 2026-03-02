@@ -24,7 +24,7 @@ export default async function HomePage() {
         .single();
 
       if (community?.slug) {
-        redirect(`/${community.slug}`);
+        redirect(`/${community.slug}/dashboard`);
       }
     }
   }
