@@ -5,8 +5,7 @@
       "name": "dev",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
-      "port": 6006,
-      "cwd": "C:\\Users\\colem\\Projects\\coleman-web-dev\\westwood6-site"
+      "port": 6006
     }
   ]
 }

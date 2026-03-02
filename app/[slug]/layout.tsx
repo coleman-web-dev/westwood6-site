@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { CommunityProvider } from '@/lib/providers/community-provider';
 import type { Community, Member, Unit } from '@/lib/types/database';
@@ -19,6 +20,43 @@ export default async function CommunityLayout({ children, params }: Props) {
     .single();
 
   if (!community) notFound();
+
+  // Dev bypass: provide mock member data in development
+  const cookieStore = await cookies();
+  const isDevBypass = process.env.NODE_ENV === 'development' && cookieStore.get('dev-bypass')?.value === '1';
+
+  if (isDevBypass) {
+    const mockMember = {
+      id: 'dev-member',
+      user_id: 'dev-user',
+      community_id: community.id,
+      unit_id: 'dev-unit',
+      first_name: 'Dev',
+      last_name: 'User',
+      email: 'dev@localhost',
+      member_role: 'owner',
+      system_role: 'super_admin',
+      is_approved: true,
+      parent_member_id: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as Member;
+
+    const mockUnit = {
+      id: 'dev-unit',
+      community_id: community.id,
+      unit_number: '101',
+      address: '123 Dev St',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as Unit;
+
+    return (
+      <CommunityProvider initialData={{ community: community as Community, member: mockMember, unit: mockUnit, householdMembers: [mockMember] }}>
+        {children}
+      </CommunityProvider>
+    );
+  }
 
   const { data: { user } } = await supabase.auth.getUser();
   let member: Member | null = null;
