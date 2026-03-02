@@ -47,20 +47,24 @@ ALTER TABLE reservations ADD COLUMN IF NOT EXISTS deposit_paid_at TIMESTAMPTZ;
 -- 1f. RLS
 ALTER TABLE unit_wallets ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Members can view their unit wallet" ON unit_wallets;
 CREATE POLICY "Members can view their unit wallet"
   ON unit_wallets FOR SELECT
   USING (community_id = get_my_community_id() AND (unit_id = get_my_unit_id() OR is_board_member()));
 
+DROP POLICY IF EXISTS "Board can manage wallets" ON unit_wallets;
 CREATE POLICY "Board can manage wallets"
   ON unit_wallets FOR ALL
   USING (community_id = get_my_community_id() AND is_board_member());
 
 ALTER TABLE wallet_transactions ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Members can view their unit transactions" ON wallet_transactions;
 CREATE POLICY "Members can view their unit transactions"
   ON wallet_transactions FOR SELECT
   USING (community_id = get_my_community_id() AND (unit_id = get_my_unit_id() OR is_board_member()));
 
+DROP POLICY IF EXISTS "Board can manage transactions" ON wallet_transactions;
 CREATE POLICY "Board can manage transactions"
   ON wallet_transactions FOR ALL
   USING (community_id = get_my_community_id() AND is_board_member());

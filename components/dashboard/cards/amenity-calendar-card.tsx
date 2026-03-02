@@ -11,12 +11,18 @@ import {
   isSameDay,
   eachDayOfInterval,
   subDays,
+  format,
 } from 'date-fns';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Calendar } from '@/components/shared/ui/calendar';
+import {
+  HoverCard,
+  HoverCardTrigger,
+  HoverCardContent,
+} from '@/components/shared/ui/hover-card';
 import { DashboardCardShell } from './dashboard-card-shell';
-import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
+import { ChevronLeftIcon, ChevronRightIcon, CalendarDays } from 'lucide-react';
 import { getAmenityIcon } from '@/lib/amenity-icons';
 import type { Amenity, BlockedDateRange } from '@/lib/types/database';
 
@@ -107,6 +113,32 @@ export function AmenityCalendarCard() {
     return { blockedDays: blocked, eventDays: events, partialDays: partial };
   }, [blockedRanges, selectedAmenity]);
 
+  // Map dates to event details for hover tooltips
+  const eventByDate = useMemo(() => {
+    const map = new Map<string, { title: string; description: string | null; start: string; end: string }[]>();
+    for (const range of blockedRanges) {
+      if (range.block_type !== 'event' || !range.event_title) continue;
+      const start = new Date(range.start_datetime);
+      const end = new Date(range.end_datetime);
+      const days = eachDayOfInterval({
+        start: startOfDay(start),
+        end: startOfDay(subDays(end, end.getHours() === 0 && end.getMinutes() === 0 ? 1 : 0)),
+      });
+      for (const day of days) {
+        const key = format(day, 'yyyy-MM-dd');
+        const existing = map.get(key) ?? [];
+        existing.push({
+          title: range.event_title,
+          description: range.event_description,
+          start: range.start_datetime,
+          end: range.end_datetime,
+        });
+        map.set(key, existing);
+      }
+    }
+    return map;
+  }, [blockedRanges]);
+
   const today = useMemo(() => startOfDay(new Date()), []);
 
   const disabledDates = useMemo(() => {
@@ -196,6 +228,46 @@ export function AmenityCalendarCard() {
                   partiallyBooked:
                     'bg-secondary-100 dark:bg-secondary-900/30 border border-secondary-300/50 dark:border-secondary-700/50',
                   hasEvent: 'bg-mint/20 dark:bg-mint/10',
+                }}
+                components={{
+                  DayButton: ({ day, ...buttonProps }) => {
+                    const dateKey = format(day.date, 'yyyy-MM-dd');
+                    const dayEvents = eventByDate.get(dateKey);
+
+                    if (dayEvents && dayEvents.length > 0) {
+                      return (
+                        <HoverCard openDelay={200} closeDelay={100}>
+                          <HoverCardTrigger asChild>
+                            <button {...buttonProps} />
+                          </HoverCardTrigger>
+                          <HoverCardContent side="top" className="w-56 p-3">
+                            <div className="space-y-2">
+                              {dayEvents.map((evt, i) => (
+                                <div key={i}>
+                                  <div className="flex items-center gap-1.5">
+                                    <CalendarDays className="h-3.5 w-3.5 text-mint shrink-0" />
+                                    <p className="text-label text-text-primary-light dark:text-text-primary-dark leading-tight">
+                                      {evt.title}
+                                    </p>
+                                  </div>
+                                  <p className="text-meta text-text-muted-light dark:text-text-muted-dark mt-0.5 ml-5">
+                                    {format(new Date(evt.start), 'h:mm a')} &ndash; {format(new Date(evt.end), 'h:mm a')}
+                                  </p>
+                                  {evt.description && (
+                                    <p className="text-meta text-text-secondary-light dark:text-text-secondary-dark mt-1 ml-5 line-clamp-3">
+                                      {evt.description}
+                                    </p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </HoverCardContent>
+                        </HoverCard>
+                      );
+                    }
+
+                    return <button {...buttonProps} />;
+                  },
                 }}
                 className="rounded-inner-card border border-stroke-light dark:border-stroke-dark"
               />
