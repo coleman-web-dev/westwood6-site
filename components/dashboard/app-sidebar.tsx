@@ -55,13 +55,15 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
   return (
     <aside
       className={`
-        fixed lg:sticky top-0 left-0 z-50 h-screen
-        w-sidebar flex flex-col items-center
+        group/sidebar
+        fixed top-0 left-0 z-50 h-screen
+        w-sidebar lg:hover:w-52
+        flex flex-col
         py-4 gap-3.5
         bg-surface-light dark:bg-surface-dark
         border-r border-stroke-light dark:border-stroke-dark
-        transform transition-transform duration-300
-        ${open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        transition-[width] duration-200 ease-out overflow-hidden
+        ${open ? 'translate-x-0 w-52' : '-translate-x-full lg:translate-x-0'}
       `}
     >
       {/* Mobile close */}
@@ -73,14 +75,22 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
       </button>
 
       {/* Brand mark */}
-      <Link href={basePath} className="w-7 h-7 rounded-full bg-gradient-to-br from-secondary-300 to-mint flex items-center justify-center mb-4">
-        <span className="text-[10px] font-bold text-primary-900">D</span>
+      <Link href={basePath} className="flex items-center gap-3 px-5 mb-4">
+        <div className="w-7 h-7 shrink-0 rounded-full bg-gradient-to-br from-secondary-300 to-mint flex items-center justify-center">
+          <span className="text-[10px] font-bold text-primary-900">D</span>
+        </div>
+        <span className="text-label font-semibold text-text-primary-light dark:text-text-primary-dark whitespace-nowrap opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200 hidden lg:block">
+          DuesIQ
+        </span>
+        <span className="text-label font-semibold text-text-primary-light dark:text-text-primary-dark whitespace-nowrap lg:hidden">
+          DuesIQ
+        </span>
       </Link>
 
-      {/* Nav icons */}
-      <nav className="flex-1 flex flex-col items-center gap-1">
+      {/* Nav items */}
+      <nav className="flex-1 flex flex-col gap-1 px-3">
         {NAV_ITEMS.map((item) => (
-          <NavIcon
+          <NavItem
             key={item.href}
             icon={item.icon}
             href={`${basePath}${item.href}`}
@@ -89,7 +99,7 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
           />
         ))}
         {isHeadOfHousehold && (
-          <NavIcon
+          <NavItem
             icon={Users}
             href={`${basePath}/household`}
             active={isActive('/household')}
@@ -98,15 +108,15 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
         )}
       </nav>
 
-      {/* Utility icons */}
-      <div className="flex flex-col items-center gap-1">
-        <NavIcon
+      {/* Utility items */}
+      <div className="flex flex-col gap-1 px-3">
+        <NavItem
           icon={Globe}
           href={`/${community.slug}`}
           active={false}
           label="Community Page"
         />
-        <NavIcon
+        <NavItem
           icon={Settings}
           href={`${basePath}/settings`}
           active={isActive('/settings')}
@@ -114,17 +124,22 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
         />
         <button
           onClick={handleSignOut}
-          title="Sign out"
-          className="w-11 h-11 flex items-center justify-center rounded-inner-card transition-colors text-text-muted-light dark:text-text-muted-dark hover:text-text-primary-light dark:hover:text-text-primary-dark hover:bg-surface-light-2 dark:hover:bg-surface-dark-2"
+          className="flex items-center gap-3 h-10 px-2.5 rounded-inner-card transition-colors text-text-muted-light dark:text-text-muted-dark hover:text-text-primary-light dark:hover:text-text-primary-dark hover:bg-surface-light-2 dark:hover:bg-surface-dark-2"
         >
-          <LogOut className="w-[18px] h-[18px]" />
+          <LogOut className="w-[18px] h-[18px] shrink-0" />
+          <span className="text-body whitespace-nowrap opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200 hidden lg:block">
+            Sign out
+          </span>
+          <span className="text-body whitespace-nowrap lg:hidden">
+            Sign out
+          </span>
         </button>
       </div>
     </aside>
   );
 }
 
-function NavIcon({
+function NavItem({
   icon: Icon,
   href,
   active = false,
@@ -138,9 +153,8 @@ function NavIcon({
   return (
     <Link
       href={href}
-      title={label}
       className={`
-        w-11 h-11 flex items-center justify-center rounded-inner-card transition-colors
+        flex items-center gap-3 h-10 px-2.5 rounded-inner-card transition-colors
         ${
           active
             ? 'bg-secondary-400/15 text-secondary-400'
@@ -148,7 +162,13 @@ function NavIcon({
         }
       `}
     >
-      <Icon className="w-[18px] h-[18px]" />
+      <Icon className="w-[18px] h-[18px] shrink-0" />
+      <span className="text-body whitespace-nowrap opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200 hidden lg:block">
+        {label}
+      </span>
+      <span className="text-body whitespace-nowrap lg:hidden">
+        {label}
+      </span>
     </Link>
   );
 }

@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
-import type { Event, EventVisibility } from '@/lib/types/database';
+import type { Amenity, Event, EventVisibility } from '@/lib/types/database';
 
 interface CreateEventDialogProps {
   open: boolean;
@@ -61,9 +61,28 @@ export function CreateEventDialog({
   const [endDate, setEndDate] = useState('');
   const [endTime, setEndTime] = useState('');
   const [visibility, setVisibility] = useState<EventVisibility>('public');
+  const [amenityId, setAmenityId] = useState<string | null>(null);
+  const [blocksAmenity, setBlocksAmenity] = useState(false);
+  const [amenities, setAmenities] = useState<Amenity[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   const isEditing = editingEvent !== null;
+
+  // Fetch amenities when dialog opens
+  useEffect(() => {
+    if (!open) return;
+    const supabase = createClient();
+    async function loadAmenities() {
+      const { data } = await supabase
+        .from('amenities')
+        .select('*')
+        .eq('community_id', community.id)
+        .eq('active', true)
+        .order('name');
+      setAmenities((data as Amenity[]) ?? []);
+    }
+    loadAmenities();
+  }, [open, community.id]);
 
   // Pre-fill form when editing, reset when creating
   useEffect(() => {
@@ -76,6 +95,8 @@ export function CreateEventDialog({
       setEndDate(toLocalDateString(editingEvent.end_datetime));
       setEndTime(toLocalTimeString(editingEvent.end_datetime));
       setVisibility(editingEvent.visibility);
+      setAmenityId(editingEvent.amenity_id);
+      setBlocksAmenity(editingEvent.blocks_amenity);
     } else {
       resetForm();
     }
@@ -90,6 +111,8 @@ export function CreateEventDialog({
     setEndDate('');
     setEndTime('');
     setVisibility('public');
+    setAmenityId(null);
+    setBlocksAmenity(false);
   }
 
   function isFormValid(): boolean {
@@ -122,6 +145,8 @@ export function CreateEventDialog({
       start_datetime: startIso,
       end_datetime: endIso,
       visibility,
+      amenity_id: amenityId || null,
+      blocks_amenity: amenityId ? blocksAmenity : false,
     };
 
     if (isEditing) {
@@ -218,6 +243,51 @@ export function CreateEventDialog({
               maxLength={200}
             />
           </div>
+
+          {/* Amenity */}
+          {amenities.length > 0 && (
+            <div className="space-y-1.5">
+              <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                Amenity
+                <span className="ml-1 text-text-muted-light dark:text-text-muted-dark font-normal">
+                  (optional)
+                </span>
+              </label>
+              <Select
+                value={amenityId ?? 'none'}
+                onValueChange={(v) => {
+                  setAmenityId(v === 'none' ? null : v);
+                  if (v === 'none') setBlocksAmenity(false);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="None" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {amenities.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {amenityId && (
+                <label className="flex items-center gap-2 pt-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={blocksAmenity}
+                    onChange={(e) => setBlocksAmenity(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300"
+                  />
+                  <span className="text-body text-text-secondary-light dark:text-text-secondary-dark">
+                    Block amenity calendar during this event
+                  </span>
+                </label>
+              )}
+            </div>
+          )}
 
           {/* Start date/time */}
           <div className="space-y-1.5">

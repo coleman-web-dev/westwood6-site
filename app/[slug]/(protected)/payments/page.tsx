@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Plus, DollarSign } from 'lucide-react';
+import { Plus, DollarSign, ClipboardList } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Button } from '@/components/shared/ui/button';
@@ -9,15 +9,29 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/shared/ui
 import { InvoiceList } from '@/components/payments/invoice-list';
 import { PaymentHistory } from '@/components/payments/payment-history';
 import { CreateInvoiceDialog } from '@/components/payments/create-invoice-dialog';
-import type { Invoice, Payment } from '@/lib/types/database';
+import { WalletCard } from '@/components/payments/wallet-card';
+import { ManageWalletDialog } from '@/components/payments/manage-wallet-dialog';
+import { HouseholdLedger } from '@/components/payments/household-ledger';
+import { AssessmentList } from '@/components/payments/assessment-list';
+import { CreateAssessmentDialog } from '@/components/payments/create-assessment-dialog';
+import { FrequencySelector } from '@/components/payments/frequency-selector';
+import type { Invoice, Payment, Unit, Assessment } from '@/lib/types/database';
 
 export default function PaymentsPage() {
   const { community, member, unit, isBoard } = useCommunity();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [unitOwnerMap, setUnitOwnerMap] = useState<Record<string, string>>({});
+  const [allUnits, setAllUnits] = useState<Unit[]>([]);
+  const [allMembers, setAllMembers] = useState<{ unit_id: string | null; user_id: string | null }[]>([]);
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [walletBalance, setWalletBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [assessmentDialogOpen, setAssessmentDialogOpen] = useState(false);
+  const [walletDialogOpen, setWalletDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('invoices');
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const fetchData = useCallback(async () => {
     const supabase = createClient();
@@ -44,14 +58,10 @@ export default function PaymentsPage() {
     if (!isBoard && unit) {
       paymentQuery = paymentQuery.eq('unit_id', unit.id);
     } else if (isBoard) {
-      // Board sees all community payments via invoice join
-      // Since payments table doesn't have community_id directly,
-      // filter by invoice_ids belonging to this community
       const communityInvoiceIds = (invoiceData as Invoice[] | null)?.map((inv) => inv.id) ?? [];
       if (communityInvoiceIds.length > 0) {
         paymentQuery = paymentQuery.in('invoice_id', communityInvoiceIds);
       } else {
-        // No invoices means no payments to show
         setInvoices([]);
         setPayments([]);
         setLoading(false);
@@ -61,8 +71,71 @@ export default function PaymentsPage() {
 
     const { data: paymentData } = await paymentQuery;
 
+    // Fetch unit owners for display (board only)
+    const ownerMap: Record<string, string> = {};
+    if (isBoard) {
+      const { data: owners } = await supabase
+        .from('members')
+        .select('unit_id, first_name, last_name')
+        .eq('community_id', community.id)
+        .eq('member_role', 'owner')
+        .is('parent_member_id', null);
+
+      for (const o of (owners ?? []) as { unit_id: string | null; first_name: string; last_name: string }[]) {
+        if (o.unit_id) ownerMap[o.unit_id] = `${o.first_name} ${o.last_name}`;
+      }
+    }
+
+    // Fetch units + members for filtering (board only)
+    let fetchedUnits: Unit[] = [];
+    let fetchedMembers: { unit_id: string | null; user_id: string | null }[] = [];
+    if (isBoard) {
+      const { data: unitData } = await supabase
+        .from('units')
+        .select('*')
+        .eq('community_id', community.id)
+        .eq('status', 'active')
+        .order('unit_number', { ascending: true });
+
+      fetchedUnits = (unitData as Unit[]) ?? [];
+
+      const { data: memberData } = await supabase
+        .from('members')
+        .select('unit_id, user_id')
+        .eq('community_id', community.id);
+
+      fetchedMembers = (memberData ?? []) as { unit_id: string | null; user_id: string | null }[];
+    }
+
+    // Fetch assessments (board only)
+    let fetchedAssessments: Assessment[] = [];
+    if (isBoard) {
+      const { data: assessmentData } = await supabase
+        .from('assessments')
+        .select('*')
+        .eq('community_id', community.id)
+        .order('created_at', { ascending: false });
+
+      fetchedAssessments = (assessmentData as Assessment[]) ?? [];
+    }
+
+    // Fetch wallet balance for current unit
+    if (unit) {
+      const { data: walletData } = await supabase
+        .from('unit_wallets')
+        .select('balance')
+        .eq('unit_id', unit.id)
+        .single();
+
+      setWalletBalance(walletData?.balance ?? 0);
+    }
+
     setInvoices((invoiceData as Invoice[]) ?? []);
     setPayments((paymentData as Payment[]) ?? []);
+    setUnitOwnerMap(ownerMap);
+    setAllUnits(fetchedUnits);
+    setAllMembers(fetchedMembers);
+    setAssessments(fetchedAssessments);
     setLoading(false);
   }, [community.id, isBoard, unit]);
 
@@ -84,6 +157,11 @@ export default function PaymentsPage() {
     fetchData();
   }
 
+  function handleWalletUpdated() {
+    setRefreshKey((k) => k + 1);
+    fetchData();
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -92,40 +170,64 @@ export default function PaymentsPage() {
           Payments
         </h1>
         {isBoard && (
-          <Button onClick={() => setDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Create Invoice
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setAssessmentDialogOpen(true)}>
+              <ClipboardList className="h-4 w-4 mr-2" />
+              New Assessment
+            </Button>
+            <Button onClick={() => setDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Invoice
+            </Button>
+          </div>
         )}
       </div>
 
-      {/* Balance summary card */}
-      <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-inner-card bg-secondary-100 dark:bg-secondary-900">
-            <DollarSign className="h-5 w-5 text-secondary-600 dark:text-secondary-400" />
+      {/* Summary cards */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        {/* Balance summary card */}
+        <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-inner-card bg-secondary-100 dark:bg-secondary-900">
+              <DollarSign className="h-5 w-5 text-secondary-600 dark:text-secondary-400" />
+            </div>
+            <div>
+              <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                Total Outstanding
+              </p>
+              <p className="text-metric-xl tabular-nums text-text-primary-light dark:text-text-primary-dark">
+                ${(totalOutstanding / 100).toFixed(2)}
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-              Total Outstanding
-            </p>
-            <p className="text-metric-xl tabular-nums text-text-primary-light dark:text-text-primary-dark">
-              ${(totalOutstanding / 100).toFixed(2)}
-            </p>
-          </div>
+          <p className="text-meta text-text-muted-light dark:text-text-muted-dark mt-2">
+            {outstandingInvoices.length === 0
+              ? 'No outstanding invoices'
+              : `${outstandingInvoices.length} outstanding invoice${outstandingInvoices.length === 1 ? '' : 's'}`}
+          </p>
         </div>
-        <p className="text-meta text-text-muted-light dark:text-text-muted-dark mt-2">
-          {outstandingInvoices.length === 0
-            ? 'No outstanding invoices'
-            : `${outstandingInvoices.length} outstanding invoice${outstandingInvoices.length === 1 ? '' : 's'}`}
-        </p>
+
+        {/* Wallet card */}
+        {unit && (
+          <WalletCard
+            unitId={unit.id}
+            isBoard={isBoard}
+            onManageClick={() => setWalletDialogOpen(true)}
+            refreshKey={refreshKey}
+          />
+        )}
       </div>
+
+      {/* Frequency selector for households */}
+      <FrequencySelector onFrequencyChanged={fetchData} />
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="invoices">Invoices</TabsTrigger>
           <TabsTrigger value="history">Payment History</TabsTrigger>
+          <TabsTrigger value="ledger">Ledger</TabsTrigger>
+          {isBoard && <TabsTrigger value="assessments">Assessments</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="invoices">
@@ -133,6 +235,9 @@ export default function PaymentsPage() {
             invoices={invoices}
             loading={loading}
             onInvoiceUpdated={handleInvoiceUpdated}
+            unitOwnerMap={isBoard ? unitOwnerMap : undefined}
+            units={isBoard ? allUnits : undefined}
+            allMembers={isBoard ? allMembers : undefined}
           />
         </TabsContent>
 
@@ -143,6 +248,20 @@ export default function PaymentsPage() {
             loading={loading}
           />
         </TabsContent>
+
+        <TabsContent value="ledger">
+          <HouseholdLedger refreshKey={refreshKey} />
+        </TabsContent>
+
+        {isBoard && (
+          <TabsContent value="assessments">
+            <AssessmentList
+              assessments={assessments}
+              loading={loading}
+              onAssessmentUpdated={fetchData}
+            />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Create invoice dialog (board only) */}
@@ -151,6 +270,24 @@ export default function PaymentsPage() {
         onOpenChange={setDialogOpen}
         onSuccess={handleDialogSuccess}
       />
+
+      {/* Create assessment dialog (board only) */}
+      <CreateAssessmentDialog
+        open={assessmentDialogOpen}
+        onOpenChange={setAssessmentDialogOpen}
+        onSuccess={fetchData}
+      />
+
+      {/* Manage wallet dialog (board only) */}
+      {unit && (
+        <ManageWalletDialog
+          unitId={unit.id}
+          currentBalance={walletBalance}
+          open={walletDialogOpen}
+          onOpenChange={setWalletDialogOpen}
+          onSuccess={handleWalletUpdated}
+        />
+      )}
     </div>
   );
 }

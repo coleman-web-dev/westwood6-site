@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import {
@@ -15,81 +15,55 @@ import {
 import { Button } from '@/components/shared/ui/button';
 import { Input } from '@/components/shared/ui/input';
 import { Textarea } from '@/components/shared/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/shared/ui/select';
 import { toast } from 'sonner';
-import type { Unit } from '@/lib/types/database';
 
-interface CreateInvoiceDialogProps {
+interface CreateAssessmentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
 }
 
-export function CreateInvoiceDialog({
+export function CreateAssessmentDialog({
   open,
   onOpenChange,
   onSuccess,
-}: CreateInvoiceDialogProps) {
-  const { community } = useCommunity();
-  const [units, setUnits] = useState<Unit[]>([]);
-  const [unitId, setUnitId] = useState('');
+}: CreateAssessmentDialogProps) {
+  const { community, member } = useCommunity();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [amount, setAmount] = useState('');
-  const [dueDate, setDueDate] = useState('');
-  const [notes, setNotes] = useState('');
+  const [annualAmount, setAnnualAmount] = useState('');
+  const [fiscalYearStart, setFiscalYearStart] = useState('');
+  const [fiscalYearEnd, setFiscalYearEnd] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Fetch active units for the community
-  useEffect(() => {
-    if (!open) return;
-
-    async function loadUnits() {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from('units')
-        .select('*')
-        .eq('community_id', community.id)
-        .eq('status', 'active')
-        .order('unit_number', { ascending: true });
-
-      setUnits((data as Unit[]) ?? []);
-    }
-
-    loadUnits();
-  }, [open, community.id]);
-
   function resetForm() {
-    setUnitId('');
     setTitle('');
     setDescription('');
-    setAmount('');
-    setDueDate('');
-    setNotes('');
+    setAnnualAmount('');
+    setFiscalYearStart('');
+    setFiscalYearEnd('');
   }
 
-  // Reset form when dialog closes
   useEffect(() => {
-    if (!open) {
-      resetForm();
-    }
+    if (!open) resetForm();
   }, [open]);
 
   async function handleSubmit() {
-    if (!unitId || !title.trim() || !amount || !dueDate) {
+    if (!member) return;
+
+    if (!title.trim() || !annualAmount || !fiscalYearStart || !fiscalYearEnd) {
       toast.error('Please fill in all required fields.');
       return;
     }
 
-    const parsedAmount = parseFloat(amount);
+    const parsedAmount = parseFloat(annualAmount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      toast.error('Please enter a valid amount.');
+      toast.error('Please enter a valid annual amount.');
+      return;
+    }
+
+    if (fiscalYearEnd <= fiscalYearStart) {
+      toast.error('Fiscal year end must be after the start date.');
       return;
     }
 
@@ -98,69 +72,50 @@ export function CreateInvoiceDialog({
     setSubmitting(true);
     const supabase = createClient();
 
-    const { error } = await supabase.from('invoices').insert({
+    const { error } = await supabase.from('assessments').insert({
       community_id: community.id,
-      unit_id: unitId,
       title: title.trim(),
       description: description.trim() || null,
-      notes: notes.trim() || null,
-      amount: amountCents,
-      due_date: dueDate,
-      status: 'pending',
+      annual_amount: amountCents,
+      fiscal_year_start: fiscalYearStart,
+      fiscal_year_end: fiscalYearEnd,
+      created_by: member.id,
     });
 
     setSubmitting(false);
 
     if (error) {
-      toast.error('Failed to create invoice. Please try again.');
+      toast.error('Failed to create assessment. Please try again.');
       return;
     }
 
-    toast.success('Invoice created.');
+    toast.success('Assessment created. You can now generate invoices for it.');
     resetForm();
     onOpenChange(false);
     onSuccess();
   }
 
-  const isValid = unitId && title.trim() && amount && dueDate;
+  const isValid = title.trim() && annualAmount && fiscalYearStart && fiscalYearEnd;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Create Invoice</DialogTitle>
+          <DialogTitle>Create Assessment</DialogTitle>
           <DialogDescription>
-            Create a new invoice for a unit in this community.
+            Define a recurring annual charge. After creating, use &quot;Generate Invoices&quot; to
+            create invoices for all units.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          {/* Unit selector */}
-          <div className="space-y-1.5">
-            <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-              Unit <span className="text-destructive">*</span>
-            </label>
-            <Select value={unitId} onValueChange={setUnitId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a unit" />
-              </SelectTrigger>
-              <SelectContent>
-                {units.map((u) => (
-                  <SelectItem key={u.id} value={u.id}>
-                    {u.unit_number}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
           {/* Title */}
           <div className="space-y-1.5">
             <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
               Title <span className="text-destructive">*</span>
             </label>
             <Input
-              placeholder="e.g. Q1 2026 HOA Dues"
+              placeholder="e.g. HOA Dues 2026"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               maxLength={200}
@@ -173,57 +128,53 @@ export function CreateInvoiceDialog({
               Description
             </label>
             <Textarea
-              placeholder="Optional details about this invoice"
+              placeholder="Optional details about this assessment"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="resize-none"
-              rows={3}
+              rows={2}
             />
           </div>
 
-          {/* Amount */}
+          {/* Annual Amount */}
           <div className="space-y-1.5">
             <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-              Amount ($) <span className="text-destructive">*</span>
+              Annual Amount ($) <span className="text-destructive">*</span>
             </label>
             <Input
               type="number"
               step="0.01"
               min="0.01"
               placeholder="0.00"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              value={annualAmount}
+              onChange={(e) => setAnnualAmount(e.target.value)}
               className="tabular-nums"
             />
           </div>
 
-          {/* Due date */}
+          {/* Fiscal Year Start */}
           <div className="space-y-1.5">
             <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-              Due Date <span className="text-destructive">*</span>
+              Fiscal Year Start <span className="text-destructive">*</span>
             </label>
             <input
               type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
+              value={fiscalYearStart}
+              onChange={(e) => setFiscalYearStart(e.target.value)}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
 
-          {/* Notes */}
+          {/* Fiscal Year End */}
           <div className="space-y-1.5">
             <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-              Notes
-              <span className="ml-1 text-text-muted-light dark:text-text-muted-dark font-normal">
-                (optional, visible to residents)
-              </span>
+              Fiscal Year End <span className="text-destructive">*</span>
             </label>
-            <Textarea
-              placeholder="Add a note to this invoice"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="resize-none"
-              rows={2}
+            <input
+              type="date"
+              value={fiscalYearEnd}
+              onChange={(e) => setFiscalYearEnd(e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
         </div>
@@ -236,7 +187,7 @@ export function CreateInvoiceDialog({
             onClick={handleSubmit}
             disabled={submitting || !isValid}
           >
-            {submitting ? 'Creating...' : 'Create Invoice'}
+            {submitting ? 'Creating...' : 'Create Assessment'}
           </Button>
         </DialogFooter>
       </DialogContent>

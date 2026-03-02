@@ -8,6 +8,7 @@ import { DashboardCardShell } from './dashboard-card-shell';
 export function BalanceCard() {
   const { unit } = useCommunity();
   const [balance, setBalance] = useState<number | null>(null);
+  const [walletCredit, setWalletCredit] = useState<number>(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -27,6 +28,15 @@ export function BalanceCard() {
 
       const total = invoices?.reduce((sum: number, inv: { amount: number }) => sum + inv.amount, 0) ?? 0;
       setBalance(total);
+
+      // Fetch wallet credit
+      const { data: walletData } = await supabase
+        .from('unit_wallets')
+        .select('balance')
+        .eq('unit_id', unit!.id)
+        .single();
+
+      setWalletCredit(walletData?.balance ?? 0);
       setLoading(false);
     }
 
@@ -45,6 +55,11 @@ export function BalanceCard() {
           <p className="text-meta text-text-secondary-light dark:text-text-secondary-dark mt-1">
             Outstanding balance
           </p>
+          {walletCredit > 0 && (
+            <p className="text-meta text-primary-600 dark:text-primary-400 mt-1 tabular-nums">
+              Credit: ${(walletCredit / 100).toFixed(2)}
+            </p>
+          )}
         </div>
       )}
     </DashboardCardShell>

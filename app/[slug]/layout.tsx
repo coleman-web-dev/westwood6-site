@@ -34,12 +34,13 @@ export default async function CommunityLayout({ children, params }: Props) {
       first_name: 'Dev',
       last_name: 'User',
       email: 'dev@localhost',
+      phone: null,
       member_role: 'owner',
       system_role: 'super_admin',
       is_approved: true,
+      show_in_directory: true,
       parent_member_id: null,
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
     } as Member;
 
     const mockUnit = {
@@ -47,8 +48,9 @@ export default async function CommunityLayout({ children, params }: Props) {
       community_id: community.id,
       unit_number: '101',
       address: '123 Dev St',
+      status: 'active',
+      payment_frequency: null,
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
     } as Unit;
 
     return (

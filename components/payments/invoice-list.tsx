@@ -1,12 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Button } from '@/components/shared/ui/button';
 import { Badge } from '@/components/shared/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/shared/ui/select';
 import { toast } from 'sonner';
-import type { Invoice, InvoiceStatus } from '@/lib/types/database';
+import { BounceInvoiceDialog } from '@/components/payments/bounce-invoice-dialog';
+import type { Invoice, InvoiceStatus, Unit } from '@/lib/types/database';
 
 const STATUS_FILTERS: { value: string; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -15,6 +23,7 @@ const STATUS_FILTERS: { value: string; label: string }[] = [
   { value: 'paid', label: 'Paid' },
   { value: 'partial', label: 'Partial' },
   { value: 'waived', label: 'Waived' },
+  { value: 'voided', label: 'Voided' },
 ];
 
 const STATUS_BADGE_VARIANT: Record<InvoiceStatus, 'outline' | 'secondary' | 'destructive' | 'default'> = {
@@ -23,23 +32,63 @@ const STATUS_BADGE_VARIANT: Record<InvoiceStatus, 'outline' | 'secondary' | 'des
   overdue: 'destructive',
   partial: 'default',
   waived: 'outline',
+  voided: 'outline',
 };
 
 interface InvoiceListProps {
   invoices: Invoice[];
   loading: boolean;
   onInvoiceUpdated: () => void;
+  unitOwnerMap?: Record<string, string>;
+  units?: Unit[];
+  allMembers?: { unit_id: string | null; user_id: string | null }[];
 }
 
-export function InvoiceList({ invoices, loading, onInvoiceUpdated }: InvoiceListProps) {
+export function InvoiceList({
+  invoices,
+  loading,
+  onInvoiceUpdated,
+  unitOwnerMap,
+  units,
+  allMembers,
+}: InvoiceListProps) {
   const { isBoard } = useCommunity();
   const [statusFilter, setStatusFilter] = useState('all');
+  const [unitFilter, setUnitFilter] = useState('all');
+  const [unregisteredOnly, setUnregisteredOnly] = useState(false);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [bouncingInvoice, setBouncingInvoice] = useState<Invoice | null>(null);
 
-  const filteredInvoices =
-    statusFilter === 'all'
-      ? invoices
-      : invoices.filter((inv) => inv.status === statusFilter);
+  // Compute set of unit IDs that have NO registered members (no user_id)
+  const unregisteredUnitIds = useMemo(() => {
+    if (!allMembers) return new Set<string>();
+    const unitUserMap = new Map<string, boolean>();
+    for (const m of allMembers) {
+      if (!m.unit_id) continue;
+      if (m.user_id) {
+        unitUserMap.set(m.unit_id, true);
+      } else if (!unitUserMap.has(m.unit_id)) {
+        unitUserMap.set(m.unit_id, false);
+      }
+    }
+    return new Set(
+      [...unitUserMap.entries()]
+        .filter(([, hasRegistered]) => !hasRegistered)
+        .map(([unitId]) => unitId)
+    );
+  }, [allMembers]);
+
+  // Apply all filters
+  const filteredInvoices = invoices.filter((inv) => {
+    if (statusFilter !== 'all' && inv.status !== statusFilter) return false;
+    if (unitFilter !== 'all' && inv.unit_id !== unitFilter) return false;
+    if (unregisteredOnly && !unregisteredUnitIds.has(inv.unit_id)) return false;
+    if (dateFrom && inv.due_date < dateFrom) return false;
+    if (dateTo && inv.due_date > dateTo) return false;
+    return true;
+  });
 
   async function handleMarkPaid(invoice: Invoice) {
     setUpdatingId(invoice.id);
@@ -81,6 +130,26 @@ export function InvoiceList({ invoices, loading, onInvoiceUpdated }: InvoiceList
     onInvoiceUpdated();
   }
 
+  async function handleVoid(invoice: Invoice) {
+    setUpdatingId(invoice.id);
+    const supabase = createClient();
+
+    const { error } = await supabase
+      .from('invoices')
+      .update({ status: 'voided' })
+      .eq('id', invoice.id);
+
+    setUpdatingId(null);
+
+    if (error) {
+      toast.error('Failed to void invoice. Please try again.');
+      return;
+    }
+
+    toast.success('Invoice voided.');
+    onInvoiceUpdated();
+  }
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -100,23 +169,105 @@ export function InvoiceList({ invoices, loading, onInvoiceUpdated }: InvoiceList
 
   return (
     <div className="space-y-4">
-      {/* Status filter (board sees all statuses, residents do too for their own) */}
+      {/* Filters (board only) */}
       {isBoard && (
-        <div className="flex flex-wrap gap-2">
-          {STATUS_FILTERS.map((filter) => (
+        <div className="space-y-3">
+          {/* Status pills */}
+          <div className="flex flex-wrap gap-2">
+            {STATUS_FILTERS.map((filter) => (
+              <button
+                key={filter.value}
+                type="button"
+                onClick={() => setStatusFilter(filter.value)}
+                className={`px-3 py-1.5 rounded-pill text-label transition-colors ${
+                  statusFilter === filter.value
+                    ? 'bg-primary-700 text-white dark:bg-primary-300 dark:text-primary-900'
+                    : 'bg-surface-light-2 dark:bg-surface-dark-2 text-text-secondary-light dark:text-text-secondary-dark hover:bg-primary-100 dark:hover:bg-primary-800'
+                }`}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Advanced filters row */}
+          <div className="flex flex-wrap items-end gap-3">
+            {/* Unit filter */}
+            {units && units.length > 0 && (
+              <div className="space-y-1 min-w-[160px]">
+                <label className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                  Unit
+                </label>
+                <Select value={unitFilter} onValueChange={setUnitFilter}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Units</SelectItem>
+                    {units.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        Unit {u.unit_number}
+                        {unitOwnerMap?.[u.id] ? ` - ${unitOwnerMap[u.id]}` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Date range */}
+            <div className="space-y-1">
+              <label className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                From
+              </label>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                To
+              </label>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              />
+            </div>
+
+            {/* Unregistered only toggle */}
             <button
-              key={filter.value}
               type="button"
-              onClick={() => setStatusFilter(filter.value)}
+              onClick={() => setUnregisteredOnly(!unregisteredOnly)}
               className={`px-3 py-1.5 rounded-pill text-label transition-colors ${
-                statusFilter === filter.value
+                unregisteredOnly
                   ? 'bg-primary-700 text-white dark:bg-primary-300 dark:text-primary-900'
                   : 'bg-surface-light-2 dark:bg-surface-dark-2 text-text-secondary-light dark:text-text-secondary-dark hover:bg-primary-100 dark:hover:bg-primary-800'
               }`}
             >
-              {filter.label}
+              Unregistered Only
             </button>
-          ))}
+
+            {/* Clear filters */}
+            {(unitFilter !== 'all' || unregisteredOnly || dateFrom || dateTo) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setUnitFilter('all');
+                  setUnregisteredOnly(false);
+                  setDateFrom('');
+                  setDateTo('');
+                }}
+              >
+                Clear Filters
+              </Button>
+            )}
+          </div>
         </div>
       )}
 
@@ -130,7 +281,9 @@ export function InvoiceList({ invoices, loading, onInvoiceUpdated }: InvoiceList
           const canUpdate =
             isBoard &&
             invoice.status !== 'paid' &&
-            invoice.status !== 'waived';
+            invoice.status !== 'waived' &&
+            invoice.status !== 'voided';
+          const canBounce = isBoard && invoice.status === 'paid';
 
           return (
             <div
@@ -148,9 +301,22 @@ export function InvoiceList({ invoices, loading, onInvoiceUpdated }: InvoiceList
                     </Badge>
                   </div>
 
+                  {/* Owner name (board view) */}
+                  {unitOwnerMap?.[invoice.unit_id] && (
+                    <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                      {unitOwnerMap[invoice.unit_id]}
+                    </p>
+                  )}
+
                   {invoice.description && (
                     <p className="text-body text-text-secondary-light dark:text-text-secondary-dark mt-1">
                       {invoice.description}
+                    </p>
+                  )}
+
+                  {invoice.notes && (
+                    <p className="text-meta text-text-muted-light dark:text-text-muted-dark mt-1 italic">
+                      Note: {invoice.notes}
                     </p>
                   )}
 
@@ -171,6 +337,11 @@ export function InvoiceList({ invoices, loading, onInvoiceUpdated }: InvoiceList
                           month: 'short',
                           day: 'numeric',
                         })}
+                      </p>
+                    )}
+                    {invoice.bounced_from_invoice_id && (
+                      <p className="text-meta text-destructive">
+                        Rebilled (bounced check)
                       </p>
                     )}
                   </div>
@@ -202,12 +373,43 @@ export function InvoiceList({ invoices, loading, onInvoiceUpdated }: InvoiceList
                   >
                     Waive
                   </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleVoid(invoice)}
+                    disabled={isUpdating}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    Void
+                  </Button>
+                </div>
+              )}
+
+              {/* Bounced check action (paid invoices only) */}
+              {canBounce && (
+                <div className="flex gap-2 mt-3 pt-3 border-t border-stroke-light dark:border-stroke-dark">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setBouncingInvoice(invoice)}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    Mark as Bounced
+                  </Button>
                 </div>
               )}
             </div>
           );
         })
       )}
+
+      {/* Bounce invoice dialog */}
+      <BounceInvoiceDialog
+        invoice={bouncingInvoice}
+        open={bouncingInvoice !== null}
+        onOpenChange={(open) => { if (!open) setBouncingInvoice(null); }}
+        onSuccess={onInvoiceUpdated}
+      />
     </div>
   );
 }

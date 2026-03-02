@@ -4,18 +4,25 @@ export type MemberRole = 'owner' | 'member' | 'tenant' | 'minor';
 export type SystemRole = 'resident' | 'board' | 'manager' | 'super_admin';
 export type UnitStatus = 'active' | 'inactive';
 export type RequestStatus = 'open' | 'in_progress' | 'resolved' | 'closed';
-export type InvoiceStatus = 'pending' | 'paid' | 'overdue' | 'partial' | 'waived';
+export type InvoiceStatus = 'pending' | 'paid' | 'overdue' | 'partial' | 'waived' | 'voided';
 export type ReservationStatus = 'pending' | 'approved' | 'denied' | 'cancelled';
 export type BookingType = 'full_day' | 'time_slot';
 export type EventVisibility = 'public' | 'private';
 export type DocCategory = 'rules' | 'financial' | 'meeting_minutes' | 'forms' | 'other';
 export type AnnouncementPriority = 'normal' | 'important' | 'urgent';
 export type SignupRequestStatus = 'pending' | 'approved' | 'denied';
+export type PaymentFrequency = 'monthly' | 'quarterly' | 'semi_annual' | 'annual';
 
 // ─── Community theme config ─────────────────────────
 
+export interface PaymentSettings {
+  allow_flexible_frequency: boolean;
+  default_frequency: PaymentFrequency;
+}
+
 export interface CommunityTheme {
   dashboard_cards?: Partial<Record<MemberRole, string[]>>;
+  payment_settings?: PaymentSettings;
   [key: string]: unknown;
 }
 
@@ -45,6 +52,7 @@ export interface Unit {
   unit_number: string;
   address: string | null;
   status: UnitStatus;
+  payment_frequency: PaymentFrequency | null;
   created_at: string;
 }
 
@@ -127,6 +135,9 @@ export interface Invoice {
   paid_at: string | null;
   paid_by: string | null;
   stripe_payment_id: string | null;
+  notes: string | null;
+  bounced_from_invoice_id: string | null;
+  assessment_id: string | null;
   created_at: string;
 }
 
@@ -182,6 +193,8 @@ export interface Reservation {
   deposit_amount: number;
   stripe_payment_id: string | null;
   deposit_refunded: boolean;
+  deposit_paid: boolean;
+  deposit_paid_at: string | null;
   admin_notes: string | null;
   created_at: string;
 }
@@ -198,6 +211,52 @@ export interface Event {
   visibility: EventVisibility;
   blocks_amenity: boolean;
   created_by: string;
+  created_at: string;
+}
+
+export type WalletTransactionType = 'overpayment' | 'manual_credit' | 'manual_debit' | 'payment_applied' | 'refund' | 'bounced_reversal';
+
+export interface UnitWallet {
+  id: string;
+  unit_id: string;
+  community_id: string;
+  balance: number;
+  updated_at: string;
+}
+
+export interface WalletTransaction {
+  id: string;
+  unit_id: string;
+  community_id: string;
+  member_id: string | null;
+  amount: number;
+  type: WalletTransactionType;
+  reference_id: string | null;
+  description: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface LedgerEntry {
+  entry_date: string;
+  entry_type: string;
+  description: string;
+  amount: number;
+  running_balance: number;
+  reference_id: string | null;
+  member_name: string | null;
+}
+
+export interface Assessment {
+  id: string;
+  community_id: string;
+  title: string;
+  description: string | null;
+  annual_amount: number;
+  fiscal_year_start: string;
+  fiscal_year_end: string;
+  is_active: boolean;
+  created_by: string | null;
   created_at: string;
 }
 

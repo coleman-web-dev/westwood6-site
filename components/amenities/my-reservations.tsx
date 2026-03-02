@@ -81,6 +81,46 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
     );
   }
 
+  async function handleDepositPaid(reservationId: string) {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('reservations')
+      .update({ deposit_paid: true, deposit_paid_at: new Date().toISOString() })
+      .eq('id', reservationId);
+
+    if (error) {
+      toast.error('Failed to update deposit.');
+      return;
+    }
+
+    toast.success('Deposit marked as paid.');
+    setReservations((prev) =>
+      prev.map((r) =>
+        r.id === reservationId ? { ...r, deposit_paid: true, deposit_paid_at: new Date().toISOString() } : r
+      )
+    );
+  }
+
+  async function handleDepositRefund(reservationId: string) {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('reservations')
+      .update({ deposit_refunded: true })
+      .eq('id', reservationId);
+
+    if (error) {
+      toast.error('Failed to refund deposit.');
+      return;
+    }
+
+    toast.success('Deposit refunded.');
+    setReservations((prev) =>
+      prev.map((r) =>
+        r.id === reservationId ? { ...r, deposit_refunded: true } : r
+      )
+    );
+  }
+
   if (loading) {
     return (
       <div className="space-y-2">
@@ -132,19 +172,49 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
                     ${(r.fee_amount / 100).toFixed(2)}
                   </span>
                 )}
+                {r.deposit_amount > 0 && (
+                  <span className="ml-2">
+                    {r.deposit_paid
+                      ? r.deposit_refunded
+                        ? '(deposit refunded)'
+                        : '(deposit paid)'
+                      : `(deposit: $${(r.deposit_amount / 100).toFixed(2)})`}
+                  </span>
+                )}
               </p>
             </div>
 
-            {canCancel && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleCancel(r.id)}
-                className="shrink-0"
-              >
-                Cancel
-              </Button>
-            )}
+            <div className="flex gap-2 shrink-0">
+              {canCancel && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleCancel(r.id)}
+                >
+                  Cancel
+                </Button>
+              )}
+
+              {/* Deposit management (board only) */}
+              {isBoard && r.deposit_amount > 0 && !r.deposit_paid && r.status !== 'cancelled' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDepositPaid(r.id)}
+                >
+                  Mark Deposit Paid
+                </Button>
+              )}
+              {isBoard && r.deposit_amount > 0 && r.deposit_paid && !r.deposit_refunded && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDepositRefund(r.id)}
+                >
+                  Refund Deposit
+                </Button>
+              )}
+            </div>
           </div>
         );
       })}

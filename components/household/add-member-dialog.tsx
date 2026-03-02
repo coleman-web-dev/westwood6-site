@@ -22,16 +22,18 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
-import type { MemberRole } from '@/lib/types/database';
+import type { MemberRole, Unit } from '@/lib/types/database';
 
 interface AddMemberDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  unitOverride?: Unit;
 }
 
-export function AddMemberDialog({ open, onOpenChange, onSuccess }: AddMemberDialogProps) {
-  const { community, member, unit } = useCommunity();
+export function AddMemberDialog({ open, onOpenChange, onSuccess, unitOverride }: AddMemberDialogProps) {
+  const { community, member, unit: contextUnit } = useCommunity();
+  const unit = unitOverride ?? contextUnit;
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -131,7 +133,7 @@ export function AddMemberDialog({ open, onOpenChange, onSuccess }: AddMemberDial
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="add-email">Email</Label>
+            <Label htmlFor="add-email">Email <span className="text-text-muted-light dark:text-text-muted-dark font-normal">(optional)</span></Label>
             <Input
               id="add-email"
               type="email"
@@ -143,7 +145,7 @@ export function AddMemberDialog({ open, onOpenChange, onSuccess }: AddMemberDial
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="add-phone">Phone</Label>
+            <Label htmlFor="add-phone">Phone <span className="text-text-muted-light dark:text-text-muted-dark font-normal">(optional)</span></Label>
             <Input
               id="add-phone"
               type="tel"

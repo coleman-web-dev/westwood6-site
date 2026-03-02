@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
@@ -17,8 +17,15 @@ import { Button } from '@/components/shared/ui/button';
 import { Input } from '@/components/shared/ui/input';
 import { Textarea } from '@/components/shared/ui/textarea';
 import { Badge } from '@/components/shared/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/shared/ui/select';
 import { toast } from 'sonner';
-import type { Amenity } from '@/lib/types/database';
+import type { Amenity, Member, Unit } from '@/lib/types/database';
 
 interface ReservationDialogProps {
   amenity: Amenity;
@@ -37,10 +44,78 @@ export function ReservationDialog({
   onOpenChange,
   onSuccess,
 }: ReservationDialogProps) {
-  const { community, member, unit } = useCommunity();
+  const { community, member, unit, isBoard } = useCommunity();
   const [purpose, setPurpose] = useState('');
   const [guestCount, setGuestCount] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Board: reserve on behalf of another unit/member
+  const [allUnits, setAllUnits] = useState<Unit[]>([]);
+  const [unitMembers, setUnitMembers] = useState<Member[]>([]);
+  const [selectedUnitId, setSelectedUnitId] = useState('');
+  const [selectedMemberId, setSelectedMemberId] = useState('');
+  const [unitOwnerMap, setUnitOwnerMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!open || !isBoard) return;
+    const supabase = createClient();
+    async function loadUnits() {
+      const { data: unitData } = await supabase
+        .from('units')
+        .select('*')
+        .eq('community_id', community.id)
+        .eq('status', 'active')
+        .order('unit_number', { ascending: true });
+
+      const units = (unitData as Unit[]) ?? [];
+      setAllUnits(units);
+
+      const { data: owners } = await supabase
+        .from('members')
+        .select('unit_id, first_name, last_name')
+        .eq('community_id', community.id)
+        .eq('member_role', 'owner')
+        .is('parent_member_id', null);
+
+      const ownerMap: Record<string, string> = {};
+      for (const o of (owners ?? []) as { unit_id: string | null; first_name: string; last_name: string }[]) {
+        if (o.unit_id) ownerMap[o.unit_id] = `${o.first_name} ${o.last_name}`;
+      }
+      setUnitOwnerMap(ownerMap);
+
+      // Default to own unit if available
+      if (unit) {
+        setSelectedUnitId(unit.id);
+      }
+    }
+    loadUnits();
+  }, [open, isBoard, community.id, unit]);
+
+  // Fetch members for selected unit (board mode)
+  useEffect(() => {
+    if (!isBoard || !selectedUnitId) {
+      setUnitMembers([]);
+      setSelectedMemberId('');
+      return;
+    }
+    const supabase = createClient();
+    async function loadMembers() {
+      const { data } = await supabase
+        .from('members')
+        .select('*')
+        .eq('unit_id', selectedUnitId)
+        .order('first_name');
+      const members = (data as Member[]) ?? [];
+      setUnitMembers(members);
+      // Auto-select first member
+      if (members.length > 0) {
+        setSelectedMemberId(members[0].id);
+      } else {
+        setSelectedMemberId('');
+      }
+    }
+    loadMembers();
+  }, [isBoard, selectedUnitId]);
 
   const isFullDay = amenity.booking_type === 'full_day';
   const fee = amenity.fee / 100;
@@ -48,7 +123,13 @@ export function ReservationDialog({
   const total = fee + deposit;
 
   async function handleSubmit() {
-    if (!member || !unit) return;
+    const reserveUnitId = isBoard ? selectedUnitId : unit?.id;
+    const reserveMemberId = isBoard ? selectedMemberId : member?.id;
+
+    if (!reserveUnitId || !reserveMemberId) {
+      toast.error('Please select a unit and member.');
+      return;
+    }
 
     setSubmitting(true);
     const supabase = createClient();
@@ -56,8 +137,8 @@ export function ReservationDialog({
     const { error } = await supabase.from('reservations').insert({
       amenity_id: amenity.id,
       community_id: community.id,
-      unit_id: unit.id,
-      reserved_by: member.id,
+      unit_id: reserveUnitId,
+      reserved_by: reserveMemberId,
       start_datetime: startDate.toISOString(),
       end_datetime: endDate.toISOString(),
       status: amenity.auto_approve ? 'approved' : 'pending',
@@ -111,6 +192,50 @@ export function ReservationDialog({
               <Badge variant="outline">Requires board approval</Badge>
             )}
           </div>
+
+          {/* Board: Reserve on behalf */}
+          {isBoard && allUnits.length > 0 && (
+            <>
+              <div className="space-y-1.5">
+                <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                  Unit
+                </label>
+                <Select value={selectedUnitId} onValueChange={setSelectedUnitId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a unit" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allUnits.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        Unit {u.unit_number}
+                        {unitOwnerMap[u.id] ? ` - ${unitOwnerMap[u.id]}` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {unitMembers.length > 0 && (
+                <div className="space-y-1.5">
+                  <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                    Member
+                  </label>
+                  <Select value={selectedMemberId} onValueChange={setSelectedMemberId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a member" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {unitMembers.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.first_name} {m.last_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </>
+          )}
 
           {/* Purpose */}
           <div className="space-y-1.5">

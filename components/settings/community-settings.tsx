@@ -7,7 +7,15 @@ import { Button } from '@/components/shared/ui/button';
 import { Input } from '@/components/shared/ui/input';
 import { Label } from '@/components/shared/ui/label';
 import { Switch } from '@/components/shared/ui/switch';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/shared/ui/select';
 import { toast } from 'sonner';
+import type { PaymentFrequency } from '@/lib/types/database';
 
 export function CommunitySettings() {
   const { community } = useCommunity();
@@ -20,6 +28,8 @@ export function CommunitySettings() {
   const [canAttendEvents, setCanAttendEvents] = useState(false);
   const [canSubmitRequests, setCanSubmitRequests] = useState(false);
   const [canViewDirectory, setCanViewDirectory] = useState(false);
+  const [allowFlexibleFrequency, setAllowFlexibleFrequency] = useState(false);
+  const [defaultFrequency, setDefaultFrequency] = useState<PaymentFrequency>('quarterly');
   const [saving, setSaving] = useState(false);
 
   // Load current values from community context
@@ -33,6 +43,8 @@ export function CommunitySettings() {
       setCanAttendEvents(community.tenant_permissions?.can_attend_events ?? false);
       setCanSubmitRequests(community.tenant_permissions?.can_submit_requests ?? false);
       setCanViewDirectory(community.tenant_permissions?.can_view_directory ?? false);
+      setAllowFlexibleFrequency(community.theme?.payment_settings?.allow_flexible_frequency ?? false);
+      setDefaultFrequency(community.theme?.payment_settings?.default_frequency ?? 'quarterly');
     }
   }, [community]);
 
@@ -61,6 +73,13 @@ export function CommunitySettings() {
           can_attend_events: canAttendEvents,
           can_submit_requests: canSubmitRequests,
           can_view_directory: canViewDirectory,
+        },
+        theme: {
+          ...community.theme,
+          payment_settings: {
+            allow_flexible_frequency: allowFlexibleFrequency,
+            default_frequency: defaultFrequency,
+          },
         },
       })
       .eq('id', community.id);
@@ -224,6 +243,57 @@ export function CommunitySettings() {
               checked={canViewDirectory}
               onCheckedChange={setCanViewDirectory}
             />
+          </div>
+        </div>
+      </div>
+
+      {/* Payment settings */}
+      <div className="bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark rounded-panel p-card-padding">
+        <h2 className="text-card-title text-text-primary-light dark:text-text-primary-dark mb-1">
+          Payment Settings
+        </h2>
+        <p className="text-meta text-text-muted-light dark:text-text-muted-dark mb-4">
+          Configure how recurring assessments and payment schedules work.
+        </p>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-body text-text-primary-light dark:text-text-primary-dark">
+                Allow flexible payment frequency
+              </p>
+              <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                Households can choose to pay monthly, quarterly, semi-annually, or annually
+              </p>
+            </div>
+            <Switch
+              checked={allowFlexibleFrequency}
+              onCheckedChange={setAllowFlexibleFrequency}
+            />
+          </div>
+
+          <div className="border-t border-stroke-light dark:border-stroke-dark" />
+
+          <div className="space-y-1.5">
+            <label className="text-body text-text-primary-light dark:text-text-primary-dark">
+              Default payment frequency
+            </label>
+            <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+              Used when generating invoices for units that have not chosen a preference
+            </p>
+            <div className="max-w-xs mt-2">
+              <Select value={defaultFrequency} onValueChange={(v) => setDefaultFrequency(v as PaymentFrequency)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                  <SelectItem value="quarterly">Quarterly</SelectItem>
+                  <SelectItem value="semi_annual">Semi-Annual</SelectItem>
+                  <SelectItem value="annual">Annual</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
       </div>
