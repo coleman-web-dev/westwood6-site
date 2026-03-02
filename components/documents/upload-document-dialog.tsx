@@ -1,0 +1,193 @@
+'use client';
+
+import { useRef, useState } from 'react';
+import { Upload } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import { useCommunity } from '@/lib/providers/community-provider';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from '@/components/shared/ui/dialog';
+import { Button } from '@/components/shared/ui/button';
+import { Input } from '@/components/shared/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/shared/ui/select';
+import { toast } from 'sonner';
+import type { DocCategory } from '@/lib/types/database';
+
+interface UploadDocumentDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: () => void;
+}
+
+const ACCEPTED_FILE_TYPES =
+  '.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.rtf,.ppt,.pptx,.jpg,.jpeg,.png';
+
+export function UploadDocumentDialog({
+  open,
+  onOpenChange,
+  onSuccess,
+}: UploadDocumentDialogProps) {
+  const { community, member } = useCommunity();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [title, setTitle] = useState('');
+  const [category, setCategory] = useState<DocCategory>('other');
+  const [submitting, setSubmitting] = useState(false);
+
+  function resetForm() {
+    setTitle('');
+    setCategory('other');
+    if (fileRef.current) {
+      fileRef.current.value = '';
+    }
+  }
+
+  async function handleSubmit() {
+    const file = fileRef.current?.files?.[0];
+
+    if (!title.trim()) {
+      toast.error('Please enter a document title.');
+      return;
+    }
+
+    if (!file) {
+      toast.error('Please select a file to upload.');
+      return;
+    }
+
+    if (!member) return;
+
+    setSubmitting(true);
+    const supabase = createClient();
+
+    // Upload to Supabase Storage
+    const filePath = `${community.id}/${Date.now()}_${file.name}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('hoa-documents')
+      .upload(filePath, file);
+
+    if (uploadError) {
+      setSubmitting(false);
+      toast.error('Failed to upload file. Please try again.');
+      return;
+    }
+
+    // Insert document row
+    const { error: insertError } = await supabase.from('documents').insert({
+      community_id: community.id,
+      title: title.trim(),
+      category,
+      file_path: filePath,
+      file_size: file.size,
+      uploaded_by: member.id,
+    });
+
+    setSubmitting(false);
+
+    if (insertError) {
+      // Attempt to clean up the uploaded file
+      await supabase.storage.from('hoa-documents').remove([filePath]);
+      toast.error('Failed to save document record. Please try again.');
+      return;
+    }
+
+    toast.success('Document uploaded.');
+    resetForm();
+    onOpenChange(false);
+    onSuccess();
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Upload Document</DialogTitle>
+          <DialogDescription>
+            Add a document for community members to access.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          {/* Title */}
+          <div className="space-y-1.5">
+            <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+              Title
+            </label>
+            <Input
+              placeholder="Document title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              maxLength={200}
+            />
+          </div>
+
+          {/* Category */}
+          <div className="space-y-1.5">
+            <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+              Category
+            </label>
+            <Select
+              value={category}
+              onValueChange={(val) => setCategory(val as DocCategory)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="rules">Rules</SelectItem>
+                <SelectItem value="financial">Financial</SelectItem>
+                <SelectItem value="meeting_minutes">Meeting Minutes</SelectItem>
+                <SelectItem value="forms">Forms</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* File picker */}
+          <div className="space-y-1.5">
+            <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+              File
+            </label>
+            <input
+              ref={fileRef}
+              type="file"
+              accept={ACCEPTED_FILE_TYPES}
+              className="block w-full text-sm text-text-secondary-light dark:text-text-secondary-dark file:mr-3 file:rounded-md file:border-0 file:bg-primary-300 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-foreground hover:file:bg-primary-300/80 dark:file:bg-primary-700 dark:hover:file:bg-primary-700/80 cursor-pointer"
+            />
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <DialogClose asChild>
+            <Button variant="outline">Cancel</Button>
+          </DialogClose>
+          <Button
+            onClick={handleSubmit}
+            disabled={submitting || !title.trim()}
+          >
+            {submitting ? (
+              <>Uploading...</>
+            ) : (
+              <>
+                <Upload className="h-4 w-4 mr-2" />
+                Upload
+              </>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
