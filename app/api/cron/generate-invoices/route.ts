@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getPeriods } from '@/lib/utils/generate-assessment-invoices';
+import { queuePaymentReminder } from '@/lib/email/queue';
 import type { PaymentFrequency } from '@/lib/types/database';
 
 /**
  * POST /api/cron/generate-invoices
  * Daily cron: auto-generates invoices for upcoming billing periods (next 14 days).
+ * Optionally sends notification emails to homeowners for new invoices.
  * Idempotent: always checks for existing invoices before inserting.
  */
 export async function POST(req: NextRequest) {
@@ -21,7 +23,7 @@ export async function POST(req: NextRequest) {
   // Get communities with auto-generate enabled
   const { data: communities, error: comError } = await supabase
     .from('communities')
-    .select('id, theme');
+    .select('id, slug, theme');
 
   if (comError || !communities) {
     return NextResponse.json({ error: 'Failed to fetch communities' }, { status: 500 });
@@ -29,6 +31,7 @@ export async function POST(req: NextRequest) {
 
   let totalGenerated = 0;
   let totalSkipped = 0;
+  let totalNotified = 0;
 
   const today = new Date();
   const lookAhead = new Date();
@@ -43,6 +46,7 @@ export async function POST(req: NextRequest) {
     if (!paymentSettings?.auto_generate_invoices) continue;
 
     const defaultFrequency = (paymentSettings?.default_frequency as PaymentFrequency) || 'quarterly';
+    const autoNotify = !!paymentSettings?.auto_notify_new_invoices;
 
     // Get active assessments
     const { data: assessments } = await supabase
@@ -120,16 +124,41 @@ export async function POST(req: NextRequest) {
         // Insert in batches of 50
         for (let i = 0; i < newInvoices.length; i += 50) {
           const batch = newInvoices.slice(i, i + 50);
-          const { error } = await supabase.from('invoices').insert(batch);
+          const { data: inserted, error } = await supabase
+            .from('invoices')
+            .insert(batch)
+            .select('id, unit_id, title, amount, due_date');
+
           if (error) {
             console.error('Failed to insert invoices batch:', error);
           } else {
             totalGenerated += batch.length;
+
+            // Auto-notify homeowners about new invoices
+            if (autoNotify && inserted) {
+              for (const inv of inserted) {
+                try {
+                  await queuePaymentReminder(
+                    community.id,
+                    community.slug as string,
+                    inv.id,
+                    inv.title,
+                    inv.amount,
+                    inv.due_date,
+                    false, // not overdue, it's a new invoice notification
+                    inv.unit_id,
+                  );
+                  totalNotified++;
+                } catch {
+                  // Non-critical, continue
+                }
+              }
+            }
           }
         }
       }
     }
   }
 
-  return NextResponse.json({ generated: totalGenerated, skipped: totalSkipped });
+  return NextResponse.json({ generated: totalGenerated, skipped: totalSkipped, notified: totalNotified });
 }

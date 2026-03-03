@@ -44,6 +44,10 @@ export function CommunitySettings() {
   const [feeAmount, setFeeAmount] = useState(2500); // cents
   const [maxFee, setMaxFee] = useState<number | undefined>(undefined);
   const [autoGenerateInvoices, setAutoGenerateInvoices] = useState(false);
+  const [autoMarkOverdue, setAutoMarkOverdue] = useState(false);
+  const [autoNotifyNewInvoices, setAutoNotifyNewInvoices] = useState(false);
+  const [reminderDaysBefore, setReminderDaysBefore] = useState(7);
+  const [reminderDaysAfter, setReminderDaysAfter] = useState(7);
   const [arcEnabled, setArcEnabled] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -69,6 +73,10 @@ export function CommunitySettings() {
       setFeeAmount(lfs?.fee_amount ?? 2500);
       setMaxFee(lfs?.max_fee);
       setAutoGenerateInvoices(!!community.theme?.payment_settings?.auto_generate_invoices);
+      setAutoMarkOverdue(!!community.theme?.payment_settings?.auto_mark_overdue);
+      setAutoNotifyNewInvoices(!!community.theme?.payment_settings?.auto_notify_new_invoices);
+      setReminderDaysBefore((community.theme?.payment_settings?.reminder_days_before as number) ?? 7);
+      setReminderDaysAfter((community.theme?.payment_settings?.reminder_days_after as number) ?? 7);
       setArcEnabled(!!community.theme?.arc_enabled);
     }
   }, [community]);
@@ -94,6 +102,10 @@ export function CommunitySettings() {
       feeAmount !== ((community.theme?.payment_settings?.late_fee_settings as LateFeeSettings | undefined)?.fee_amount ?? 2500) ||
       maxFee !== (community.theme?.payment_settings?.late_fee_settings as LateFeeSettings | undefined)?.max_fee ||
       autoGenerateInvoices !== (!!community.theme?.payment_settings?.auto_generate_invoices) ||
+      autoMarkOverdue !== (!!community.theme?.payment_settings?.auto_mark_overdue) ||
+      autoNotifyNewInvoices !== (!!community.theme?.payment_settings?.auto_notify_new_invoices) ||
+      reminderDaysBefore !== ((community.theme?.payment_settings?.reminder_days_before as number) ?? 7) ||
+      reminderDaysAfter !== ((community.theme?.payment_settings?.reminder_days_after as number) ?? 7) ||
       arcEnabled !== (!!community.theme?.arc_enabled)
     );
   }, [
@@ -102,7 +114,8 @@ export function CommunitySettings() {
     allowFlexibleFrequency, defaultFrequency,
     bulletinPosting, bulletinCommenting,
     lateFeesEnabled, gracePeriodDays, feeType, feeAmount, maxFee,
-    autoGenerateInvoices, arcEnabled,
+    autoGenerateInvoices, autoMarkOverdue, autoNotifyNewInvoices,
+    reminderDaysBefore, reminderDaysAfter, arcEnabled,
     community,
   ]);
 
@@ -145,6 +158,10 @@ export function CommunitySettings() {
               ...(maxFee ? { max_fee: maxFee } : {}),
             },
             auto_generate_invoices: autoGenerateInvoices,
+            auto_mark_overdue: autoMarkOverdue,
+            auto_notify_new_invoices: autoNotifyNewInvoices,
+            reminder_days_before: reminderDaysBefore,
+            reminder_days_after: reminderDaysAfter,
           },
           bulletin_settings: {
             posting: bulletinPosting,
@@ -463,6 +480,80 @@ export function CommunitySettings() {
               checked={autoGenerateInvoices}
               onCheckedChange={setAutoGenerateInvoices}
             />
+          </div>
+
+          <div className="border-t border-stroke-light dark:border-stroke-dark" />
+
+          {/* Auto-notify new invoices */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-body text-text-primary-light dark:text-text-primary-dark">
+                Auto-notify new invoices
+              </p>
+              <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                Email homeowners when new invoices are generated
+              </p>
+            </div>
+            <Switch
+              checked={autoNotifyNewInvoices}
+              onCheckedChange={setAutoNotifyNewInvoices}
+            />
+          </div>
+
+          <div className="border-t border-stroke-light dark:border-stroke-dark" />
+
+          {/* Auto-mark overdue */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-body text-text-primary-light dark:text-text-primary-dark">
+                Auto-mark overdue
+              </p>
+              <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                Automatically change invoice status to overdue when past due date
+              </p>
+            </div>
+            <Switch
+              checked={autoMarkOverdue}
+              onCheckedChange={setAutoMarkOverdue}
+            />
+          </div>
+
+          <div className="border-t border-stroke-light dark:border-stroke-dark" />
+
+          {/* Reminder schedule */}
+          <div className="space-y-1.5">
+            <label className="text-body text-text-primary-light dark:text-text-primary-dark">
+              Payment reminder schedule
+            </label>
+            <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+              When to send automated payment reminder emails
+            </p>
+            <div className="grid grid-cols-2 gap-4 mt-2">
+              <div className="space-y-1">
+                <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                  Days before due date
+                </Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={reminderDaysBefore}
+                  onChange={(e) => setReminderDaysBefore(Number(e.target.value))}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                  Days after (overdue reminder)
+                </Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={reminderDaysAfter}
+                  onChange={(e) => setReminderDaysAfter(Number(e.target.value))}
+                />
+              </div>
+            </div>
           </div>
 
           <div className="border-t border-stroke-light dark:border-stroke-dark" />

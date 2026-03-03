@@ -5,6 +5,7 @@ import { queuePaymentReminder } from '@/lib/email/queue';
 /**
  * POST /api/email/schedule-reminders
  * Cron endpoint: finds invoices needing reminders and queues emails.
+ * Uses configurable reminder_days_before and reminder_days_after from community settings.
  * Protected by CRON_SECRET header.
  * Accepts optional { community_id } body for targeted manual trigger.
  */
@@ -28,8 +29,8 @@ export async function POST(req: NextRequest) {
     // No body is fine
   }
 
-  // Get communities
-  let communityQuery = supabase.from('communities').select('id, slug');
+  // Get communities with theme for settings
+  let communityQuery = supabase.from('communities').select('id, slug, theme');
   if (targetCommunityId) {
     communityQuery = communityQuery.eq('id', targetCommunityId);
   }
@@ -41,19 +42,16 @@ export async function POST(req: NextRequest) {
 
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
-  const sevenDaysOut = new Date(today);
-  sevenDaysOut.setDate(sevenDaysOut.getDate() + 7);
-  const reminderDate = sevenDaysOut.toISOString().split('T')[0];
 
-  // Check for recently sent reminders to avoid duplicates (last 7 days)
-  const sevenDaysAgo = new Date(today);
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  // Check for recently sent reminders to avoid duplicates (last 3 days)
+  const threeDaysAgo = new Date(today);
+  threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
 
   const { data: recentEmails } = await supabase
     .from('email_queue')
     .select('template_data')
     .eq('category', 'payment_reminder')
-    .gte('created_at', sevenDaysAgo.toISOString());
+    .gte('created_at', threeDaysAgo.toISOString());
 
   const sentInvoiceIds = new Set<string>();
   if (recentEmails) {
@@ -69,21 +67,39 @@ export async function POST(req: NextRequest) {
   let skipped = 0;
 
   for (const community of communities) {
-    // Find upcoming invoices (due in 7 days)
+    const theme = community.theme as Record<string, unknown> | null;
+    const paymentSettings = theme?.payment_settings as Record<string, unknown> | undefined;
+
+    // Configurable reminder windows (defaults: 7 days before, 7 days after)
+    const daysBefore = (paymentSettings?.reminder_days_before as number) ?? 7;
+    const daysAfter = (paymentSettings?.reminder_days_after as number) ?? 7;
+
+    // Calculate reminder date for upcoming invoices
+    const reminderDate = new Date(today);
+    reminderDate.setDate(reminderDate.getDate() + daysBefore);
+    const reminderDateStr = reminderDate.toISOString().split('T')[0];
+
+    // Calculate cutoff for overdue reminders
+    const overdueCutoff = new Date(today);
+    overdueCutoff.setDate(overdueCutoff.getDate() - daysAfter);
+    const overdueCutoffStr = overdueCutoff.toISOString().split('T')[0];
+
+    // Find upcoming invoices (due in X days)
     const { data: upcomingInvoices } = await supabase
       .from('invoices')
       .select('id, title, amount, due_date, unit_id')
       .eq('community_id', community.id)
       .eq('status', 'pending')
-      .eq('due_date', reminderDate);
+      .eq('due_date', reminderDateStr);
 
-    // Find overdue invoices
+    // Find overdue invoices (still within reminder window)
     const { data: overdueInvoices } = await supabase
       .from('invoices')
       .select('id, title, amount, due_date, unit_id')
       .eq('community_id', community.id)
-      .in('status', ['overdue', 'pending'])
-      .lt('due_date', todayStr);
+      .in('status', ['overdue', 'partial'])
+      .lt('due_date', todayStr)
+      .gte('due_date', overdueCutoffStr);
 
     const allInvoices = [
       ...(upcomingInvoices ?? []).map((inv) => ({ ...inv, isOverdue: false })),

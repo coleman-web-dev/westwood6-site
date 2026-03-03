@@ -46,6 +46,10 @@ export interface PaymentSettings {
   default_frequency: PaymentFrequency;
   late_fee_settings?: LateFeeSettings;
   auto_generate_invoices?: boolean;
+  auto_mark_overdue?: boolean;
+  auto_notify_new_invoices?: boolean;
+  reminder_days_before?: number;
+  reminder_days_after?: number;
 }
 
 export interface BulletinSettings {
