@@ -14,6 +14,7 @@ import {
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
 import { BounceInvoiceDialog } from '@/components/payments/bounce-invoice-dialog';
+import { PayInvoiceButton } from '@/components/payments/pay-invoice-button';
 import type { Invoice, InvoiceStatus, Unit } from '@/lib/types/database';
 
 const STATUS_FILTERS: { value: string; label: string }[] = [
@@ -42,6 +43,7 @@ interface InvoiceListProps {
   unitOwnerMap?: Record<string, string>;
   units?: Unit[];
   allMembers?: { unit_id: string | null; user_id: string | null }[];
+  stripeEnabled?: boolean;
 }
 
 export function InvoiceList({
@@ -51,8 +53,9 @@ export function InvoiceList({
   unitOwnerMap,
   units,
   allMembers,
+  stripeEnabled,
 }: InvoiceListProps) {
-  const { isBoard } = useCommunity();
+  const { isBoard, community } = useCommunity();
   const [statusFilter, setStatusFilter] = useState('all');
   const [unitFilter, setUnitFilter] = useState('all');
   const [unregisteredOnly, setUnregisteredOnly] = useState(false);
@@ -191,7 +194,7 @@ export function InvoiceList({
           </div>
 
           {/* Advanced filters row */}
-          <div className="flex flex-wrap items-end gap-3">
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-end gap-3">
             {/* Unit filter */}
             {units && units.length > 0 && (
               <div className="space-y-1 min-w-[160px]">
@@ -364,9 +367,20 @@ export function InvoiceList({
                 </div>
               </div>
 
+              {/* Pay button (when Stripe is connected and invoice is payable) */}
+              {stripeEnabled && !isBoard && (invoice.status === 'pending' || invoice.status === 'overdue' || invoice.status === 'partial') && (
+                <div className="flex gap-2 mt-3 pt-3 border-t border-stroke-light dark:border-stroke-dark">
+                  <PayInvoiceButton
+                    invoiceId={invoice.id}
+                    communityId={community.id}
+                    amount={invoice.status === 'partial' ? invoice.amount - invoice.amount_paid : invoice.amount}
+                  />
+                </div>
+              )}
+
               {/* Board actions */}
               {canUpdate && (
-                <div className="flex gap-2 mt-3 pt-3 border-t border-stroke-light dark:border-stroke-dark">
+                <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-stroke-light dark:border-stroke-dark">
                   <Button
                     variant="outline"
                     size="sm"

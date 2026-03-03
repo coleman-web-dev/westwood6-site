@@ -25,11 +25,24 @@ export interface BulletinSettings {
   commenting: 'board_only' | 'all_households';
 }
 
+export interface EmailSettings {
+  reply_to?: string;
+  from_name?: string;
+  primary_color?: string;
+}
+
+export interface OnboardingState {
+  completed_steps: ('info' | 'units' | 'members' | 'assessments' | 'invites')[];
+  completed_at: string | null;
+}
+
 export interface CommunityTheme {
   dashboard_cards?: Partial<Record<MemberRole, string[]>>;
   payment_settings?: PaymentSettings;
   voting_enabled?: boolean;
   bulletin_settings?: BulletinSettings;
+  email_settings?: EmailSettings;
+  onboarding?: OnboardingState;
   [key: string]: unknown;
 }
 
@@ -244,7 +257,7 @@ export interface Event {
   created_at: string;
 }
 
-export type WalletTransactionType = 'overpayment' | 'manual_credit' | 'manual_debit' | 'payment_applied' | 'refund' | 'bounced_reversal' | 'deposit_return';
+export type WalletTransactionType = 'overpayment' | 'manual_credit' | 'manual_debit' | 'payment_applied' | 'refund' | 'bounced_reversal' | 'deposit_return' | 'stripe_payment';
 
 export interface UnitWallet {
   id: string;
@@ -462,4 +475,54 @@ export interface BulletinComment {
   updated_at: string;
   // Joined fields
   author?: Pick<Member, 'id' | 'first_name' | 'last_name' | 'member_role'>;
+}
+
+// ─── Email System ─────────────────────────────────
+
+export type EmailCategory = 'payment_confirmation' | 'payment_reminder' | 'announcement' | 'maintenance_update' | 'voting_notice' | 'reservation_update' | 'weekly_digest' | 'system';
+export type EmailStatus = 'queued' | 'sending' | 'sent' | 'failed' | 'bounced';
+export type EmailPriority = 'immediate' | 'normal' | 'scheduled';
+
+export interface EmailPreference {
+  id: string;
+  member_id: string;
+  community_id: string;
+  category: EmailCategory;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EmailQueueItem {
+  id: string;
+  community_id: string;
+  recipient_member_id: string | null;
+  recipient_email: string;
+  recipient_name: string | null;
+  category: EmailCategory;
+  priority: EmailPriority;
+  subject: string;
+  template_id: string;
+  template_data: Record<string, unknown>;
+  status: EmailStatus;
+  resend_message_id: string | null;
+  error_message: string | null;
+  attempts: number;
+  max_attempts: number;
+  scheduled_for: string;
+  sent_at: string | null;
+  created_at: string;
+}
+
+export interface EmailLog {
+  id: string;
+  community_id: string;
+  queue_id: string | null;
+  recipient_email: string;
+  category: EmailCategory;
+  subject: string;
+  resend_message_id: string | null;
+  status: EmailStatus;
+  error_message: string | null;
+  created_at: string;
 }

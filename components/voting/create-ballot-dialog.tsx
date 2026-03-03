@@ -468,7 +468,7 @@ export function CreateBallotDialog({
         {/* ── Step 3: Schedule & Rules ── */}
         {step === 3 && (
           <div className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
                   Opens <span className="text-red-500">*</span>
@@ -491,7 +491,7 @@ export function CreateBallotDialog({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
                   Quorum Threshold (%)

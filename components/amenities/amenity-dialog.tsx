@@ -598,7 +598,7 @@ export function AmenityDialog({
                 {/* Time slot options (nested collapsible) */}
                 <Collapsible open={bookingType === 'time_slot' || bookingType === 'both'}>
                   <CollapsibleContent className="overflow-hidden transition-all data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
                         <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
                           Min booking

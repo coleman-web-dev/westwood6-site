@@ -590,7 +590,7 @@ export function AgreementWizardDialog({
                       {editingFieldId === field.id ? (
                         /* Edit mode */
                         <div className="space-y-3">
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div className="space-y-1">
                               <label className="text-meta text-text-muted-light dark:text-text-muted-dark">
                                 Question
@@ -631,7 +631,7 @@ export function AgreementWizardDialog({
                               </Select>
                             </div>
                           </div>
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div className="space-y-1">
                               <label className="text-meta text-text-muted-light dark:text-text-muted-dark">
                                 Variable key

@@ -19,6 +19,8 @@ import { toast } from 'sonner';
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes';
 import { UnsavedChangesDialog } from '@/components/settings/unsaved-changes-dialog';
 import { AmenityList } from '@/components/amenities/amenity-list';
+import { EmailSettingsSection } from '@/components/settings/email-settings-section';
+import { StripeConnectSection } from '@/components/settings/stripe-connect-section';
 import type { PaymentFrequency, BulletinSettings } from '@/lib/types/database';
 
 export function CommunitySettings() {
@@ -338,6 +340,12 @@ export function CommunitySettings() {
           </div>
         </div>
       </div>
+
+      {/* Stripe Connect (online payments) */}
+      <StripeConnectSection />
+
+      {/* Email notifications (board config) */}
+      <EmailSettingsSection />
 
       {/* Amenities */}
       {community && (

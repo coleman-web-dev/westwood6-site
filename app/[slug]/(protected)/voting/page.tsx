@@ -74,7 +74,7 @@ export default function VotingPage() {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div className="flex items-center gap-3">
           <Vote className="h-6 w-6 text-secondary-500" />
           <h1 className="text-page-title text-text-primary-light dark:text-text-primary-dark">

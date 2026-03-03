@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
+import { sendAnnouncementEmails } from '@/lib/actions/email-actions';
 import type { Announcement, AnnouncementPriority } from '@/lib/types/database';
 
 interface CreateAnnouncementDialogProps {
@@ -111,6 +112,15 @@ export function CreateAnnouncementDialog({
       }
 
       toast.success('Announcement posted.');
+
+      // Queue email notifications for all members (fire-and-forget)
+      sendAnnouncementEmails(
+        community.id,
+        community.slug,
+        title.trim(),
+        body.trim(),
+        priority,
+      ).catch((err) => console.error('Failed to queue announcement emails:', err));
     }
 
     resetForm();

@@ -3,6 +3,7 @@
 import ThemeSwitch from '@/components/shared/ThemeSwitch';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { NotificationBell } from '@/components/notifications/notification-bell';
+import { ViewModeToggle } from './view-mode-toggle';
 import { SearchIcon, MailIcon, MenuIcon } from 'lucide-react';
 
 interface DashboardTopbarProps {
@@ -10,7 +11,7 @@ interface DashboardTopbarProps {
 }
 
 export function DashboardTopbar({ onMenuClick }: DashboardTopbarProps) {
-  const { member } = useCommunity();
+  const { member, actualIsBoard } = useCommunity();
 
   const initials = [member?.first_name?.[0], member?.last_name?.[0]]
     .filter(Boolean)
@@ -18,7 +19,7 @@ export function DashboardTopbar({ onMenuClick }: DashboardTopbarProps) {
     .toUpperCase();
 
   return (
-    <header className="sticky top-0 z-30 h-topbar flex items-center gap-2 sm:gap-4 px-3 sm:px-app-padding border-b border-stroke-light dark:border-stroke-dark bg-canvas-light/80 dark:bg-canvas-dark/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-30 h-topbar flex items-center gap-1.5 sm:gap-4 px-3 sm:px-app-padding border-b border-stroke-light dark:border-stroke-dark bg-canvas-light/80 dark:bg-canvas-dark/80 backdrop-blur-xl">
       {/* Mobile hamburger */}
       <button
         onClick={onMenuClick}
@@ -28,9 +29,16 @@ export function DashboardTopbar({ onMenuClick }: DashboardTopbarProps) {
       </button>
 
       {/* Title */}
-      <h1 className="text-page-title text-text-primary-light dark:text-text-primary-dark">
+      <h1 className="text-[18px] sm:text-page-title text-text-primary-light dark:text-text-primary-dark">
         Dashboard
       </h1>
+
+      {/* View mode toggle (board members only) */}
+      {actualIsBoard && (
+        <div className="ml-2 sm:ml-4">
+          <ViewModeToggle />
+        </div>
+      )}
 
       {/* Search (centered) */}
       <div className="hidden sm:flex flex-1 justify-center">
@@ -45,7 +53,7 @@ export function DashboardTopbar({ onMenuClick }: DashboardTopbarProps) {
       </div>
 
       {/* Right actions */}
-      <div className="flex items-center gap-3 ml-auto">
+      <div className="flex items-center gap-1.5 sm:gap-3 ml-auto">
         <ThemeSwitch />
 
         <NotificationBell />

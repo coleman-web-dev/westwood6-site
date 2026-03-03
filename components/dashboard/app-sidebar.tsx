@@ -13,6 +13,7 @@ import {
   ClipboardList,
   Users,
   Vote,
+  Rocket,
   Settings,
   Globe,
   LogOut,
@@ -41,7 +42,9 @@ interface AppSidebarProps {
 export function AppSidebar({ open, onClose }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { community, isHeadOfHousehold, isBoard } = useCommunity();
+  const { community, isHeadOfHousehold, isBoard, actualIsBoard } = useCommunity();
+
+  const onboardingComplete = !!community.theme?.onboarding?.completed_at;
   const basePath = `/${community.slug}`;
 
   async function handleSignOut() {
@@ -72,7 +75,7 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
       {/* Mobile close */}
       <button
         onClick={onClose}
-        className="lg:hidden absolute top-3 right-3 p-1 rounded-lg text-text-muted-light dark:text-text-muted-dark hover:text-text-primary-light dark:hover:text-text-primary-dark"
+        className="lg:hidden absolute top-3 right-3 p-2.5 rounded-lg text-text-muted-light dark:text-text-muted-dark hover:text-text-primary-light dark:hover:text-text-primary-dark"
       >
         <XIcon className="w-4 h-4" />
       </button>
@@ -115,6 +118,14 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
             href={`${basePath}/household`}
             active={isActive('/household')}
             label="Household"
+          />
+        )}
+        {actualIsBoard && !onboardingComplete && (
+          <NavItem
+            icon={Rocket}
+            href={`${basePath}/onboarding`}
+            active={isActive('/onboarding')}
+            label="Setup"
           />
         )}
       </nav>

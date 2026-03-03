@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Plus, DollarSign, ClipboardList } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
@@ -15,10 +16,12 @@ import { HouseholdLedger } from '@/components/payments/household-ledger';
 import { AssessmentList } from '@/components/payments/assessment-list';
 import { CreateAssessmentDialog } from '@/components/payments/create-assessment-dialog';
 import { FrequencySelector } from '@/components/payments/frequency-selector';
+import { toast } from 'sonner';
 import type { Invoice, Payment, Unit, Assessment } from '@/lib/types/database';
 
 export default function PaymentsPage() {
   const { community, member, unit, isBoard } = useCommunity();
+  const searchParams = useSearchParams();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [unitOwnerMap, setUnitOwnerMap] = useState<Record<string, string>>({});
@@ -32,6 +35,7 @@ export default function PaymentsPage() {
   const [walletDialogOpen, setWalletDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('invoices');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [stripeEnabled, setStripeEnabled] = useState(false);
 
   const fetchData = useCallback(async () => {
     const supabase = createClient();
@@ -130,6 +134,14 @@ export default function PaymentsPage() {
       setWalletBalance(walletData?.balance ?? 0);
     }
 
+    // Check if Stripe is enabled for this community
+    const { data: stripeAccount } = await supabase
+      .from('stripe_accounts')
+      .select('charges_enabled')
+      .eq('community_id', community.id)
+      .maybeSingle();
+
+    setStripeEnabled(stripeAccount?.charges_enabled ?? false);
     setInvoices((invoiceData as Invoice[]) ?? []);
     setPayments((paymentData as Payment[]) ?? []);
     setUnitOwnerMap(ownerMap);
@@ -142,6 +154,21 @@ export default function PaymentsPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Handle payment success/cancelled URL params
+  useEffect(() => {
+    const payment = searchParams.get('payment');
+    if (payment === 'success') {
+      toast.success('Payment successful! Your invoice will be updated shortly.');
+      // Clean up the URL
+      window.history.replaceState({}, '', window.location.pathname);
+      // Refresh to pick up the updated invoice
+      setTimeout(fetchData, 2000);
+    } else if (payment === 'cancelled') {
+      toast.info('Payment was cancelled. No charges were made.');
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [searchParams, fetchData]);
 
   // Calculate outstanding balance from pending, overdue, and partial invoices
   const outstandingInvoices = invoices.filter(
@@ -165,19 +192,19 @@ export default function PaymentsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-page-title text-text-primary-light dark:text-text-primary-dark">
           Payments
         </h1>
         {isBoard && (
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setAssessmentDialogOpen(true)}>
-              <ClipboardList className="h-4 w-4 mr-2" />
-              New Assessment
+            <Button variant="outline" onClick={() => setAssessmentDialogOpen(true)} className="text-meta sm:text-body">
+              <ClipboardList className="h-4 w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">New </span>Assessment
             </Button>
-            <Button onClick={() => setDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Invoice
+            <Button onClick={() => setDialogOpen(true)} className="text-meta sm:text-body">
+              <Plus className="h-4 w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Create </span>Invoice
             </Button>
           </div>
         )}
@@ -238,6 +265,7 @@ export default function PaymentsPage() {
             unitOwnerMap={isBoard ? unitOwnerMap : undefined}
             units={isBoard ? allUnits : undefined}
             allMembers={isBoard ? allMembers : undefined}
+            stripeEnabled={stripeEnabled}
           />
         </TabsContent>
 
