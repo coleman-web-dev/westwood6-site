@@ -4,6 +4,10 @@ import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import {
+  checkMemberExists,
+  sendPasswordSetupLink,
+} from '@/lib/actions/auth-actions';
 
 export default function LoginPage() {
   return (
@@ -18,6 +22,9 @@ function LoginForm() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [needsPasswordSetup, setNeedsPasswordSetup] = useState(false);
+  const [setupLinkSent, setSetupLinkSent] = useState(false);
+  const [sendingSetupLink, setSendingSetupLink] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect');
@@ -25,6 +32,8 @@ function LoginForm() {
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setNeedsPasswordSetup(false);
+    setSetupLinkSent(false);
     setLoading(true);
 
     const supabase = createClient();
@@ -34,6 +43,15 @@ function LoginForm() {
     });
 
     if (authError) {
+      // Check if this is a member who has not set their password yet
+      if (authError.message === 'Invalid login credentials') {
+        const memberExists = await checkMemberExists(email);
+        if (memberExists) {
+          setNeedsPasswordSetup(true);
+          setLoading(false);
+          return;
+        }
+      }
       setError(authError.message);
       setLoading(false);
       return;
@@ -71,6 +89,96 @@ function LoginForm() {
     setLoading(false);
   }
 
+  async function handleSendSetupLink() {
+    setSendingSetupLink(true);
+    setError(null);
+    const result = await sendPasswordSetupLink(email);
+    setSendingSetupLink(false);
+    if (result.success) {
+      setSetupLinkSent(true);
+    } else {
+      setError(result.error || 'Failed to send setup link');
+    }
+  }
+
+  // State: setup link sent successfully
+  if (setupLinkSent) {
+    return (
+      <div className="rounded-panel p-card-padding bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark surface-elevation">
+        <div className="text-center mb-6">
+          <h1 className="text-page-title text-text-primary-light dark:text-text-primary-dark">
+            Check your email
+          </h1>
+          <p className="text-body text-text-muted-light dark:text-text-muted-dark mt-2">
+            We sent a link to <strong>{email}</strong> to set your password.
+            Click the link in your email, then come back and sign in.
+          </p>
+        </div>
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={() => {
+              setSetupLinkSent(false);
+              setNeedsPasswordSetup(false);
+              setError(null);
+            }}
+            className="h-10 px-8 rounded-pill border border-stroke-light dark:border-stroke-dark text-label text-secondary-500 dark:text-secondary-400 hover:bg-secondary-50 dark:hover:bg-surface-dark-2 transition-colors inline-flex items-center justify-center"
+          >
+            Back to login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // State: needs password setup (member exists but login failed)
+  if (needsPasswordSetup) {
+    return (
+      <div className="rounded-panel p-card-padding bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark surface-elevation">
+        <div className="text-center mb-6">
+          <h1 className="text-page-title text-text-primary-light dark:text-text-primary-dark">
+            Set up your password
+          </h1>
+          <p className="text-body text-text-muted-light dark:text-text-muted-dark mt-2">
+            It looks like you need to set your password. We can send you a link
+            to get started.
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          {error && (
+            <div className="rounded-inner-card bg-surface-light-2 dark:bg-surface-dark-2 border border-warning-dot/20 p-3 text-body text-warning-dot">
+              {error}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={handleSendSetupLink}
+            disabled={sendingSetupLink}
+            className="w-full h-10 rounded-pill bg-secondary-400 text-label font-semibold text-primary-900 hover:bg-secondary-300 active:bg-secondary-500 focus:outline-none focus:ring-2 focus:ring-secondary-300/40 transition-all shadow-lg shadow-secondary-400/20 disabled:opacity-50 disabled:pointer-events-none"
+          >
+            {sendingSetupLink ? 'Sending...' : 'Send password setup link'}
+          </button>
+
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={() => {
+                setNeedsPasswordSetup(false);
+                setError(null);
+              }}
+              className="text-meta text-secondary-500 dark:text-secondary-400 hover:text-secondary-600 dark:hover:text-secondary-300 transition-colors"
+            >
+              Back to login
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Default state: regular login form
   return (
     <div className="rounded-panel p-card-padding bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark surface-elevation">
       <div className="text-center mb-6">

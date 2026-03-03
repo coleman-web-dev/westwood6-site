@@ -73,6 +73,8 @@ export interface Unit {
   address: string | null;
   status: UnitStatus;
   payment_frequency: PaymentFrequency | null;
+  stripe_subscription_id?: string | null;
+  stripe_subscription_status?: string | null;
   created_at: string;
 }
 
@@ -90,6 +92,7 @@ export interface Member {
   parent_member_id: string | null;
   show_in_directory: boolean;
   is_approved: boolean;
+  stripe_customer_id?: string | null;
   created_at: string;
 }
 
@@ -155,6 +158,7 @@ export interface Invoice {
   paid_at: string | null;
   paid_by: string | null;
   stripe_payment_id: string | null;
+  stripe_invoice_id?: string | null;
   notes: string | null;
   bounced_from_invoice_id: string | null;
   assessment_id: string | null;

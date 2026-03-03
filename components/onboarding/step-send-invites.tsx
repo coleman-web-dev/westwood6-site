@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { sendWelcomeInvites } from '@/lib/actions/email-actions';
 import { toast } from 'sonner';
-import { Copy, Mail, Check } from 'lucide-react';
+import { Copy, Mail, Check, UserPlus } from 'lucide-react';
 
 interface InvitableMember {
   id: string;
@@ -25,6 +25,8 @@ export function StepSendInvites({ onBack }: { onBack: () => void }) {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [creatingAccounts, setCreatingAccounts] = useState(false);
+  const [accountsCreated, setAccountsCreated] = useState(false);
 
   useEffect(() => {
     async function fetchMembers() {
@@ -105,6 +107,28 @@ export function StepSendInvites({ onBack }: { onBack: () => void }) {
     }
   }
 
+  async function handleCreateAccounts() {
+    setCreatingAccounts(true);
+    try {
+      const res = await fetch('/api/stripe/pre-create-accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ communityId: community.id }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success("Created " + data.created + " accounts. " + data.alreadyExists + " already existed.");
+        setAccountsCreated(true);
+      } else {
+        toast.error(data.error || 'Failed to create accounts');
+      }
+    } catch {
+      toast.error('An unexpected error occurred');
+    } finally {
+      setCreatingAccounts(false);
+    }
+  }
+
   const handleCopyLink = useCallback(
     async (member: InvitableMember) => {
       const baseUrl =
@@ -130,11 +154,10 @@ export function StepSendInvites({ onBack }: { onBack: () => void }) {
   return (
     <div className="bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark rounded-panel p-card-padding">
       <h2 className="text-card-title text-text-primary-light dark:text-text-primary-dark mb-1">
-        Send Welcome Invites
+        Create Member Accounts
       </h2>
       <p className="text-body text-text-secondary-light dark:text-text-secondary-dark mb-6">
-        Invite your community members to create their accounts. You can send
-        welcome emails or share individual invite links.
+        Set up login accounts for your community members, then send welcome emails so they know how to sign in.
       </p>
 
       {loading ? (
@@ -166,8 +189,21 @@ export function StepSendInvites({ onBack }: { onBack: () => void }) {
 
           {members.length > 0 && (
             <>
-              {/* Send all button */}
-              <div className="mb-4">
+              {/* Action buttons */}
+              <div className="mb-4 space-y-2">
+                <Button
+                  type="button"
+                  onClick={handleCreateAccounts}
+                  disabled={creatingAccounts || accountsCreated}
+                  variant="outline"
+                >
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  {accountsCreated
+                    ? 'Accounts Created'
+                    : creatingAccounts
+                      ? 'Creating...'
+                      : `Create Login Accounts (${members.length})`}
+                </Button>
                 <Button
                   type="button"
                   onClick={handleSendInvites}

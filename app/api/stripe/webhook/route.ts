@@ -159,28 +159,184 @@ export async function POST(req: NextRequest) {
         break;
       }
 
-      case 'account.updated': {
-        const account = event.data.object as Stripe.Account;
 
-        // Update stripe_accounts row where stripe_account_id matches
-        const { error: updateError } = await supabase
-          .from('stripe_accounts')
-          .update({
-            charges_enabled: account.charges_enabled ?? false,
-            payouts_enabled: account.payouts_enabled ?? false,
-            onboarding_complete: account.details_submitted ?? false,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('stripe_account_id', account.id);
+      // -- Subscription invoice paid automatically ---------------------
+      case 'invoice.paid': {
+        const stripeInvoice = event.data.object as Stripe.Invoice;
 
-        if (updateError) {
-          console.error('Failed to update stripe_accounts from webhook:', updateError);
-        } else {
-          console.log('Account updated:', account.id);
+        // Only process subscription invoices (not one-off)
+        const subDetails = stripeInvoice.parent?.subscription_details;
+        if (!subDetails?.subscription) break;
+
+        const subscriptionId = typeof subDetails.subscription === 'string'
+          ? subDetails.subscription
+          : subDetails.subscription.id;
+
+        // Look up the unit by stripe_subscription_id
+        const { data: unit } = await supabase
+          .from('units')
+          .select('id, community_id')
+          .eq('stripe_subscription_id', subscriptionId)
+          .single();
+
+        if (!unit) {
+          console.log('No unit found for subscription:', subscriptionId);
+          break;
         }
+
+        // Find the matching DuesIQ invoice:
+        // Same unit_id, status is 'pending' or 'overdue', closest due_date to today
+        const { data: duesiqInvoice } = await supabase
+          .from('invoices')
+          .select('*')
+          .eq('unit_id', unit.id)
+          .in('status', ['pending', 'overdue'])
+          .order('due_date', { ascending: true })
+          .limit(1)
+          .single();
+
+        if (!duesiqInvoice) {
+          console.log('No pending DuesIQ invoice found for unit:', unit.id);
+          break;
+        }
+
+        const amountPaid = stripeInvoice.amount_paid || 0;
+        const totalPaid = (duesiqInvoice.amount_paid || 0) + amountPaid;
+
+        // Update the DuesIQ invoice
+        await supabase.from('invoices').update({
+          status: 'paid',
+          paid_at: new Date().toISOString(),
+          amount_paid: Math.min(totalPaid, duesiqInvoice.amount),
+          stripe_invoice_id: stripeInvoice.id,
+          stripe_payment_id: stripeInvoice.id,
+        }).eq('id', duesiqInvoice.id);
+
+        // Create payment record
+        await supabase.from('payments').insert({
+          invoice_id: duesiqInvoice.id,
+          unit_id: unit.id,
+          amount: amountPaid,
+          stripe_payment_intent: stripeInvoice.id,
+          paid_by: 'stripe',
+        });
+
+        // Handle overpayment: credit excess to unit wallet
+        if (totalPaid > duesiqInvoice.amount) {
+          const excess = totalPaid - duesiqInvoice.amount;
+
+          const { data: wallet } = await supabase
+            .from('unit_wallets')
+            .select('balance')
+            .eq('unit_id', unit.id)
+            .single();
+
+          const newBalance = (wallet?.balance ?? 0) + excess;
+
+          await supabase.from('unit_wallets').upsert({
+            unit_id: unit.id,
+            community_id: unit.community_id,
+            balance: newBalance,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'unit_id' });
+
+          await supabase.from('wallet_transactions').insert({
+            unit_id: unit.id,
+            community_id: unit.community_id,
+            amount: excess,
+            type: 'overpayment',
+            reference_id: duesiqInvoice.id,
+            description: `Overpayment on: ${duesiqInvoice.title}`,
+          });
+        }
+
+        // Queue payment confirmation email
+        const { data: community } = await supabase
+          .from('communities')
+          .select('slug')
+          .eq('id', unit.community_id)
+          .single();
+
+        if (community?.slug) {
+          await queuePaymentConfirmation(
+            unit.community_id,
+            community.slug,
+            unit.id,
+            duesiqInvoice.title,
+            amountPaid,
+            new Date().toISOString()
+          );
+        }
+
+        console.log('Subscription invoice paid for unit:', unit.id, 'invoice:', duesiqInvoice.id);
         break;
       }
 
+      // -- Subscription payment failed ---------------------------------
+      case 'invoice.payment_failed': {
+        const stripeInvoice = event.data.object as Stripe.Invoice;
+        const failedSubDetails = stripeInvoice.parent?.subscription_details;
+        if (!failedSubDetails?.subscription) break;
+
+        const subscriptionId = typeof failedSubDetails.subscription === 'string'
+          ? failedSubDetails.subscription
+          : failedSubDetails.subscription.id;
+
+        const { data: unit } = await supabase
+          .from('units')
+          .select('id, community_id')
+          .eq('stripe_subscription_id', subscriptionId)
+          .single();
+
+        if (!unit) break;
+
+        // Find matching pending invoice and mark overdue
+        const { data: duesiqInvoice } = await supabase
+          .from('invoices')
+          .select('id')
+          .eq('unit_id', unit.id)
+          .eq('status', 'pending')
+          .order('due_date', { ascending: true })
+          .limit(1)
+          .single();
+
+        if (duesiqInvoice) {
+          await supabase.from('invoices').update({ status: 'overdue' }).eq('id', duesiqInvoice.id);
+        }
+
+        // Update subscription status on unit
+        await supabase.from('units').update({ stripe_subscription_status: 'past_due' }).eq('id', unit.id);
+
+        console.log('Subscription payment failed for unit:', unit.id);
+        break;
+      }
+
+      // -- Subscription status changed ---------------------------------
+      case 'customer.subscription.updated': {
+        const subscription = event.data.object as Stripe.Subscription;
+
+        await supabase.from('units').update({
+          stripe_subscription_status: subscription.status,
+        }).eq('stripe_subscription_id', subscription.id);
+
+        console.log('Subscription updated:', subscription.id, 'status:', subscription.status);
+        break;
+      }
+
+      // -- Subscription canceled/deleted -------------------------------
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object as Stripe.Subscription;
+
+        await supabase.from('units').update({
+          stripe_subscription_id: null,
+          stripe_subscription_status: null,
+        }).eq('stripe_subscription_id', subscription.id);
+
+        console.log('Subscription deleted:', subscription.id);
+        break;
+      }
+
+      // -- Refunds & disputes ------------------------------------------
       case 'charge.refunded': {
         const charge = event.data.object as Stripe.Charge;
         console.log('Charge refunded:', charge.id);

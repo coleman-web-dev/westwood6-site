@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
+import { CreditCard } from 'lucide-react';
 import { BounceInvoiceDialog } from '@/components/payments/bounce-invoice-dialog';
 import { PayInvoiceButton } from '@/components/payments/pay-invoice-button';
 import type { Invoice, InvoiceStatus, Unit } from '@/lib/types/database';
@@ -44,6 +45,7 @@ interface InvoiceListProps {
   units?: Unit[];
   allMembers?: { unit_id: string | null; user_id: string | null }[];
   stripeEnabled?: boolean;
+  subscriptionActive?: boolean;
 }
 
 export function InvoiceList({
@@ -54,6 +56,7 @@ export function InvoiceList({
   units,
   allMembers,
   stripeEnabled,
+  subscriptionActive,
 }: InvoiceListProps) {
   const { isBoard, community } = useCommunity();
   const [statusFilter, setStatusFilter] = useState('all');
@@ -302,6 +305,12 @@ export function InvoiceList({
                     <Badge variant={STATUS_BADGE_VARIANT[invoice.status]} className="text-meta shrink-0">
                       {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
                     </Badge>
+                    {subscriptionActive && (invoice.status === 'pending' || invoice.status === 'overdue') && (
+                      <span className="text-meta text-green-600 dark:text-green-400 flex items-center gap-1">
+                        <CreditCard className="h-3 w-3" />
+                        Auto-pay
+                      </span>
+                    )}
                   </div>
 
                   {/* Owner name (board view) */}

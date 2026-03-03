@@ -1,10 +1,217 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 
+type PageMode = 'loading' | 'request-reset' | 'set-password';
+
 export default function ResetPasswordPage() {
+  const [mode, setMode] = useState<PageMode>('loading');
+  const router = useRouter();
+
+  useEffect(() => {
+    async function detectSession() {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) {
+        setMode('set-password');
+      } else {
+        setMode('request-reset');
+      }
+    }
+    detectSession();
+  }, []);
+
+  if (mode === 'loading') {
+    return (
+      <div className="rounded-panel p-card-padding bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark surface-elevation">
+        <div className="text-center">
+          <p className="text-body text-text-muted-light dark:text-text-muted-dark">
+            Loading...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (mode === 'set-password') {
+    return <SetPasswordForm />;
+  }
+
+  return <RequestResetForm />;
+}
+
+function SetPasswordForm() {
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
+
+  async function handleSetPassword(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    if (newPassword.length < 8) {
+      setError('Password must be at least 8 characters.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
+    setLoading(true);
+
+    const supabase = createClient();
+    const { error: updateError } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+
+    if (updateError) {
+      setError(updateError.message);
+      setLoading(false);
+      return;
+    }
+
+    setSuccess(true);
+
+    // Look up community slug and redirect to dashboard
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (user) {
+      const { data: member } = await supabase
+        .from('members')
+        .select('community_id')
+        .eq('user_id', user.id)
+        .eq('is_approved', true)
+        .single();
+
+      if (member?.community_id) {
+        const { data: community } = await supabase
+          .from('communities')
+          .select('slug')
+          .eq('id', member.community_id)
+          .single();
+
+        if (community?.slug) {
+          setTimeout(() => {
+            router.push(`/${community.slug}/dashboard`);
+          }, 1500);
+          return;
+        }
+      }
+    }
+
+    // Fallback if we cannot determine the community
+    setTimeout(() => {
+      router.push('/login');
+    }, 1500);
+  }
+
+  if (success) {
+    return (
+      <div className="rounded-panel p-card-padding bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark surface-elevation">
+        <div className="text-center mb-6">
+          <h1 className="text-page-title text-text-primary-light dark:text-text-primary-dark">
+            Password updated
+          </h1>
+          <p className="text-body text-text-muted-light dark:text-text-muted-dark mt-2">
+            Your password has been set. Redirecting you now...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-panel p-card-padding bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark surface-elevation">
+      <div className="text-center mb-6">
+        <h1 className="text-page-title text-text-primary-light dark:text-text-primary-dark">
+          Set new password
+        </h1>
+        <p className="text-body text-text-muted-light dark:text-text-muted-dark mt-1">
+          Choose a password for your account
+        </p>
+      </div>
+
+      <form onSubmit={handleSetPassword} className="space-y-4">
+        {error && (
+          <div className="rounded-inner-card bg-surface-light-2 dark:bg-surface-dark-2 border border-warning-dot/20 p-3 text-body text-warning-dot">
+            {error}
+          </div>
+        )}
+
+        <div>
+          <label
+            htmlFor="new-password"
+            className="text-label text-text-secondary-light dark:text-text-secondary-dark block mb-1.5"
+          >
+            New password
+          </label>
+          <input
+            id="new-password"
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            required
+            minLength={8}
+            autoComplete="new-password"
+            placeholder="At least 8 characters"
+            className="w-full h-10 px-3 rounded-pill bg-surface-light-2 dark:bg-surface-dark-2 border border-stroke-light dark:border-stroke-dark text-body text-text-primary-light dark:text-text-primary-dark placeholder:text-text-muted-light dark:placeholder:text-text-muted-dark focus:outline-none focus:ring-2 focus:ring-secondary-400/30 transition-all"
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="confirm-password"
+            className="text-label text-text-secondary-light dark:text-text-secondary-dark block mb-1.5"
+          >
+            Confirm password
+          </label>
+          <input
+            id="confirm-password"
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+            minLength={8}
+            autoComplete="new-password"
+            className="w-full h-10 px-3 rounded-pill bg-surface-light-2 dark:bg-surface-dark-2 border border-stroke-light dark:border-stroke-dark text-body text-text-primary-light dark:text-text-primary-dark focus:outline-none focus:ring-2 focus:ring-secondary-400/30 transition-all"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full h-10 rounded-pill bg-secondary-400 text-label font-semibold text-primary-900 hover:bg-secondary-300 active:bg-secondary-500 focus:outline-none focus:ring-2 focus:ring-secondary-300/40 transition-all shadow-lg shadow-secondary-400/20 disabled:opacity-50 disabled:pointer-events-none"
+        >
+          {loading ? 'Updating...' : 'Set password'}
+        </button>
+
+        <div className="text-center">
+          <Link
+            href="/login"
+            className="text-meta text-secondary-500 dark:text-secondary-400 hover:text-secondary-600 dark:hover:text-secondary-300 transition-colors"
+          >
+            Back to login
+          </Link>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function RequestResetForm() {
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);

@@ -16,6 +16,7 @@ import { HouseholdLedger } from '@/components/payments/household-ledger';
 import { AssessmentList } from '@/components/payments/assessment-list';
 import { CreateAssessmentDialog } from '@/components/payments/create-assessment-dialog';
 import { FrequencySelector } from '@/components/payments/frequency-selector';
+import { ManagePaymentMethodButton } from '@/components/payments/manage-payment-method-button';
 import { toast } from 'sonner';
 import type { Invoice, Payment, Unit, Assessment } from '@/lib/types/database';
 
@@ -36,6 +37,7 @@ export default function PaymentsPage() {
   const [activeTab, setActiveTab] = useState('invoices');
   const [refreshKey, setRefreshKey] = useState(0);
   const [stripeEnabled, setStripeEnabled] = useState(false);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     const supabase = createClient();
@@ -132,6 +134,21 @@ export default function PaymentsPage() {
         .single();
 
       setWalletBalance(walletData?.balance ?? 0);
+    }
+
+    // Fetch subscription status for current unit
+    if (unit) {
+      const { data: unitData } = await supabase
+        .from('units')
+        .select('stripe_subscription_id, stripe_subscription_status')
+        .eq('id', unit.id)
+        .single();
+
+      if (unitData?.stripe_subscription_id) {
+        setSubscriptionStatus(unitData.stripe_subscription_status || 'active');
+      } else {
+        setSubscriptionStatus(null);
+      }
     }
 
     // Check if Stripe is enabled for this community
@@ -245,6 +262,16 @@ export default function PaymentsPage() {
         )}
       </div>
 
+      {/* Manage payment method (if subscription active) */}
+      {subscriptionStatus && !isBoard && (
+        <div className="flex items-center gap-3">
+          <ManagePaymentMethodButton />
+          <span className="text-meta text-text-muted-light dark:text-text-muted-dark">
+            Auto-pay is {subscriptionStatus === 'active' ? 'enabled' : subscriptionStatus}
+          </span>
+        </div>
+      )}
+
       {/* Frequency selector for households */}
       <FrequencySelector onFrequencyChanged={fetchData} />
 
@@ -266,6 +293,7 @@ export default function PaymentsPage() {
             units={isBoard ? allUnits : undefined}
             allMembers={isBoard ? allMembers : undefined}
             stripeEnabled={stripeEnabled}
+            subscriptionActive={subscriptionStatus === 'active'}
           />
         </TabsContent>
 
