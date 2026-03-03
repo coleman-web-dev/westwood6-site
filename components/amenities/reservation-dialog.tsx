@@ -44,7 +44,9 @@ import { toast } from 'sonner';
 import {
   buildSystemContext,
   fillAgreementTemplate,
+  fillAgreementTemplateHtml,
 } from '@/lib/utils/agreement-template';
+import { formatAgreementHtml } from '@/lib/utils/format-agreement';
 import type { Amenity, Member, Unit } from '@/lib/types/database';
 
 interface ReservationDialogProps {
@@ -84,7 +86,9 @@ export function ReservationDialog({
   const [step, setStep] = useState<1 | 2>(1);
   const [fieldAnswers, setFieldAnswers] = useState<Record<string, string>>({});
   const [filledAgreement, setFilledAgreement] = useState('');
+  const [filledAgreementHtml, setFilledAgreementHtml] = useState('');
   const [signatureName, setSignatureName] = useState('');
+  const [eSignConsent, setESignConsent] = useState(false);
 
   // Reset step when dialog opens/closes
   useEffect(() => {
@@ -218,6 +222,15 @@ export function ReservationDialog({
       fieldAnswers,
     );
     setFilledAgreement(filled);
+
+    // Build formatted HTML version with underlined values and paragraphs
+    const htmlRaw = fillAgreementTemplateHtml(
+      amenity.agreement_template!,
+      systemContext,
+      fieldAnswers,
+    );
+    setFilledAgreementHtml(formatAgreementHtml(htmlRaw));
+    setESignConsent(false);
     setStep(2);
   }
 
@@ -595,10 +608,38 @@ export function ReservationDialog({
         {step === 2 && (
           <div className="space-y-4 py-2">
             <ScrollArea className="h-[300px] rounded-inner-card border border-stroke-light dark:border-stroke-dark p-4">
-              <div className="whitespace-pre-line text-body text-text-primary-light dark:text-text-primary-dark leading-relaxed pr-3">
-                {filledAgreement}
-              </div>
+              <div
+                className="text-body text-text-primary-light dark:text-text-primary-dark leading-relaxed pr-3 [&_u]:underline [&_u]:decoration-secondary-500/60 [&_u]:underline-offset-2 [&_p]:mb-3 [&_p:last-child]:mb-0"
+                dangerouslySetInnerHTML={{ __html: filledAgreementHtml }}
+              />
             </ScrollArea>
+
+            {/* E-Signature Consent Disclosure */}
+            <div className="rounded-inner-card bg-surface-light-2 dark:bg-surface-dark-2 p-3 space-y-2">
+              <p className="text-label text-text-primary-light dark:text-text-primary-dark font-semibold">
+                Consent to Electronic Signature
+              </p>
+              <div className="text-meta text-text-secondary-light dark:text-text-secondary-dark space-y-1.5 leading-relaxed">
+                <p>By checking this box, you acknowledge and agree to the following:</p>
+                <ol className="list-decimal pl-4 space-y-1">
+                  <li>You consent to sign this document electronically. Electronic signatures carry the same legal weight as handwritten signatures under the Electronic Signatures in Global and National Commerce Act (ESIGN) and the Uniform Electronic Transactions Act (UETA).</li>
+                  <li>You have the right to receive a paper copy of this document at no charge by contacting your community management.</li>
+                  <li>You may withdraw your consent to electronic records at any time by contacting your community management. Previously signed agreements remain valid and enforceable.</li>
+                  <li>To access and retain this electronic record, you need a device with internet access and a current web browser.</li>
+                </ol>
+              </div>
+              <label className="flex items-start gap-2 pt-1 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={eSignConsent}
+                  onChange={(e) => setESignConsent(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-stroke-light dark:border-stroke-dark text-secondary-500 focus:ring-secondary-500"
+                />
+                <span className="text-meta text-text-primary-light dark:text-text-primary-dark leading-snug">
+                  I have read and agree to the above disclosure. I consent to use an electronic signature for this document.
+                </span>
+              </label>
+            </div>
 
             {/* E-Signature */}
             <div className="space-y-1.5">
@@ -615,6 +656,11 @@ export function ReservationDialog({
                 placeholder="Full legal name"
                 className="text-body"
               />
+              {signatureName.trim() && (
+                <p className="font-signature text-2xl text-text-primary-light dark:text-text-primary-dark mt-1 pl-1">
+                  {signatureName}
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -645,7 +691,7 @@ export function ReservationDialog({
               </Button>
               <Button
                 onClick={handleSubmit}
-                disabled={submitting || !signatureName.trim()}
+                disabled={submitting || !signatureName.trim() || !eSignConsent}
               >
                 {submitting ? 'Submitting...' : 'Sign & Confirm Reservation'}
               </Button>

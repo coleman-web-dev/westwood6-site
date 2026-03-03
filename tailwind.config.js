@@ -25,7 +25,8 @@ module.exports = {
       fontFamily: {
         sans: ['var(--font-space-default)', ...fontFamily.sans],
         display: ['var(--font-space-display)', ...fontFamily.sans],
-        cursive: ['cursive'],
+        cursive: ['var(--font-cursive)', 'cursive'],
+        signature: ['var(--font-cursive)', 'cursive'],
       },
       colors: {
         /* ── Primary: Slate / Ink (full scale from brief) ── */

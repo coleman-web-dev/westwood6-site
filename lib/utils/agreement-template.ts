@@ -75,6 +75,37 @@ export function fillAgreementTemplate(
 }
 
 /**
+ * Escape HTML special characters to prevent injection.
+ */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/**
+ * Replace all {{key}} placeholders with <u>underlined</u> values.
+ * Returns HTML safe for dangerouslySetInnerHTML.
+ * The template text is HTML-escaped first, then placeholders are replaced.
+ */
+export function fillAgreementTemplateHtml(
+  template: string,
+  systemContext: Record<string, string>,
+  fieldAnswers: Record<string, string>,
+): string {
+  const allValues: Record<string, string> = { ...systemContext, ...fieldAnswers };
+  // Escape the raw template (the {{}} placeholders survive because they have no special chars)
+  const escaped = escapeHtml(template);
+  return escaped.replace(/\{\{\s*(\w+)\s*\}\}/g, (_match, key: string) => {
+    const val = allValues[key];
+    if (val) return `<u>${escapeHtml(val)}</u>`;
+    return `{{${key}}}`;
+  });
+}
+
+/**
  * Build an example-filled version of the template (for admin preview).
  * Uses example values from SYSTEM_VARIABLES and placeholder text for custom fields.
  */

@@ -1,4 +1,4 @@
-import { Inter } from 'next/font/google';
+import { Inter, Dancing_Script } from 'next/font/google';
 import { siteConfig } from '@/data/config/site.settings';
 import { ThemeProviders } from './theme-providers';
 import { Metadata } from 'next';
@@ -20,6 +20,13 @@ const baseFont = Inter({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-space-default',
+});
+
+const cursiveFont = Dancing_Script({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-cursive',
+  weight: ['400', '700'],
 });
 
 const globalColors = colors;
@@ -80,7 +87,7 @@ export default function RootLayout({
   return (
     <html
       lang={siteConfig.language}
-      className={`${baseFont.variable} ${displayFont.variable} scroll-smooth`}
+      className={`${baseFont.variable} ${displayFont.variable} ${cursiveFont.variable} scroll-smooth`}
       suppressHydrationWarning
     >
       <head>
