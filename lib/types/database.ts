@@ -297,6 +297,21 @@ export interface SignedAgreement {
   created_at: string;
 }
 
+export type NotificationType = 'agreement_signed' | 'reservation_created' | 'reservation_approved' | 'reservation_denied' | 'general';
+
+export interface Notification {
+  id: string;
+  community_id: string;
+  member_id: string;
+  type: NotificationType;
+  title: string;
+  body: string | null;
+  reference_id: string | null;
+  reference_type: string | null;
+  read: boolean;
+  created_at: string;
+}
+
 export interface UserPreference {
   id: string;
   user_id: string;

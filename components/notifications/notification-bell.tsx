@@ -1,0 +1,155 @@
+'use client';
+
+import { useEffect, useState, useCallback } from 'react';
+import { formatDistanceToNow } from 'date-fns';
+import { createClient } from '@/lib/supabase/client';
+import { useCommunity } from '@/lib/providers/community-provider';
+import { Button } from '@/components/shared/ui/button';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/shared/ui/popover';
+import { ScrollArea } from '@/components/shared/ui/scroll-area';
+import { BellIcon, FileSignature, CalendarCheck, CheckCheck } from 'lucide-react';
+import type { Notification, NotificationType } from '@/lib/types/database';
+
+const TYPE_ICON: Record<NotificationType, React.ReactNode> = {
+  agreement_signed: <FileSignature className="h-4 w-4 text-secondary-500" />,
+  reservation_created: <CalendarCheck className="h-4 w-4 text-primary-500" />,
+  reservation_approved: <CalendarCheck className="h-4 w-4 text-green-500" />,
+  reservation_denied: <CalendarCheck className="h-4 w-4 text-red-500" />,
+  general: <BellIcon className="h-4 w-4 text-text-muted-light dark:text-text-muted-dark" />,
+};
+
+export function NotificationBell() {
+  const { member } = useCommunity();
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [open, setOpen] = useState(false);
+
+  const fetchNotifications = useCallback(async () => {
+    if (!member) return;
+
+    const supabase = createClient();
+    const { data } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('member_id', member.id)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    const items = (data as Notification[]) ?? [];
+    setNotifications(items);
+    setUnreadCount(items.filter((n) => !n.read).length);
+  }, [member]);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
+
+  // Refresh when popover opens
+  useEffect(() => {
+    if (open) fetchNotifications();
+  }, [open, fetchNotifications]);
+
+  async function markAsRead(id: string) {
+    const supabase = createClient();
+    await supabase.from('notifications').update({ read: true }).eq('id', id);
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+    );
+    setUnreadCount((prev) => Math.max(0, prev - 1));
+  }
+
+  async function markAllRead() {
+    if (!member) return;
+    const supabase = createClient();
+    await supabase
+      .from('notifications')
+      .update({ read: true })
+      .eq('member_id', member.id)
+      .eq('read', false);
+
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setUnreadCount(0);
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button className="relative p-2 rounded-inner-card text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors">
+          <BellIcon className="w-[18px] h-[18px]" />
+          {unreadCount > 0 && (
+            <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80 p-0">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-stroke-light dark:border-stroke-dark">
+          <h3 className="text-label text-text-primary-light dark:text-text-primary-dark">
+            Notifications
+          </h3>
+          {unreadCount > 0 && (
+            <Button variant="ghost" size="sm" onClick={markAllRead} className="text-meta">
+              <CheckCheck className="h-3.5 w-3.5 mr-1" />
+              Mark all read
+            </Button>
+          )}
+        </div>
+
+        <ScrollArea className="max-h-[320px]">
+          {notifications.length === 0 ? (
+            <div className="py-8 text-center">
+              <p className="text-body text-text-muted-light dark:text-text-muted-dark">
+                No notifications yet.
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-stroke-light dark:divide-stroke-dark">
+              {notifications.map((n) => (
+                <button
+                  key={n.id}
+                  onClick={() => { if (!n.read) markAsRead(n.id); }}
+                  className={`w-full text-left px-4 py-3 hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors ${
+                    !n.read ? 'bg-secondary-50/50 dark:bg-secondary-950/20' : ''
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="shrink-0 mt-0.5">
+                      {TYPE_ICON[n.type] ?? TYPE_ICON.general}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-label truncate ${
+                          !n.read
+                            ? 'text-text-primary-light dark:text-text-primary-dark'
+                            : 'text-text-secondary-light dark:text-text-secondary-dark'
+                        }`}>
+                          {n.title}
+                        </span>
+                        {!n.read && (
+                          <span className="w-2 h-2 bg-secondary-500 rounded-full shrink-0" />
+                        )}
+                      </div>
+                      {n.body && (
+                        <p className="text-meta text-text-muted-light dark:text-text-muted-dark line-clamp-2 mt-0.5">
+                          {n.body}
+                        </p>
+                      )}
+                      <p className="text-meta text-text-muted-light dark:text-text-muted-dark mt-1">
+                        {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </ScrollArea>
+      </PopoverContent>
+    </Popover>
+  );
+}

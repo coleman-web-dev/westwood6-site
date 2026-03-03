@@ -6,7 +6,8 @@ import { useCommunity } from '@/lib/providers/community-provider';
 import { MemberList } from '@/components/household/member-list';
 import { AddMemberDialog } from '@/components/household/add-member-dialog';
 import { MoveOutDialog } from '@/components/household/move-out-dialog';
-import { Home } from 'lucide-react';
+import { SignedAgreementsSection } from '@/components/household/signed-agreements-section';
+import { Home, FileSignature } from 'lucide-react';
 import { Button } from '@/components/shared/ui/button';
 import {
   Select,
@@ -203,6 +204,19 @@ export default function HouseholdPage() {
         onAddClick={() => setAddDialogOpen(true)}
         onMemberRemoved={handleMemberRemoved}
       />
+
+      {/* Signed agreements */}
+      {activeUnit && (
+        <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding space-y-3">
+          <div className="flex items-center gap-2">
+            <FileSignature className="h-5 w-5 text-secondary-500" />
+            <h2 className="text-card-title text-text-primary-light dark:text-text-primary-dark">
+              Signed Agreements
+            </h2>
+          </div>
+          <SignedAgreementsSection unitId={activeUnit.id} />
+        </div>
+      )}
 
       {/* Add member dialog */}
       {canManage && (

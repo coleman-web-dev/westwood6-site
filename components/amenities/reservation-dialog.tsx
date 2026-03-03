@@ -287,7 +287,31 @@ export function ReservationDialog({
         console.error('Agreement insert error:', agreementError);
         // Reservation was created but agreement failed. Don't block.
         toast.warning('Reservation created, but the agreement could not be saved. Please contact the board.');
+      } else {
+        // Notify board members about the signed agreement
+        const resolved = getResolvedMember();
+        await supabase.rpc('create_board_notifications', {
+          p_community_id: community.id,
+          p_type: 'agreement_signed',
+          p_title: `${amenity.name} agreement signed`,
+          p_body: `${resolved.name} (Unit ${resolved.unitNumber}) signed the ${amenity.name} rental agreement.`,
+          p_reference_id: reservationData.id,
+          p_reference_type: 'reservation',
+        });
       }
+    }
+
+    // Notify board members about the new reservation (if no agreement, or in addition)
+    if (reservationData) {
+      const resolved = getResolvedMember();
+      await supabase.rpc('create_board_notifications', {
+        p_community_id: community.id,
+        p_type: 'reservation_created',
+        p_title: `New ${amenity.name} reservation`,
+        p_body: `${resolved.name} (Unit ${resolved.unitNumber}) reserved ${amenity.name}.`,
+        p_reference_id: reservationData.id,
+        p_reference_type: 'reservation',
+      });
     }
 
     setSubmitting(false);

@@ -2,7 +2,8 @@
 
 import ThemeSwitch from '@/components/shared/ThemeSwitch';
 import { useCommunity } from '@/lib/providers/community-provider';
-import { SearchIcon, BellIcon, MailIcon, MenuIcon } from 'lucide-react';
+import { NotificationBell } from '@/components/notifications/notification-bell';
+import { SearchIcon, MailIcon, MenuIcon } from 'lucide-react';
 
 interface DashboardTopbarProps {
   onMenuClick: () => void;
@@ -47,10 +48,7 @@ export function DashboardTopbar({ onMenuClick }: DashboardTopbarProps) {
       <div className="flex items-center gap-3 ml-auto">
         <ThemeSwitch />
 
-        <button className="relative p-2 rounded-inner-card text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors">
-          <BellIcon className="w-[18px] h-[18px]" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-warning-dot rounded-full" />
-        </button>
+        <NotificationBell />
         <button className="p-2 rounded-inner-card text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors">
           <MailIcon className="w-[18px] h-[18px]" />
         </button>
