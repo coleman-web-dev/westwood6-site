@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes';
 import { UnsavedChangesDialog } from '@/components/settings/unsaved-changes-dialog';
 import { AmenityList } from '@/components/amenities/amenity-list';
-import type { PaymentFrequency } from '@/lib/types/database';
+import type { PaymentFrequency, BulletinSettings } from '@/lib/types/database';
 
 export function CommunitySettings() {
   const { community } = useCommunity();
@@ -34,6 +34,8 @@ export function CommunitySettings() {
   const [canViewDirectory, setCanViewDirectory] = useState(false);
   const [allowFlexibleFrequency, setAllowFlexibleFrequency] = useState(false);
   const [defaultFrequency, setDefaultFrequency] = useState<PaymentFrequency>('quarterly');
+  const [bulletinPosting, setBulletinPosting] = useState<BulletinSettings['posting']>('board_only');
+  const [bulletinCommenting, setBulletinCommenting] = useState<BulletinSettings['commenting']>('all_households');
   const [saving, setSaving] = useState(false);
 
   // Load current values from community context
@@ -49,6 +51,8 @@ export function CommunitySettings() {
       setCanViewDirectory(community.tenant_permissions?.can_view_directory ?? false);
       setAllowFlexibleFrequency(community.theme?.payment_settings?.allow_flexible_frequency ?? false);
       setDefaultFrequency(community.theme?.payment_settings?.default_frequency ?? 'quarterly');
+      setBulletinPosting(community.theme?.bulletin_settings?.posting ?? 'board_only');
+      setBulletinCommenting(community.theme?.bulletin_settings?.commenting ?? 'all_households');
     }
   }, [community]);
 
@@ -64,12 +68,15 @@ export function CommunitySettings() {
       canSubmitRequests !== (community.tenant_permissions?.can_submit_requests ?? false) ||
       canViewDirectory !== (community.tenant_permissions?.can_view_directory ?? false) ||
       allowFlexibleFrequency !== (community.theme?.payment_settings?.allow_flexible_frequency ?? false) ||
-      defaultFrequency !== (community.theme?.payment_settings?.default_frequency ?? 'quarterly')
+      defaultFrequency !== (community.theme?.payment_settings?.default_frequency ?? 'quarterly') ||
+      bulletinPosting !== (community.theme?.bulletin_settings?.posting ?? 'board_only') ||
+      bulletinCommenting !== (community.theme?.bulletin_settings?.commenting ?? 'all_households')
     );
   }, [
     name, address, phone, email,
     canReserveAmenities, canAttendEvents, canSubmitRequests, canViewDirectory,
     allowFlexibleFrequency, defaultFrequency,
+    bulletinPosting, bulletinCommenting,
     community,
   ]);
 
@@ -104,6 +111,10 @@ export function CommunitySettings() {
           payment_settings: {
             allow_flexible_frequency: allowFlexibleFrequency,
             default_frequency: defaultFrequency,
+          },
+          bulletin_settings: {
+            posting: bulletinPosting,
+            commenting: bulletinCommenting,
           },
         },
       })
@@ -270,6 +281,60 @@ export function CommunitySettings() {
               checked={canViewDirectory}
               onCheckedChange={setCanViewDirectory}
             />
+          </div>
+        </div>
+      </div>
+
+      {/* Bulletin Board */}
+      <div className="bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark rounded-panel p-card-padding">
+        <h2 className="text-card-title text-text-primary-light dark:text-text-primary-dark mb-1">
+          Bulletin Board
+        </h2>
+        <p className="text-meta text-text-muted-light dark:text-text-muted-dark mb-4">
+          Control who can post and comment on the community bulletin board.
+        </p>
+
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-body text-text-primary-light dark:text-text-primary-dark">
+              Who can create posts
+            </label>
+            <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+              Board members can always post. This controls whether all households can too.
+            </p>
+            <div className="max-w-xs mt-2">
+              <Select value={bulletinPosting} onValueChange={(v) => setBulletinPosting(v as BulletinSettings['posting'])}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="board_only">Board members only</SelectItem>
+                  <SelectItem value="all_households">All households</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="border-t border-stroke-light dark:border-stroke-dark" />
+
+          <div className="space-y-1.5">
+            <label className="text-body text-text-primary-light dark:text-text-primary-dark">
+              Who can comment on posts
+            </label>
+            <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+              Board members can always comment. This controls whether all households can too.
+            </p>
+            <div className="max-w-xs mt-2">
+              <Select value={bulletinCommenting} onValueChange={(v) => setBulletinCommenting(v as BulletinSettings['commenting'])}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="board_only">Board members only</SelectItem>
+                  <SelectItem value="all_households">All households</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
       </div>

@@ -10,7 +10,8 @@ export type DashboardCardId =
   | 'documents'
   | 'amenities'
   | 'amenity-calendar'
-  | 'voting';
+  | 'voting'
+  | 'bulletin-board';
 
 export interface DashboardCardConfig {
   id: DashboardCardId;
@@ -23,8 +24,8 @@ export interface DashboardCardConfig {
 }
 
 export const DEFAULT_CARD_VISIBILITY: Record<MemberRole, DashboardCardId[]> = {
-  owner: ['balance', 'announcements', 'maintenance', 'payments', 'events', 'amenities', 'amenity-calendar', 'household', 'documents', 'voting'],
-  member: ['balance', 'announcements', 'maintenance', 'payments', 'events', 'amenities', 'amenity-calendar', 'documents', 'voting'],
-  tenant: ['announcements', 'maintenance', 'events', 'amenities', 'amenity-calendar'],
-  minor: ['announcements', 'events'],
+  owner: ['balance', 'announcements', 'maintenance', 'payments', 'events', 'amenities', 'amenity-calendar', 'household', 'documents', 'voting', 'bulletin-board'],
+  member: ['balance', 'announcements', 'maintenance', 'payments', 'events', 'amenities', 'amenity-calendar', 'documents', 'voting', 'bulletin-board'],
+  tenant: ['announcements', 'maintenance', 'events', 'amenities', 'amenity-calendar', 'bulletin-board'],
+  minor: ['announcements', 'events', 'bulletin-board'],
 };

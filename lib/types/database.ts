@@ -20,10 +20,16 @@ export interface PaymentSettings {
   default_frequency: PaymentFrequency;
 }
 
+export interface BulletinSettings {
+  posting: 'board_only' | 'all_households';
+  commenting: 'board_only' | 'all_households';
+}
+
 export interface CommunityTheme {
   dashboard_cards?: Partial<Record<MemberRole, string[]>>;
   payment_settings?: PaymentSettings;
   voting_enabled?: boolean;
+  bulletin_settings?: BulletinSettings;
   [key: string]: unknown;
 }
 
@@ -428,4 +434,32 @@ export interface QuorumStatus {
   participation_rate: number;
   quorum_threshold: number;
   quorum_met: boolean;
+}
+
+// ─── Bulletin Board ────────────────────────────────
+
+export interface BulletinPost {
+  id: string;
+  community_id: string;
+  title: string;
+  body: string;
+  posted_by: string;
+  is_pinned: boolean;
+  created_at: string;
+  updated_at: string;
+  // Joined fields
+  author?: Pick<Member, 'id' | 'first_name' | 'last_name' | 'member_role'>;
+  comment_count?: number;
+}
+
+export interface BulletinComment {
+  id: string;
+  post_id: string;
+  community_id: string;
+  body: string;
+  posted_by: string;
+  created_at: string;
+  updated_at: string;
+  // Joined fields
+  author?: Pick<Member, 'id' | 'first_name' | 'last_name' | 'member_role'>;
 }

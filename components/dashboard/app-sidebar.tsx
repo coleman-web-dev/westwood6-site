@@ -10,6 +10,7 @@ import {
   Calendar,
   Building2,
   Megaphone,
+  ClipboardList,
   Users,
   Vote,
   Settings,
@@ -29,6 +30,7 @@ const NAV_ITEMS = [
   { icon: Calendar, href: '/events', label: 'Events' },
   { icon: Building2, href: '/amenities', label: 'Amenities' },
   { icon: Megaphone, href: '/announcements', label: 'Announcements' },
+  { icon: ClipboardList, href: '/bulletin-board', label: 'Bulletin Board' },
 ];
 
 interface AppSidebarProps {

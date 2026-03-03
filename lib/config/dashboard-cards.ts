@@ -96,4 +96,13 @@ export const CARD_REGISTRY: Record<DashboardCardId, DashboardCardConfig> = {
     defaultW: 6,
     defaultH: 5,
   },
+  'bulletin-board': {
+    id: 'bulletin-board',
+    title: 'Bulletin Board',
+    icon: 'ClipboardList',
+    minW: 3,
+    minH: 4,
+    defaultW: 6,
+    defaultH: 7,
+  },
 };
