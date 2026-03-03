@@ -23,6 +23,7 @@ export interface PaymentSettings {
 export interface CommunityTheme {
   dashboard_cards?: Partial<Record<MemberRole, string[]>>;
   payment_settings?: PaymentSettings;
+  voting_enabled?: boolean;
   [key: string]: unknown;
 }
 
@@ -297,7 +298,19 @@ export interface SignedAgreement {
   created_at: string;
 }
 
-export type NotificationType = 'agreement_signed' | 'reservation_created' | 'reservation_approved' | 'reservation_denied' | 'general';
+export type NotificationType =
+  | 'agreement_signed'
+  | 'reservation_created'
+  | 'reservation_approved'
+  | 'reservation_denied'
+  | 'general'
+  | 'ballot_created'
+  | 'ballot_opened'
+  | 'ballot_reminder'
+  | 'ballot_closed'
+  | 'ballot_results'
+  | 'proxy_requested'
+  | 'proxy_granted';
 
 export interface Notification {
   id: string;
@@ -320,4 +333,99 @@ export interface UserPreference {
   dismissed_tooltips: string[];
   created_at: string;
   updated_at: string;
+}
+
+// ─── Voting Enums ──────────────────────────────────────
+
+export type BallotStatus = 'draft' | 'scheduled' | 'open' | 'closed' | 'certified' | 'cancelled';
+export type BallotType = 'board_election' | 'budget_approval' | 'amendment' | 'special_assessment' | 'recall' | 'general';
+export type BallotTallyMethod = 'plurality' | 'yes_no' | 'yes_no_abstain' | 'multi_select';
+export type ProxyStatus = 'pending' | 'active' | 'revoked' | 'expired';
+
+// ─── Voting Row Types ──────────────────────────────────
+
+export interface Ballot {
+  id: string;
+  community_id: string;
+  title: string;
+  description: string | null;
+  ballot_type: BallotType;
+  tally_method: BallotTallyMethod;
+  is_secret_ballot: boolean;
+  quorum_threshold: number;
+  approval_threshold: number | null;
+  max_selections: number;
+  notice_sent_at: string | null;
+  opens_at: string;
+  closes_at: string;
+  status: BallotStatus;
+  certified_at: string | null;
+  certified_by: string | null;
+  results_published: boolean;
+  results_published_at: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BallotOption {
+  id: string;
+  ballot_id: string;
+  label: string;
+  description: string | null;
+  display_order: number;
+  created_at: string;
+}
+
+export interface BallotEligibility {
+  id: string;
+  ballot_id: string;
+  unit_id: string;
+  member_id: string;
+  has_voted: boolean;
+  voted_at: string | null;
+  voted_by_proxy: boolean;
+  proxy_member_id: string | null;
+  created_at: string;
+}
+
+export interface BallotVote {
+  id: string;
+  ballot_id: string;
+  unit_id: string;
+  option_id: string;
+  cast_by_member_id: string;
+  created_at: string;
+}
+
+export interface BallotResultCache {
+  id: string;
+  ballot_id: string;
+  option_id: string;
+  vote_count: number;
+  vote_percentage: number;
+  is_winner: boolean;
+  created_at: string;
+}
+
+export interface ProxyAuthorization {
+  id: string;
+  community_id: string;
+  grantor_unit_id: string;
+  grantor_member_id: string;
+  grantee_member_id: string;
+  ballot_id: string | null;
+  status: ProxyStatus;
+  authorized_at: string | null;
+  revoked_at: string | null;
+  expires_at: string | null;
+  created_at: string;
+}
+
+export interface QuorumStatus {
+  total_eligible: number;
+  total_voted: number;
+  participation_rate: number;
+  quorum_threshold: number;
+  quorum_met: boolean;
 }

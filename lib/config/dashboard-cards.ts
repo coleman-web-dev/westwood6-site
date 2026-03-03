@@ -87,4 +87,13 @@ export const CARD_REGISTRY: Record<DashboardCardId, DashboardCardConfig> = {
     defaultW: 6,
     defaultH: 10,
   },
+  voting: {
+    id: 'voting',
+    title: 'Active Ballots',
+    icon: 'Vote',
+    minW: 3,
+    minH: 4,
+    defaultW: 6,
+    defaultH: 5,
+  },
 };

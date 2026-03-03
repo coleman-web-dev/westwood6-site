@@ -11,6 +11,7 @@ import {
   Building2,
   Megaphone,
   Users,
+  Vote,
   Settings,
   Globe,
   LogOut,
@@ -38,7 +39,7 @@ interface AppSidebarProps {
 export function AppSidebar({ open, onClose }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { community, isHeadOfHousehold } = useCommunity();
+  const { community, isHeadOfHousehold, isBoard } = useCommunity();
   const basePath = `/${community.slug}`;
 
   async function handleSignOut() {
@@ -98,6 +99,14 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
             label={item.label}
           />
         ))}
+        {community.theme?.voting_enabled && (
+          <NavItem
+            icon={Vote}
+            href={`${basePath}/voting`}
+            active={isActive('/voting')}
+            label="Voting"
+          />
+        )}
         {isHeadOfHousehold && (
           <NavItem
             icon={Users}

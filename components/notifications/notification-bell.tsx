@@ -11,7 +11,7 @@ import {
   PopoverTrigger,
 } from '@/components/shared/ui/popover';
 import { ScrollArea } from '@/components/shared/ui/scroll-area';
-import { BellIcon, FileSignature, CalendarCheck, CheckCheck } from 'lucide-react';
+import { BellIcon, FileSignature, CalendarCheck, CheckCheck, Vote, Users } from 'lucide-react';
 import { SignedAgreementViewer } from '@/components/amenities/signed-agreement-viewer';
 import type { Notification, NotificationType } from '@/lib/types/database';
 
@@ -20,11 +20,22 @@ const TYPE_ICON: Record<NotificationType, React.ReactNode> = {
   reservation_created: <CalendarCheck className="h-4 w-4 text-primary-500" />,
   reservation_approved: <CalendarCheck className="h-4 w-4 text-green-500" />,
   reservation_denied: <CalendarCheck className="h-4 w-4 text-red-500" />,
+  ballot_created: <Vote className="h-4 w-4 text-secondary-500" />,
+  ballot_opened: <Vote className="h-4 w-4 text-green-500" />,
+  ballot_reminder: <Vote className="h-4 w-4 text-amber-500" />,
+  ballot_closed: <Vote className="h-4 w-4 text-text-muted-light dark:text-text-muted-dark" />,
+  ballot_results: <Vote className="h-4 w-4 text-primary-500" />,
+  proxy_requested: <Users className="h-4 w-4 text-secondary-500" />,
+  proxy_granted: <Users className="h-4 w-4 text-green-500" />,
   general: <BellIcon className="h-4 w-4 text-text-muted-light dark:text-text-muted-dark" />,
 };
 
+const BALLOT_NOTIFICATION_TYPES: NotificationType[] = [
+  'ballot_created', 'ballot_opened', 'ballot_reminder', 'ballot_closed', 'ballot_results',
+];
+
 export function NotificationBell() {
-  const { member } = useCommunity();
+  const { member, community } = useCommunity();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
@@ -82,8 +93,14 @@ export function NotificationBell() {
 
     // Open the signed agreement viewer for agreement notifications
     if (n.type === 'agreement_signed' && n.reference_id && n.reference_type === 'reservation') {
-      setOpen(false); // close the popover
+      setOpen(false);
       setViewingReservationId(n.reference_id);
+    }
+
+    // Navigate to voting page for ballot notifications
+    if (BALLOT_NOTIFICATION_TYPES.includes(n.type)) {
+      setOpen(false);
+      window.location.href = `/${community.slug}/voting`;
     }
   }
 
