@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { FileText, Download, Trash2 } from 'lucide-react';
+import { FileText, Download, Trash2, Globe } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Button } from '@/components/shared/ui/button';
 import { Badge } from '@/components/shared/ui/badge';
+import { Switch } from '@/components/shared/ui/switch';
 import { toast } from 'sonner';
 import type { Document, DocCategory } from '@/lib/types/database';
 
@@ -42,6 +43,26 @@ export function DocumentList({ documents, loading, onDeleted }: DocumentListProp
   const { isBoard } = useCommunity();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  async function handleTogglePublic(doc: Document) {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('documents')
+      .update({ is_public: !doc.is_public })
+      .eq('id', doc.id);
+
+    if (error) {
+      toast.error('Failed to update visibility.');
+      return;
+    }
+
+    toast.success(
+      doc.is_public
+        ? 'Document is now private.'
+        : 'Document is now visible on the landing page.'
+    );
+    onDeleted(); // triggers refetch
+  }
 
   async function handleDownload(doc: Document) {
     setDownloadingId(doc.id);
@@ -154,6 +175,12 @@ export function DocumentList({ documents, loading, onDeleted }: DocumentListProp
                 >
                   {CATEGORY_LABELS[doc.category]}
                 </Badge>
+                {doc.is_public && (
+                  <Badge variant="outline" className="text-meta shrink-0 gap-1">
+                    <Globe className="h-3 w-3" />
+                    Public
+                  </Badge>
+                )}
               </div>
               <div className="flex items-center gap-3 mt-0.5">
                 <span className="text-meta text-text-muted-light dark:text-text-muted-dark">
@@ -172,7 +199,16 @@ export function DocumentList({ documents, loading, onDeleted }: DocumentListProp
             </div>
 
             {/* Actions */}
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
+              {isBoard && (
+                <div className="flex items-center gap-1.5" title={doc.is_public ? 'Public' : 'Private'}>
+                  <Globe className="h-3.5 w-3.5 text-text-muted-light dark:text-text-muted-dark" />
+                  <Switch
+                    checked={doc.is_public}
+                    onCheckedChange={() => handleTogglePublic(doc)}
+                  />
+                </div>
+              )}
               <Button
                 variant="ghost"
                 size="icon"

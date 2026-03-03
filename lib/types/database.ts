@@ -31,6 +31,8 @@ export type BudgetCategory = 'dues' | 'assessments' | 'amenity_fees' | 'interest
 export type VendorCategory = 'landscaping' | 'plumbing' | 'electrical' | 'hvac' | 'painting' | 'roofing' | 'cleaning' | 'security' | 'general' | 'other';
 export type VendorStatus = 'active' | 'inactive';
 
+import type { LandingPageConfig } from './landing';
+
 // ─── Community theme config ─────────────────────────
 
 export interface LateFeeSettings {
@@ -76,6 +78,7 @@ export interface CommunityTheme {
   email_settings?: EmailSettings;
   onboarding?: OnboardingState;
   arc_enabled?: boolean;
+  landing_page?: LandingPageConfig;
   [key: string]: unknown;
 }
 
@@ -123,6 +126,7 @@ export interface Member {
   member_role: MemberRole;
   system_role: SystemRole;
   parent_member_id: string | null;
+  board_title: string | null;
   show_in_directory: boolean;
   is_approved: boolean;
   stripe_customer_id?: string | null;
@@ -150,6 +154,7 @@ export interface Announcement {
   title: string;
   body: string;
   priority: AnnouncementPriority;
+  is_public: boolean;
   posted_by: string;
   created_at: string;
 }
@@ -161,6 +166,7 @@ export interface Document {
   category: DocCategory;
   file_path: string;
   file_size: number | null;
+  is_public: boolean;
   uploaded_by: string;
   created_at: string;
 }

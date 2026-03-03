@@ -1,7 +1,12 @@
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import Link from 'next/link';
 import { Button } from '@/components/shared/ui/button';
+import { LandingPageShell } from '@/components/landing-page/landing-page-shell';
+import type { LandingPageData } from '@/components/landing-page/landing-page-shell';
 import type { Community } from '@/lib/types/database';
+import type { LandingPageConfig } from '@/lib/types/landing';
+import { DEFAULT_LANDING_CONFIG } from '@/lib/types/landing';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -35,6 +40,102 @@ export default async function CommunityLandingPage({ params }: Props) {
     isMember = !!member;
   }
 
+  const landingConfig: LandingPageConfig | undefined = c.theme?.landing_page;
+
+  // If no landing page config exists, render the legacy minimal page
+  if (!landingConfig) {
+    return <LegacyLandingPage community={c} slug={slug} isMember={isMember} />;
+  }
+
+  // Fetch all public data in parallel using admin client (bypasses RLS for unauthenticated visitors)
+  const admin = createAdminClient();
+  const enabledSectionIds = new Set(
+    landingConfig.sections.filter((s) => s.enabled).map((s) => s.id)
+  );
+
+  const [boardResult, docsResult, amenitiesResult, announcementsResult] =
+    await Promise.all([
+      enabledSectionIds.has('board_members')
+        ? admin
+            .from('members')
+            .select('first_name, last_name, board_title, system_role')
+            .eq('community_id', c.id)
+            .in('system_role', ['board', 'manager', 'super_admin'])
+            .eq('is_approved', true)
+        : Promise.resolve({ data: [] }),
+
+      enabledSectionIds.has('documents')
+        ? admin
+            .from('documents')
+            .select('id, title, category, file_path, file_size')
+            .eq('community_id', c.id)
+            .eq('is_public', true)
+            .order('created_at', { ascending: false })
+        : Promise.resolve({ data: [] }),
+
+      enabledSectionIds.has('amenities')
+        ? admin
+            .from('amenities')
+            .select('id, name, description, icon')
+            .eq('community_id', c.id)
+            .eq('active', true)
+        : Promise.resolve({ data: [] }),
+
+      enabledSectionIds.has('announcements')
+        ? admin
+            .from('announcements')
+            .select('id, title, body, priority, created_at')
+            .eq('community_id', c.id)
+            .eq('is_public', true)
+            .order('created_at', { ascending: false })
+            .limit(landingConfig.max_public_announcements || 5)
+        : Promise.resolve({ data: [] }),
+    ]);
+
+  // Generate signed URLs for public documents (they're in the private hoa-documents bucket)
+  const publicDocs = await Promise.all(
+    (docsResult.data || []).map(async (doc: { id: string; title: string; category: string; file_path: string; file_size: number | null }) => {
+      const { data } = await admin.storage
+        .from('hoa-documents')
+        .createSignedUrl(doc.file_path, 3600);
+      return {
+        id: doc.id,
+        title: doc.title,
+        category: doc.category,
+        file_size: doc.file_size,
+        signed_url: data?.signedUrl || '#',
+      };
+    })
+  );
+
+  const landingData: LandingPageData = {
+    boardMembers: (boardResult.data || []) as LandingPageData['boardMembers'],
+    publicDocs,
+    amenities: (amenitiesResult.data || []) as LandingPageData['amenities'],
+    announcements: (announcementsResult.data || []) as LandingPageData['announcements'],
+  };
+
+  return (
+    <LandingPageShell
+      community={c}
+      config={landingConfig}
+      data={landingData}
+      slug={slug}
+      isMember={isMember}
+    />
+  );
+}
+
+/** Backwards-compatible minimal landing page for communities without landing config */
+function LegacyLandingPage({
+  community: c,
+  slug,
+  isMember,
+}: {
+  community: Community;
+  slug: string;
+  isMember: boolean;
+}) {
   return (
     <div className="min-h-screen bg-canvas-light dark:bg-canvas-dark">
       <div className="mx-auto max-w-3xl px-6 py-16">

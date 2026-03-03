@@ -12,12 +12,13 @@ import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes';
 import { UnsavedChangesDialog } from '@/components/settings/unsaved-changes-dialog';
 
 export function ProfileSettings() {
-  const { member } = useCommunity();
+  const { member, actualIsBoard } = useCommunity();
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [boardTitle, setBoardTitle] = useState('');
   const [showInDirectory, setShowInDirectory] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -28,6 +29,7 @@ export function ProfileSettings() {
       setLastName(member.last_name);
       setEmail(member.email ?? '');
       setPhone(member.phone ?? '');
+      setBoardTitle(member.board_title ?? '');
       setShowInDirectory(member.show_in_directory);
     }
   }, [member]);
@@ -39,9 +41,10 @@ export function ProfileSettings() {
       lastName !== member.last_name ||
       email !== (member.email ?? '') ||
       phone !== (member.phone ?? '') ||
+      boardTitle !== (member.board_title ?? '') ||
       showInDirectory !== member.show_in_directory
     );
-  }, [firstName, lastName, email, phone, showInDirectory, member]);
+  }, [firstName, lastName, email, phone, boardTitle, showInDirectory, member]);
 
   async function handleSave() {
     if (!member) return;
@@ -64,6 +67,7 @@ export function ProfileSettings() {
         last_name: trimmedLast,
         email: email.trim() || null,
         phone: phone.trim() || null,
+        board_title: boardTitle.trim() || null,
         show_in_directory: showInDirectory,
       })
       .eq('id', member.id);
@@ -152,6 +156,27 @@ export function ProfileSettings() {
             placeholder="(555) 555-5555"
           />
         </div>
+
+        {actualIsBoard && (
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="board-title"
+              className="text-label text-text-secondary-light dark:text-text-secondary-dark"
+            >
+              Board Title
+            </Label>
+            <Input
+              id="board-title"
+              value={boardTitle}
+              onChange={(e) => setBoardTitle(e.target.value)}
+              placeholder="e.g. President, Treasurer, Secretary"
+              maxLength={50}
+            />
+            <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+              Shown on the public landing page if enabled.
+            </p>
+          </div>
+        )}
 
         <div className="flex items-center justify-between pt-2">
           <div>

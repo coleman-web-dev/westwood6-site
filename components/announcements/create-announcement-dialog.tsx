@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/shared/ui/select';
+import { Switch } from '@/components/shared/ui/switch';
 import { toast } from 'sonner';
 import { sendAnnouncementEmails } from '@/lib/actions/email-actions';
 import type { Announcement, AnnouncementPriority } from '@/lib/types/database';
@@ -43,6 +44,7 @@ export function CreateAnnouncementDialog({
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [priority, setPriority] = useState<AnnouncementPriority>('normal');
+  const [isPublic, setIsPublic] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const isEditing = editingAnnouncement !== null;
@@ -53,10 +55,12 @@ export function CreateAnnouncementDialog({
       setTitle(editingAnnouncement.title);
       setBody(editingAnnouncement.body);
       setPriority(editingAnnouncement.priority);
+      setIsPublic(editingAnnouncement.is_public);
     } else {
       setTitle('');
       setBody('');
       setPriority('normal');
+      setIsPublic(false);
     }
   }, [editingAnnouncement, open]);
 
@@ -64,6 +68,7 @@ export function CreateAnnouncementDialog({
     setTitle('');
     setBody('');
     setPriority('normal');
+    setIsPublic(false);
   }
 
   async function handleSubmit() {
@@ -84,6 +89,7 @@ export function CreateAnnouncementDialog({
           title: title.trim(),
           body: body.trim(),
           priority,
+          is_public: isPublic,
         })
         .eq('id', editingAnnouncement.id);
 
@@ -101,6 +107,7 @@ export function CreateAnnouncementDialog({
         title: title.trim(),
         body: body.trim(),
         priority,
+        is_public: isPublic,
         posted_by: member.id,
       });
 
@@ -188,6 +195,19 @@ export function CreateAnnouncementDialog({
                 <SelectItem value="urgent">Urgent</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Public visibility */}
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                Show on landing page
+              </label>
+              <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                Visible to anyone visiting your community page.
+              </p>
+            </div>
+            <Switch checked={isPublic} onCheckedChange={setIsPublic} />
           </div>
         </div>
 

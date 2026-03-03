@@ -5,6 +5,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/shared/ui
 import { ProfileSettings } from '@/components/settings/profile-settings';
 import { EmailPreferences } from '@/components/settings/email-preferences';
 import { CommunitySettings } from '@/components/settings/community-settings';
+import { LandingPageSettings } from '@/components/settings/landing-page-settings';
 
 export default function SettingsPage() {
   const { isBoard } = useCommunity();
@@ -19,6 +20,7 @@ export default function SettingsPage() {
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>
           {isBoard && <TabsTrigger value="community">Community</TabsTrigger>}
+          {isBoard && <TabsTrigger value="landing">Landing Page</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="profile">
@@ -31,6 +33,12 @@ export default function SettingsPage() {
         {isBoard && (
           <TabsContent value="community">
             <CommunitySettings />
+          </TabsContent>
+        )}
+
+        {isBoard && (
+          <TabsContent value="landing">
+            <LandingPageSettings />
           </TabsContent>
         )}
       </Tabs>

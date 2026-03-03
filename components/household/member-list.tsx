@@ -139,6 +139,11 @@ export function MemberList({
                     <Badge variant={ROLE_BADGE_VARIANT[m.member_role]}>
                       {ROLE_LABEL[m.member_role]}
                     </Badge>
+                    {m.board_title && (
+                      <span className="text-meta text-text-secondary-light dark:text-text-secondary-dark">
+                        {m.board_title}
+                      </span>
+                    )}
                     {isSelf && (
                       <span className="text-meta text-text-muted-light dark:text-text-muted-dark">
                         (you)

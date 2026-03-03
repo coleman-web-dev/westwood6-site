@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Pencil, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Pencil, Trash2, ChevronDown, ChevronUp, Globe } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Button } from '@/components/shared/ui/button';
 import { Badge } from '@/components/shared/ui/badge';
+import { Switch } from '@/components/shared/ui/switch';
 import { toast } from 'sonner';
 import type { Announcement } from '@/lib/types/database';
 
@@ -28,6 +29,26 @@ export function AnnouncementList({
 
   function toggleExpand(id: string) {
     setExpandedId((prev) => (prev === id ? null : id));
+  }
+
+  async function handleTogglePublic(announcement: Announcement) {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('announcements')
+      .update({ is_public: !announcement.is_public })
+      .eq('id', announcement.id);
+
+    if (error) {
+      toast.error('Failed to update visibility.');
+      return;
+    }
+
+    toast.success(
+      announcement.is_public
+        ? 'Announcement is now private.'
+        : 'Announcement is now visible on the landing page.'
+    );
+    onDeleted(); // triggers refetch
   }
 
   async function handleDelete(announcement: Announcement) {
@@ -113,6 +134,12 @@ export function AnnouncementList({
                         Urgent
                       </Badge>
                     )}
+                    {announcement.is_public && (
+                      <Badge variant="outline" className="text-meta shrink-0 gap-1">
+                        <Globe className="h-3 w-3" />
+                        Public
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-meta text-text-muted-light dark:text-text-muted-dark mt-1">
                     {new Date(announcement.created_at).toLocaleDateString(undefined, {
@@ -163,6 +190,20 @@ export function AnnouncementList({
                 <p className="text-body text-text-secondary-light dark:text-text-secondary-dark whitespace-pre-line">
                   {announcement.body}
                 </p>
+                {isBoard && (
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-stroke-light dark:border-stroke-dark">
+                    <div className="flex items-center gap-2">
+                      <Globe className="h-4 w-4 text-text-muted-light dark:text-text-muted-dark" />
+                      <span className="text-meta text-text-secondary-light dark:text-text-secondary-dark">
+                        Show on public landing page
+                      </span>
+                    </div>
+                    <Switch
+                      checked={announcement.is_public}
+                      onCheckedChange={() => handleTogglePublic(announcement)}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>
