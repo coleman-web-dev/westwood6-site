@@ -628,14 +628,14 @@ export function ReservationDialog({
                   <li>To access and retain this electronic record, you need a device with internet access and a current web browser.</li>
                 </ol>
               </div>
-              <label className="flex items-start gap-2 pt-1 cursor-pointer">
+              <label className={`flex items-start gap-3 pt-2 cursor-pointer rounded-lg border-2 p-3 transition-colors ${eSignConsent ? 'border-secondary-500 bg-secondary-50/50 dark:bg-secondary-950/20' : 'border-stroke-light dark:border-stroke-dark hover:border-secondary-300 dark:hover:border-secondary-700'}`}>
                 <input
                   type="checkbox"
                   checked={eSignConsent}
                   onChange={(e) => setESignConsent(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-stroke-light dark:border-stroke-dark text-secondary-500 focus:ring-secondary-500"
+                  className="mt-0.5 h-5 w-5 rounded border-2 border-primary-300 dark:border-primary-500 text-secondary-500 focus:ring-secondary-500 focus:ring-2 shrink-0"
                 />
-                <span className="text-meta text-text-primary-light dark:text-text-primary-dark leading-snug">
+                <span className="text-body font-medium text-text-primary-light dark:text-text-primary-dark leading-snug">
                   I have read and agree to the above disclosure. I consent to use an electronic signature for this document.
                 </span>
               </label>
