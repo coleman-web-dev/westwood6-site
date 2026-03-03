@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
@@ -11,7 +11,6 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-  DialogClose,
 } from '@/components/shared/ui/dialog';
 import { Button } from '@/components/shared/ui/button';
 import { Input } from '@/components/shared/ui/input';
@@ -38,6 +37,14 @@ import {
   CommandGroup,
   CommandItem,
 } from '@/components/shared/ui/command';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+} from '@/components/shared/ui/alert-dialog';
 import { Check, ChevronsUpDown, ChevronLeft, FileSignature } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -90,6 +97,28 @@ export function ReservationDialog({
   const [signatureName, setSignatureName] = useState('');
   const [eSignConsent, setESignConsent] = useState(false);
 
+  // Dirty state tracking for close guard
+  const formTouched = useRef(false);
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+
+  function touch() {
+    formTouched.current = true;
+  }
+
+  function handleOpenChange(newOpen: boolean) {
+    if (!newOpen && formTouched.current) {
+      setConfirmCloseOpen(true);
+      return;
+    }
+    onOpenChange(newOpen);
+  }
+
+  function handleConfirmClose() {
+    setConfirmCloseOpen(false);
+    formTouched.current = false;
+    onOpenChange(false);
+  }
+
   // Reset step when dialog opens/closes
   useEffect(() => {
     if (open) {
@@ -97,6 +126,8 @@ export function ReservationDialog({
       setFieldAnswers({});
       setFilledAgreement('');
       setSignatureName('');
+      setESignConsent(false);
+      formTouched.current = false;
     }
   }, [open]);
 
@@ -340,6 +371,7 @@ export function ReservationDialog({
     setFieldAnswers({});
     setSignatureName('');
     setStep(1);
+    formTouched.current = false;
     onOpenChange(false);
     onSuccess();
   }
@@ -347,8 +379,23 @@ export function ReservationDialog({
   const agreementFields = amenity.agreement_fields ?? [];
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={`max-h-[85vh] overflow-y-auto ${step === 2 ? 'sm:max-w-lg' : 'sm:max-w-md'}`}>
+    <>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent
+        className={`max-h-[85vh] overflow-y-auto ${step === 2 ? 'sm:max-w-lg' : 'sm:max-w-md'}`}
+        onInteractOutside={(e) => {
+          if (formTouched.current) {
+            e.preventDefault();
+            setConfirmCloseOpen(true);
+          }
+        }}
+        onEscapeKeyDown={(e) => {
+          if (formTouched.current) {
+            e.preventDefault();
+            setConfirmCloseOpen(true);
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle>
             {step === 2 ? 'Review & Sign Agreement' : `Reserve ${amenity.name}`}
@@ -366,7 +413,7 @@ export function ReservationDialog({
 
         {/* ── STEP 1: Reservation Form ── */}
         {step === 1 && (
-          <div className="space-y-4 py-2">
+          <div className="space-y-4 py-2" onChangeCapture={touch}>
             {/* Status info */}
             <div className="flex items-center gap-2">
               {amenity.auto_approve ? (
@@ -606,7 +653,7 @@ export function ReservationDialog({
 
         {/* ── STEP 2: Agreement Review + E-Sign ── */}
         {step === 2 && (
-          <div className="space-y-4 py-2">
+          <div className="space-y-4 py-2" onChangeCapture={touch}>
             <ScrollArea className="h-[300px] rounded-inner-card border border-stroke-light dark:border-stroke-dark p-4">
               <div
                 className="text-body text-text-primary-light dark:text-text-primary-dark leading-relaxed pr-3 [&_u]:underline [&_u]:decoration-secondary-500/60 [&_u]:underline-offset-2 [&_p]:mb-3 [&_p:last-child]:mb-0"
@@ -669,9 +716,7 @@ export function ReservationDialog({
         <DialogFooter className="gap-2 sm:gap-0">
           {step === 1 && (
             <>
-              <DialogClose asChild>
-                <Button variant="outline">Cancel</Button>
-              </DialogClose>
+              <Button variant="outline" onClick={() => handleOpenChange(false)}>Cancel</Button>
               {hasAgreement ? (
                 <Button onClick={proceedToAgreement}>
                   Next: Review Agreement
@@ -700,5 +745,26 @@ export function ReservationDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Confirm-close guard */}
+    <AlertDialog open={confirmCloseOpen} onOpenChange={setConfirmCloseOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Discard reservation?</AlertDialogTitle>
+          <AlertDialogDescription>
+            You have unsaved changes. If you close now, your progress will be lost.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <Button variant="outline" onClick={() => setConfirmCloseOpen(false)}>
+            Keep editing
+          </Button>
+          <Button variant="destructive" onClick={handleConfirmClose}>
+            Discard
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
