@@ -13,6 +13,7 @@ import {
   ClipboardList,
   Users,
   Vote,
+  BarChart3,
   Rocket,
   Settings,
   Globe,
@@ -110,6 +111,14 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
             href={`${basePath}/voting`}
             active={isActive('/voting')}
             label="Voting"
+          />
+        )}
+        {isBoard && (
+          <NavItem
+            icon={BarChart3}
+            href={`${basePath}/reports`}
+            active={isActive('/reports')}
+            label="Reports"
           />
         )}
         {isHeadOfHousehold && (
