@@ -7,6 +7,8 @@ import { useCommunity } from '@/lib/providers/community-provider';
 import { Badge } from '@/components/shared/ui/badge';
 import { Button } from '@/components/shared/ui/button';
 import { DepositReturnDialog } from '@/components/amenities/deposit-return-dialog';
+import { SignedAgreementViewer } from '@/components/amenities/signed-agreement-viewer';
+import { FileSignature } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Reservation, ReservationStatus } from '@/lib/types/database';
 
@@ -18,6 +20,7 @@ interface MyReservationsProps {
 type ReservationWithAmenity = Reservation & {
   amenities: { name: string };
   units: { unit_number: string };
+  signed_agreements: { id: string }[] | null;
 };
 
 const STATUS_BADGE: Record<ReservationStatus, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
@@ -33,6 +36,7 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
   const [loading, setLoading] = useState(true);
   const [returningReservation, setReturningReservation] = useState<ReservationWithAmenity | null>(null);
   const [unitOwnerMap, setUnitOwnerMap] = useState<Record<string, string>>({});
+  const [viewingAgreementId, setViewingAgreementId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!unit && !isBoard) {
@@ -45,7 +49,7 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
     async function fetch() {
       let query = supabase
         .from('reservations')
-        .select('*, amenities(name), units(unit_number)')
+        .select('*, amenities(name), units(unit_number), signed_agreements(id)')
         .order('start_datetime', { ascending: false })
         .limit(20);
 
@@ -129,7 +133,7 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
     const supabase = createClient();
     let query = supabase
       .from('reservations')
-      .select('*, amenities(name), units(unit_number)')
+      .select('*, amenities(name), units(unit_number), signed_agreements(id)')
       .order('start_datetime', { ascending: false })
       .limit(20);
 
@@ -243,6 +247,18 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
                   Return Deposit
                 </Button>
               )}
+
+              {/* View signed agreement */}
+              {r.signed_agreements && r.signed_agreements.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setViewingAgreementId(r.id)}
+                >
+                  <FileSignature className="h-4 w-4 mr-1" />
+                  Agreement
+                </Button>
+              )}
             </div>
           </div>
         );
@@ -256,6 +272,15 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
         onOpenChange={(open) => { if (!open) setReturningReservation(null); }}
         onSuccess={handleDepositReturnSuccess}
       />
+
+      {/* Signed agreement viewer */}
+      {viewingAgreementId && (
+        <SignedAgreementViewer
+          open={viewingAgreementId !== null}
+          onOpenChange={(open) => { if (!open) setViewingAgreementId(null); }}
+          reservationId={viewingAgreementId}
+        />
+      )}
     </div>
   );
 }

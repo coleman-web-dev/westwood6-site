@@ -34,7 +34,9 @@ import { Switch } from '@/components/shared/ui/switch';
 import { Collapsible, CollapsibleContent } from '@/components/shared/ui/collapsible';
 import { toast } from 'sonner';
 import { AMENITY_ICON_LIST } from '@/lib/amenity-icons';
-import type { Amenity, BookingType } from '@/lib/types/database';
+import { AgreementWizardDialog } from '@/components/amenities/agreement-wizard-dialog';
+import { FileText, Sparkles, Trash2 } from 'lucide-react';
+import type { Amenity, AgreementField, BookingType } from '@/lib/types/database';
 
 interface AmenityDialogProps {
   open: boolean;
@@ -147,6 +149,12 @@ export function AmenityDialog({
   const [requiresPayment, setRequiresPayment] = useState(false);
   const [autoApprove, setAutoApprove] = useState(true);
 
+  // Agreement config
+  const [agreementEnabled, setAgreementEnabled] = useState(false);
+  const [agreementTemplate, setAgreementTemplate] = useState('');
+  const [agreementFields, setAgreementFields] = useState<AgreementField[]>([]);
+  const [wizardOpen, setWizardOpen] = useState(false);
+
   const [submitting, setSubmitting] = useState(false);
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const formTouched = useRef(false);
@@ -192,6 +200,9 @@ export function AmenityDialog({
       setDeposit(editingAmenity.deposit ? (editingAmenity.deposit / 100).toFixed(2) : '');
       setRequiresPayment(editingAmenity.requires_payment);
       setAutoApprove(editingAmenity.auto_approve);
+      setAgreementEnabled(editingAmenity.agreement_enabled ?? false);
+      setAgreementTemplate(editingAmenity.agreement_template ?? '');
+      setAgreementFields(editingAmenity.agreement_fields ?? []);
     } else {
       resetForm();
     }
@@ -215,6 +226,9 @@ export function AmenityDialog({
     setDeposit('');
     setRequiresPayment(false);
     setAutoApprove(true);
+    setAgreementEnabled(false);
+    setAgreementTemplate('');
+    setAgreementFields([]);
     formTouched.current = false;
   }
 
@@ -302,6 +316,9 @@ export function AmenityDialog({
         deposit: depositCents,
         requires_payment: reservable ? requiresPayment : false,
         auto_approve: reservable ? autoApprove : true,
+        agreement_enabled: reservable ? agreementEnabled : false,
+        agreement_template: reservable && agreementEnabled ? agreementTemplate.trim() || null : null,
+        agreement_fields: reservable && agreementEnabled ? agreementFields : [],
       };
 
       if (isEditing) {
@@ -714,7 +731,85 @@ export function AmenityDialog({
                     </div>
                     <Switch checked={autoApprove} onCheckedChange={(v) => { touch(); setAutoApprove(v); }} />
                   </div>
+
+                  {/* Rental Agreement */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-body text-text-primary-light dark:text-text-primary-dark">
+                        Require rental agreement
+                      </p>
+                      <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                        Members must sign a rental agreement when reserving
+                      </p>
+                    </div>
+                    <Switch checked={agreementEnabled} onCheckedChange={(v) => { touch(); setAgreementEnabled(v); }} />
+                  </div>
                 </div>
+
+                {/* Agreement Setup (conditional) */}
+                <Collapsible open={agreementEnabled}>
+                  <CollapsibleContent className="overflow-hidden transition-all data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                    <div className="rounded-inner-card border border-stroke-light dark:border-stroke-dark bg-surface-light-2 dark:bg-surface-dark-2 p-3 space-y-3">
+                      {agreementTemplate ? (
+                        <>
+                          <div className="flex items-start gap-2">
+                            <FileText className="h-4 w-4 text-secondary-500 shrink-0 mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-body text-text-primary-light dark:text-text-primary-dark">
+                                Agreement configured
+                              </p>
+                              <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                                {agreementFields.length > 0
+                                  ? `${agreementFields.length} custom question${agreementFields.length > 1 ? 's' : ''} + system fields`
+                                  : 'Uses system fields only (name, dates, amounts)'}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setWizardOpen(true)}
+                            >
+                              <Sparkles className="h-3.5 w-3.5 mr-1" />
+                              Edit Agreement
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-500 hover:text-red-600"
+                              onClick={() => {
+                                touch();
+                                setAgreementTemplate('');
+                                setAgreementFields([]);
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5 mr-1" />
+                              Remove
+                            </Button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-body text-text-secondary-light dark:text-text-secondary-dark">
+                            Upload your rental agreement and AI will set up the form automatically.
+                          </p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setWizardOpen(true)}
+                          >
+                            <Sparkles className="h-3.5 w-3.5 mr-1" />
+                            Set Up Agreement
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
               </div>
             </CollapsibleContent>
           </Collapsible>
@@ -770,6 +865,19 @@ export function AmenityDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Agreement wizard */}
+    <AgreementWizardDialog
+      open={wizardOpen}
+      onOpenChange={setWizardOpen}
+      existingTemplate={agreementTemplate || null}
+      existingFields={agreementFields}
+      onSave={(newTemplate, newFields) => {
+        touch();
+        setAgreementTemplate(newTemplate);
+        setAgreementFields(newFields);
+      }}
+    />
 
     {/* Unsaved changes confirmation */}
     <AlertDialog open={confirmCloseOpen} onOpenChange={setConfirmCloseOpen}>

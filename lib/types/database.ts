@@ -153,6 +153,18 @@ export interface Payment {
   created_at: string;
 }
 
+export type AgreementFieldType = 'text' | 'number' | 'yes_no' | 'select' | 'date';
+
+export interface AgreementField {
+  id: string;
+  key: string;
+  label: string;
+  type: AgreementFieldType;
+  required: boolean;
+  options?: string[];
+  placeholder?: string;
+}
+
 export interface Amenity {
   id: string;
   community_id: string;
@@ -174,6 +186,9 @@ export interface Amenity {
   max_booking_minutes: number | null;
   blocked_days: string[];
   active: boolean;
+  agreement_enabled: boolean;
+  agreement_template: string | null;
+  agreement_fields: AgreementField[];
   created_at: string;
 }
 
@@ -265,6 +280,20 @@ export interface Assessment {
   fiscal_year_end: string;
   is_active: boolean;
   created_by: string | null;
+  created_at: string;
+}
+
+export interface SignedAgreement {
+  id: string;
+  reservation_id: string;
+  amenity_id: string;
+  community_id: string;
+  unit_id: string;
+  signer_member_id: string;
+  signer_name: string;
+  filled_text: string;
+  field_answers: Record<string, string>;
+  signed_at: string;
   created_at: string;
 }
 
