@@ -12,6 +12,7 @@ import {
 } from '@/components/shared/ui/popover';
 import { ScrollArea } from '@/components/shared/ui/scroll-area';
 import { BellIcon, FileSignature, CalendarCheck, CheckCheck } from 'lucide-react';
+import { SignedAgreementViewer } from '@/components/amenities/signed-agreement-viewer';
 import type { Notification, NotificationType } from '@/lib/types/database';
 
 const TYPE_ICON: Record<NotificationType, React.ReactNode> = {
@@ -27,6 +28,7 @@ export function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
+  const [viewingReservationId, setViewingReservationId] = useState<string | null>(null);
 
   const fetchNotifications = useCallback(async () => {
     if (!member) return;
@@ -75,81 +77,102 @@ export function NotificationBell() {
     setUnreadCount(0);
   }
 
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button className="relative p-2 rounded-inner-card text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors">
-          <BellIcon className="w-[18px] h-[18px]" />
-          {unreadCount > 0 && (
-            <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full">
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </span>
-          )}
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 p-0">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-stroke-light dark:border-stroke-dark">
-          <h3 className="text-label text-text-primary-light dark:text-text-primary-dark">
-            Notifications
-          </h3>
-          {unreadCount > 0 && (
-            <Button variant="ghost" size="sm" onClick={markAllRead} className="text-meta">
-              <CheckCheck className="h-3.5 w-3.5 mr-1" />
-              Mark all read
-            </Button>
-          )}
-        </div>
+  function handleNotificationClick(n: Notification) {
+    if (!n.read) markAsRead(n.id);
 
-        <ScrollArea className="max-h-[320px]">
-          {notifications.length === 0 ? (
-            <div className="py-8 text-center">
-              <p className="text-body text-text-muted-light dark:text-text-muted-dark">
-                No notifications yet.
-              </p>
-            </div>
-          ) : (
-            <div className="divide-y divide-stroke-light dark:divide-stroke-dark">
-              {notifications.map((n) => (
-                <button
-                  key={n.id}
-                  onClick={() => { if (!n.read) markAsRead(n.id); }}
-                  className={`w-full text-left px-4 py-3 hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors ${
-                    !n.read ? 'bg-secondary-50/50 dark:bg-secondary-950/20' : ''
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="shrink-0 mt-0.5">
-                      {TYPE_ICON[n.type] ?? TYPE_ICON.general}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className={`text-label truncate ${
-                          !n.read
-                            ? 'text-text-primary-light dark:text-text-primary-dark'
-                            : 'text-text-secondary-light dark:text-text-secondary-dark'
-                        }`}>
-                          {n.title}
-                        </span>
-                        {!n.read && (
-                          <span className="w-2 h-2 bg-secondary-500 rounded-full shrink-0" />
-                        )}
+    // Open the signed agreement viewer for agreement notifications
+    if (n.type === 'agreement_signed' && n.reference_id && n.reference_type === 'reservation') {
+      setOpen(false); // close the popover
+      setViewingReservationId(n.reference_id);
+    }
+  }
+
+  return (
+    <>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button className="relative p-2 rounded-inner-card text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors">
+            <BellIcon className="w-[18px] h-[18px]" />
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-80 p-0">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-stroke-light dark:border-stroke-dark">
+            <h3 className="text-label text-text-primary-light dark:text-text-primary-dark">
+              Notifications
+            </h3>
+            {unreadCount > 0 && (
+              <Button variant="ghost" size="sm" onClick={markAllRead} className="text-meta">
+                <CheckCheck className="h-3.5 w-3.5 mr-1" />
+                Mark all read
+              </Button>
+            )}
+          </div>
+
+          <ScrollArea className="max-h-[320px]">
+            {notifications.length === 0 ? (
+              <div className="py-8 text-center">
+                <p className="text-body text-text-muted-light dark:text-text-muted-dark">
+                  No notifications yet.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-stroke-light dark:divide-stroke-dark">
+                {notifications.map((n) => (
+                  <button
+                    key={n.id}
+                    onClick={() => handleNotificationClick(n)}
+                    className={`w-full text-left px-4 py-3 hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors ${
+                      !n.read ? 'bg-secondary-50/50 dark:bg-secondary-950/20' : ''
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="shrink-0 mt-0.5">
+                        {TYPE_ICON[n.type] ?? TYPE_ICON.general}
                       </div>
-                      {n.body && (
-                        <p className="text-meta text-text-muted-light dark:text-text-muted-dark line-clamp-2 mt-0.5">
-                          {n.body}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-label truncate ${
+                            !n.read
+                              ? 'text-text-primary-light dark:text-text-primary-dark'
+                              : 'text-text-secondary-light dark:text-text-secondary-dark'
+                          }`}>
+                            {n.title}
+                          </span>
+                          {!n.read && (
+                            <span className="w-2 h-2 bg-secondary-500 rounded-full shrink-0" />
+                          )}
+                        </div>
+                        {n.body && (
+                          <p className="text-meta text-text-muted-light dark:text-text-muted-dark line-clamp-2 mt-0.5">
+                            {n.body}
+                          </p>
+                        )}
+                        <p className="text-meta text-text-muted-light dark:text-text-muted-dark mt-1">
+                          {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
                         </p>
-                      )}
-                      <p className="text-meta text-text-muted-light dark:text-text-muted-dark mt-1">
-                        {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
-                      </p>
+                      </div>
                     </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </ScrollArea>
-      </PopoverContent>
-    </Popover>
+                  </button>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </PopoverContent>
+      </Popover>
+
+      {/* Agreement viewer dialog (opens when clicking an agreement notification) */}
+      {viewingReservationId && (
+        <SignedAgreementViewer
+          open={!!viewingReservationId}
+          onOpenChange={(isOpen) => { if (!isOpen) setViewingReservationId(null); }}
+          reservationId={viewingReservationId}
+        />
+      )}
+    </>
   );
 }
