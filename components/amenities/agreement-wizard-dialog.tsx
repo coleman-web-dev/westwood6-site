@@ -159,17 +159,36 @@ export function AgreementWizardDialog({
     setAnalyzing(true);
     try {
       const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
 
-      const { data, error } = await supabase.functions.invoke('analyze-agreement', {
-        body: { agreement_text: rawText.trim() },
-      });
-
-      if (error) {
-        throw new Error(error.message || 'AI analysis failed');
+      if (!session?.access_token) {
+        toast.error('You must be logged in to use AI analysis.');
+        setAnalyzing(false);
+        return;
       }
 
-      if (!data || !data.template) {
-        throw new Error(data?.error || 'AI returned an invalid response');
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/analyze-agreement`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
+          },
+          body: JSON.stringify({ agreement_text: rawText.trim() }),
+        },
+      );
+
+      const data = await response.json();
+      console.log('Edge function response:', response.status, data);
+
+      if (!response.ok) {
+        throw new Error(data.error || `Edge function returned ${response.status}`);
+      }
+
+      if (!data.template) {
+        throw new Error('AI returned an invalid response');
       }
 
       setTemplate(data.template);
