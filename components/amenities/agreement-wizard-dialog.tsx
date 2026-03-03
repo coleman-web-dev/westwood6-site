@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import {
   Dialog,
@@ -37,6 +37,9 @@ import {
   ChevronLeft,
   Check,
   AlertCircle,
+  Send,
+  Bot,
+  User,
 } from 'lucide-react';
 import {
   SYSTEM_VARIABLES,
@@ -90,6 +93,12 @@ export function AgreementWizardDialog({
   const [fields, setFields] = useState<AgreementField[]>(existingFields ?? []);
   const [aiSummary, setAiSummary] = useState('');
 
+  // Chat refinement
+  const [chatHistory, setChatHistory] = useState<{ role: 'ai' | 'user'; message: string }[]>([]);
+  const [refinementInput, setRefinementInput] = useState('');
+  const [refining, setRefining] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
   // Editing a field
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
 
@@ -105,6 +114,9 @@ export function AgreementWizardDialog({
         setRawText('');
         setAnalyzing(false);
         setAiSummary('');
+        setChatHistory([]);
+        setRefinementInput('');
+        setRefining(false);
         if (!existingTemplate) {
           setTemplate('');
           setFields([]);
@@ -112,6 +124,7 @@ export function AgreementWizardDialog({
       } else {
         setTemplate(existingTemplate ?? '');
         setFields(existingFields ?? []);
+        setChatHistory([]);
         setStep(existingTemplate ? 2 : 1);
       }
       onOpenChange(newOpen);
@@ -203,6 +216,72 @@ export function AgreementWizardDialog({
       );
     } finally {
       setAnalyzing(false);
+    }
+  }
+
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatHistory]);
+
+  // AI refinement (conversational follow-up)
+  async function handleRefine() {
+    const instruction = refinementInput.trim();
+    if (!instruction) return;
+
+    setRefining(true);
+    setChatHistory((prev) => [...prev, { role: 'user', message: instruction }]);
+    setRefinementInput('');
+
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        toast.error('You must be logged in.');
+        setRefining(false);
+        return;
+      }
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/analyze-agreement`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
+          },
+          body: JSON.stringify({
+            refinement: {
+              current_template: template,
+              current_fields: fields,
+              instruction,
+            },
+          }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || `Refinement failed (${response.status})`);
+      }
+
+      if (!data.template) {
+        throw new Error('AI returned an invalid response');
+      }
+
+      setTemplate(data.template);
+      setFields(data.fields ?? []);
+      setChatHistory((prev) => [...prev, { role: 'ai', message: data.summary ?? 'Changes applied.' }]);
+    } catch (err) {
+      console.error('Refinement error:', err);
+      const errorMsg = err instanceof Error ? err.message : 'Refinement failed.';
+      setChatHistory((prev) => [...prev, { role: 'ai', message: `Error: ${errorMsg}` }]);
+      toast.error(errorMsg);
+    } finally {
+      setRefining(false);
     }
   }
 
@@ -418,15 +497,66 @@ export function AgreementWizardDialog({
         {/* ── STEP 2: AI Review / Edit ── */}
         {step === 2 && (
           <div className="space-y-4 py-2">
-            {/* AI Summary */}
-            {aiSummary && (
-              <div className="flex items-start gap-2 rounded-inner-card bg-secondary-50 dark:bg-secondary-950/30 border border-secondary-200 dark:border-secondary-800 p-3">
-                <Sparkles className="h-4 w-4 text-secondary-500 shrink-0 mt-0.5" />
-                <p className="text-body text-text-secondary-light dark:text-text-secondary-dark">
-                  {aiSummary}
-                </p>
+            {/* AI Chat / Refinement */}
+            <div className="rounded-inner-card border border-stroke-light dark:border-stroke-dark overflow-hidden">
+              {/* Chat messages */}
+              <div className="max-h-[160px] overflow-y-auto p-3 space-y-2">
+                {/* Initial AI summary */}
+                {aiSummary && (
+                  <div className="flex items-start gap-2">
+                    <Bot className="h-4 w-4 text-secondary-500 shrink-0 mt-0.5" />
+                    <p className="text-body text-text-secondary-light dark:text-text-secondary-dark">
+                      {aiSummary}
+                    </p>
+                  </div>
+                )}
+                {/* Conversation history */}
+                {chatHistory.map((msg, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    {msg.role === 'user' ? (
+                      <User className="h-4 w-4 text-primary-500 shrink-0 mt-0.5" />
+                    ) : (
+                      <Bot className="h-4 w-4 text-secondary-500 shrink-0 mt-0.5" />
+                    )}
+                    <p className={`text-body ${
+                      msg.role === 'user'
+                        ? 'text-text-primary-light dark:text-text-primary-dark'
+                        : 'text-text-secondary-light dark:text-text-secondary-dark'
+                    }`}>
+                      {msg.message}
+                    </p>
+                  </div>
+                ))}
+                {refining && (
+                  <div className="flex items-center gap-2">
+                    <Bot className="h-4 w-4 text-secondary-500 shrink-0" />
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-text-muted-light dark:text-text-muted-dark" />
+                    <span className="text-meta text-text-muted-light dark:text-text-muted-dark">Thinking...</span>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
               </div>
-            )}
+              {/* Refinement input */}
+              <div className="flex items-center gap-2 border-t border-stroke-light dark:border-stroke-dark px-3 py-2">
+                <Input
+                  value={refinementInput}
+                  onChange={(e) => setRefinementInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !refining) { e.preventDefault(); handleRefine(); } }}
+                  placeholder="Tell the AI what to change..."
+                  className="text-body flex-1"
+                  disabled={refining}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRefine}
+                  disabled={refining || !refinementInput.trim()}
+                  className="shrink-0"
+                >
+                  {refining ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
 
             {/* Custom Questions */}
             <div className="space-y-2">

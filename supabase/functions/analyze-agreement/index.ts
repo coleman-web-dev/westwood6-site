@@ -74,10 +74,14 @@ Deno.serve(async (req) => {
     }
 
     // Parse request body
-    const { agreement_text } = await req.json();
-    if (!agreement_text || typeof agreement_text !== "string") {
+    const body = await req.json();
+    const { agreement_text, refinement } = body;
+
+    // Validate: must have either agreement_text (initial) or refinement (follow-up)
+    const isRefinement = refinement && typeof refinement === "object" && refinement.instruction;
+    if (!isRefinement && (!agreement_text || typeof agreement_text !== "string")) {
       return new Response(
-        JSON.stringify({ error: "agreement_text is required" }),
+        JSON.stringify({ error: "agreement_text or refinement is required" }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -97,23 +101,49 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Call Claude API
-    const claudeResponse = await fetch(
-      "https://api.anthropic.com/v1/messages",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 8192,
-          messages: [
-            {
-              role: "user",
-              content: `You are analyzing a rental/lease agreement for an HOA community portal. Your job is to:
+    // Build the prompt based on mode
+    let userPrompt: string;
+
+    if (isRefinement) {
+      // Refinement mode: admin is asking the AI to adjust the existing template/fields
+      const fieldsJson = JSON.stringify(refinement.current_fields ?? [], null, 2);
+      userPrompt = `You are helping an admin refine a rental agreement template for an HOA community portal.
+
+Here is the current agreement template (with {{placeholder}} variables):
+---
+${refinement.current_template ?? ""}
+---
+
+Here are the current custom questions that get asked to the member during reservation:
+${fieldsJson}
+
+${SYSTEM_VARIABLE_DESCRIPTIONS}
+
+The admin has requested this change:
+"${refinement.instruction}"
+
+Apply the requested change to the template and/or fields. Common requests include:
+- Removing a custom question (delete from fields array and replace its {{placeholder}} with a system variable or remove it)
+- Changing a field type (e.g., text to yes_no)
+- Adding new questions
+- Rewording questions
+- Adjusting the template text
+
+Return a JSON object with exactly this structure:
+{
+  "template": "The updated agreement template with {{placeholders}}",
+  "fields": [updated array of custom question objects],
+  "summary": "Brief description of what you changed"
+}
+
+Each field object must have: id (UUID string), key (lowercase_underscore), label (question text), type (text|number|yes_no|select|date), required (boolean). Include "options" array only for select type.
+
+Keep any existing field IDs unchanged if the field still exists. Generate new UUIDs only for new fields.
+
+Return ONLY the JSON object, no markdown code fences, no extra text.`;
+    } else {
+      // Initial analysis mode: analyze the raw agreement text
+      userPrompt = `You are analyzing a rental/lease agreement for an HOA community portal. Your job is to:
 
 1. Read the agreement text below carefully.
 2. Identify ALL fill-in-the-blank fields. These are indicated by:
@@ -163,7 +193,26 @@ Here is the rental agreement text to analyze:
 ${agreement_text}
 ---
 
-Return ONLY the JSON object, no markdown code fences, no extra text.`,
+Return ONLY the JSON object, no markdown code fences, no extra text.`;
+    }
+
+    // Call Claude API
+    const claudeResponse = await fetch(
+      "https://api.anthropic.com/v1/messages",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 8192,
+          messages: [
+            {
+              role: "user",
+              content: userPrompt,
             },
           ],
         }),
