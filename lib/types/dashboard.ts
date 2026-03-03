@@ -11,7 +11,8 @@ export type DashboardCardId =
   | 'amenities'
   | 'amenity-calendar'
   | 'voting'
-  | 'bulletin-board';
+  | 'bulletin-board'
+  | 'violations';
 
 export interface DashboardCardConfig {
   id: DashboardCardId;

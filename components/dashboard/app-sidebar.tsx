@@ -20,6 +20,10 @@ import {
   Globe,
   LogOut,
   XIcon,
+  ShieldAlert,
+  Ruler,
+  PiggyBank,
+  HardHat,
 } from 'lucide-react';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { createClient } from '@/lib/supabase/client';
@@ -120,6 +124,38 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
             href={`${basePath}/directory`}
             active={isActive('/directory')}
             label="Directory"
+          />
+        )}
+        {isBoard && (
+          <NavItem
+            icon={ShieldAlert}
+            href={`${basePath}/violations`}
+            active={isActive('/violations')}
+            label="Violations"
+          />
+        )}
+        {community.theme?.arc_enabled && (
+          <NavItem
+            icon={Ruler}
+            href={`${basePath}/arc-requests`}
+            active={isActive('/arc-requests')}
+            label="ARC Requests"
+          />
+        )}
+        {isBoard && (
+          <NavItem
+            icon={PiggyBank}
+            href={`${basePath}/budget`}
+            active={isActive('/budget')}
+            label="Budget"
+          />
+        )}
+        {isBoard && (
+          <NavItem
+            icon={HardHat}
+            href={`${basePath}/vendors`}
+            active={isActive('/vendors')}
+            label="Vendors"
           />
         )}
         {isBoard && (

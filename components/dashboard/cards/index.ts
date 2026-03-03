@@ -9,6 +9,7 @@ import { AmenitiesCard } from './amenities-card';
 import { AmenityCalendarCard } from './amenity-calendar-card';
 import { VotingCard } from './voting-card';
 import { BulletinBoardCard } from './bulletin-board-card';
+import { ViolationsCard } from './violations-card';
 import type { DashboardCardId } from '@/lib/types/dashboard';
 
 export const CARD_COMPONENTS: Record<DashboardCardId, React.ComponentType> = {
@@ -23,4 +24,5 @@ export const CARD_COMPONENTS: Record<DashboardCardId, React.ComponentType> = {
   'amenity-calendar': AmenityCalendarCard,
   voting: VotingCard,
   'bulletin-board': BulletinBoardCard,
+  violations: ViolationsCard,
 };

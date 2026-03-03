@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { AppSidebar } from '@/components/dashboard/app-sidebar';
 import { DashboardTopbar } from '@/components/dashboard/dashboard-topbar';
+import { SearchProviderWrapper } from '@/components/search/search-provider-wrapper';
 import Link from 'next/link';
 import { Button } from '@/components/shared/ui/button';
 
@@ -30,24 +31,26 @@ export default function ProtectedLayout({
   }
 
   return (
-    <div className="min-h-screen flex">
-      <AppSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+    <SearchProviderWrapper>
+      <div className="min-h-screen flex">
+        <AppSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      {/* Sidebar overlay (mobile) */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/60 z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+        {/* Sidebar overlay (mobile) */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/60 z-40 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
 
-      {/* Main area */}
-      <div className="flex-1 flex flex-col min-h-screen lg:ml-sidebar">
-        <DashboardTopbar onMenuClick={() => setSidebarOpen(true)} />
-        <main className="flex-1 p-3 sm:p-app-padding">
-          {children}
-        </main>
+        {/* Main area */}
+        <div className="flex-1 flex flex-col min-h-screen lg:ml-sidebar">
+          <DashboardTopbar onMenuClick={() => setSidebarOpen(true)} />
+          <main className="flex-1 p-3 sm:p-app-padding">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </SearchProviderWrapper>
   );
 }

@@ -13,11 +13,39 @@ export type AnnouncementPriority = 'normal' | 'important' | 'urgent';
 export type SignupRequestStatus = 'pending' | 'approved' | 'denied';
 export type PaymentFrequency = 'monthly' | 'quarterly' | 'semi_annual' | 'annual';
 
+// ─── Violation Enums ──────────────────────────────────
+export type ViolationCategory = 'architectural' | 'noise' | 'parking' | 'maintenance' | 'pets' | 'trash' | 'other';
+export type ViolationStatus = 'reported' | 'under_review' | 'notice_sent' | 'in_compliance' | 'escalated' | 'resolved' | 'dismissed';
+export type ViolationSeverity = 'warning' | 'minor' | 'major' | 'critical';
+export type NoticeType = 'courtesy' | 'first_notice' | 'second_notice' | 'final_notice' | 'hearing_notice';
+export type DeliveryMethod = 'email' | 'mail' | 'both';
+
+// ─── ARC Enums ────────────────────────────────────────
+export type ArcProjectType = 'fence' | 'landscaping' | 'paint' | 'addition' | 'deck' | 'roof' | 'solar' | 'other';
+export type ArcStatus = 'draft' | 'submitted' | 'under_review' | 'approved' | 'approved_with_conditions' | 'denied';
+
+// ─── Budget Enums ─────────────────────────────────────
+export type BudgetCategory = 'dues' | 'assessments' | 'amenity_fees' | 'interest' | 'maintenance' | 'landscaping' | 'insurance' | 'utilities' | 'management' | 'legal' | 'reserves' | 'other';
+
+// ─── Vendor Enums ─────────────────────────────────────
+export type VendorCategory = 'landscaping' | 'plumbing' | 'electrical' | 'hvac' | 'painting' | 'roofing' | 'cleaning' | 'security' | 'general' | 'other';
+export type VendorStatus = 'active' | 'inactive';
+
 // ─── Community theme config ─────────────────────────
+
+export interface LateFeeSettings {
+  enabled: boolean;
+  grace_period_days: number;
+  fee_type: 'flat' | 'percent';
+  fee_amount: number;
+  max_fee?: number;
+}
 
 export interface PaymentSettings {
   allow_flexible_frequency: boolean;
   default_frequency: PaymentFrequency;
+  late_fee_settings?: LateFeeSettings;
+  auto_generate_invoices?: boolean;
 }
 
 export interface BulletinSettings {
@@ -43,6 +71,7 @@ export interface CommunityTheme {
   bulletin_settings?: BulletinSettings;
   email_settings?: EmailSettings;
   onboarding?: OnboardingState;
+  arc_enabled?: boolean;
   [key: string]: unknown;
 }
 
@@ -142,6 +171,7 @@ export interface MaintenanceRequest {
   status: RequestStatus;
   admin_notes: string | null;
   assigned_to: string | null;
+  vendor_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -163,6 +193,7 @@ export interface Invoice {
   bounced_from_invoice_id: string | null;
   assessment_id: string | null;
   amount_paid: number;
+  late_fee_amount: number;
   created_at: string;
 }
 
@@ -483,7 +514,7 @@ export interface BulletinComment {
 
 // ─── Email System ─────────────────────────────────
 
-export type EmailCategory = 'payment_confirmation' | 'payment_reminder' | 'announcement' | 'maintenance_update' | 'voting_notice' | 'reservation_update' | 'weekly_digest' | 'system';
+export type EmailCategory = 'payment_confirmation' | 'payment_reminder' | 'announcement' | 'maintenance_update' | 'voting_notice' | 'reservation_update' | 'weekly_digest' | 'system' | 'violation_notice';
 export type EmailStatus = 'queued' | 'sending' | 'sent' | 'failed' | 'bounced';
 export type EmailPriority = 'immediate' | 'normal' | 'scheduled';
 
@@ -528,5 +559,98 @@ export interface EmailLog {
   resend_message_id: string | null;
   status: EmailStatus;
   error_message: string | null;
+  created_at: string;
+}
+
+// ─── Violations ─────────────────────────────────────
+
+export interface Violation {
+  id: string;
+  community_id: string;
+  unit_id: string;
+  reported_by: string | null;
+  category: ViolationCategory;
+  title: string;
+  description: string | null;
+  photo_urls: string[];
+  status: ViolationStatus;
+  severity: ViolationSeverity;
+  resolution_notes: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ViolationNotice {
+  id: string;
+  violation_id: string;
+  notice_type: NoticeType;
+  sent_at: string;
+  sent_by: string | null;
+  delivery_method: DeliveryMethod;
+  notes: string | null;
+  created_at: string;
+}
+
+// ─── ARC Requests ───────────────────────────────────
+
+export interface ArcRequest {
+  id: string;
+  community_id: string;
+  unit_id: string;
+  submitted_by: string;
+  title: string;
+  description: string | null;
+  project_type: ArcProjectType;
+  estimated_cost: number | null;
+  photo_urls: string[];
+  status: ArcStatus;
+  conditions: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  expires_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ─── Budgets ────────────────────────────────────────
+
+export interface Budget {
+  id: string;
+  community_id: string;
+  fiscal_year: number;
+  total_income: number;
+  total_expense: number;
+  reserve_contribution: number;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface BudgetLineItem {
+  id: string;
+  budget_id: string;
+  category: BudgetCategory;
+  name: string;
+  budgeted_amount: number;
+  actual_amount: number;
+  is_income: boolean;
+  notes: string | null;
+  created_at: string;
+}
+
+// ─── Vendors ────────────────────────────────────────
+
+export interface Vendor {
+  id: string;
+  community_id: string;
+  name: string;
+  company: string | null;
+  phone: string | null;
+  email: string | null;
+  category: VendorCategory;
+  license_number: string | null;
+  insurance_expiry: string | null;
+  notes: string | null;
+  status: VendorStatus;
   created_at: string;
 }

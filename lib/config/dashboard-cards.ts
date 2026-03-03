@@ -105,4 +105,13 @@ export const CARD_REGISTRY: Record<DashboardCardId, DashboardCardConfig> = {
     defaultW: 6,
     defaultH: 7,
   },
+  violations: {
+    id: 'violations',
+    title: 'Open Violations',
+    icon: 'ShieldAlert',
+    minW: 3,
+    minH: 3,
+    defaultW: 6,
+    defaultH: 5,
+  },
 };

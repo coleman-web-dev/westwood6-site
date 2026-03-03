@@ -14,6 +14,17 @@ import {
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
 import { CreditCard, Download } from 'lucide-react';
+import { Checkbox } from '@/components/shared/ui/checkbox';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/shared/ui/alert-dialog';
 import { downloadCsv } from '@/lib/utils/export-csv';
 import { BounceInvoiceDialog } from '@/components/payments/bounce-invoice-dialog';
 import { PayInvoiceButton } from '@/components/payments/pay-invoice-button';
@@ -67,6 +78,9 @@ export function InvoiceList({
   const [dateTo, setDateTo] = useState('');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [bouncingInvoice, setBouncingInvoice] = useState<Invoice | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkAction, setBulkAction] = useState<string | null>(null);
+  const [bulkProcessing, setBulkProcessing] = useState(false);
 
   // Compute set of unit IDs that have NO registered members (no user_id)
   const unregisteredUnitIds = useMemo(() => {
@@ -154,6 +168,81 @@ export function InvoiceList({
     }
 
     toast.success('Invoice voided.');
+    onInvoiceUpdated();
+  }
+
+  // Bulk action helpers
+  const actionableIds = useMemo(() => {
+    return filteredInvoices
+      .filter((inv) => inv.status !== 'paid' && inv.status !== 'waived' && inv.status !== 'voided')
+      .map((inv) => inv.id);
+  }, [filteredInvoices]);
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === actionableIds.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(actionableIds));
+    }
+  }
+
+  async function executeBulkAction() {
+    if (!bulkAction || selectedIds.size === 0) return;
+
+    setBulkProcessing(true);
+    const supabase = createClient();
+    const ids = [...selectedIds];
+    let failed = 0;
+
+    // Process in batches of 50
+    for (let i = 0; i < ids.length; i += 50) {
+      const batch = ids.slice(i, i + 50);
+      let updates: Record<string, unknown> = {};
+
+      if (bulkAction === 'paid') {
+        updates = { status: 'paid', paid_at: new Date().toISOString() };
+        // For paid, also set amount_paid. We'll do individual updates for accuracy
+        for (const id of batch) {
+          const inv = invoices.find((inv) => inv.id === id);
+          const { error } = await supabase
+            .from('invoices')
+            .update({ status: 'paid', paid_at: new Date().toISOString(), amount_paid: inv?.amount ?? 0 })
+            .eq('id', id);
+          if (error) failed++;
+        }
+        continue;
+      } else if (bulkAction === 'waived') {
+        updates = { status: 'waived' };
+      } else if (bulkAction === 'voided') {
+        updates = { status: 'voided' };
+      }
+
+      if (Object.keys(updates).length > 0) {
+        const { error } = await supabase
+          .from('invoices')
+          .update(updates)
+          .in('id', batch);
+        if (error) failed += batch.length;
+      }
+    }
+
+    setBulkProcessing(false);
+    setBulkAction(null);
+    setSelectedIds(new Set());
+
+    if (failed > 0) {
+      toast.error(`${failed} invoice(s) failed to update.`);
+    } else {
+      toast.success(`${ids.length} invoice(s) updated.`);
+    }
     onInvoiceUpdated();
   }
 
@@ -287,6 +376,7 @@ export function InvoiceList({
                     { header: 'Owner', value: (inv) => unitOwnerMap?.[inv.unit_id] ?? '' },
                     { header: 'Amount', value: (inv) => (inv.amount / 100).toFixed(2) },
                     { header: 'Amount Paid', value: (inv) => (inv.amount_paid / 100).toFixed(2) },
+                    { header: 'Late Fee', value: (inv) => (inv.late_fee_amount / 100).toFixed(2) },
                     { header: 'Status', value: (inv) => inv.status },
                     { header: 'Due Date', value: (inv) => inv.due_date },
                     { header: 'Paid At', value: (inv) => inv.paid_at ?? '' },
@@ -298,6 +388,61 @@ export function InvoiceList({
               </Button>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Bulk action bar (board only) */}
+      {isBoard && selectedIds.size > 0 && (
+        <div className="sticky top-topbar z-10 flex items-center gap-3 bg-primary-700 dark:bg-primary-300 text-white dark:text-primary-900 rounded-panel px-4 py-2.5">
+          <span className="text-body font-medium">
+            {selectedIds.size} selected
+          </span>
+          <div className="flex-1" />
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setBulkAction('paid')}
+            disabled={bulkProcessing}
+          >
+            Mark Paid
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setBulkAction('waived')}
+            disabled={bulkProcessing}
+          >
+            Waive
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setBulkAction('voided')}
+            disabled={bulkProcessing}
+          >
+            Void
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSelectedIds(new Set())}
+            className="text-white/80 dark:text-primary-900/80 hover:text-white dark:hover:text-primary-900"
+          >
+            Clear
+          </Button>
+        </div>
+      )}
+
+      {/* Select all (board only, when there are actionable invoices) */}
+      {isBoard && actionableIds.length > 0 && (
+        <div className="flex items-center gap-2">
+          <Checkbox
+            checked={selectedIds.size === actionableIds.length && actionableIds.length > 0}
+            onCheckedChange={toggleSelectAll}
+          />
+          <span className="text-meta text-text-muted-light dark:text-text-muted-dark">
+            Select all actionable ({actionableIds.length})
+          </span>
         </div>
       )}
 
@@ -321,6 +466,14 @@ export function InvoiceList({
               className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding"
             >
               <div className="flex items-start justify-between gap-3">
+                {/* Bulk select checkbox (board only, actionable invoices) */}
+                {isBoard && canUpdate && (
+                  <Checkbox
+                    checked={selectedIds.has(invoice.id)}
+                    onCheckedChange={() => toggleSelect(invoice.id)}
+                    className="mt-1 shrink-0"
+                  />
+                )}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="text-card-title text-text-primary-light dark:text-text-primary-dark">
@@ -353,6 +506,12 @@ export function InvoiceList({
                   {invoice.notes && (
                     <p className="text-meta text-text-muted-light dark:text-text-muted-dark mt-1 italic">
                       Note: {invoice.notes}
+                    </p>
+                  )}
+
+                  {invoice.late_fee_amount > 0 && (
+                    <p className="text-meta text-destructive mt-1">
+                      Includes ${(invoice.late_fee_amount / 100).toFixed(2)} late fee
                     </p>
                   )}
 
@@ -467,6 +626,28 @@ export function InvoiceList({
         onOpenChange={(open) => { if (!open) setBouncingInvoice(null); }}
         onSuccess={onInvoiceUpdated}
       />
+
+      {/* Bulk action confirmation */}
+      <AlertDialog open={bulkAction !== null} onOpenChange={(open) => { if (!open) setBulkAction(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {bulkAction === 'paid' && `Mark ${selectedIds.size} invoice(s) as paid?`}
+              {bulkAction === 'waived' && `Waive ${selectedIds.size} invoice(s)?`}
+              {bulkAction === 'voided' && `Void ${selectedIds.size} invoice(s)?`}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This action will update all selected invoices. This cannot be easily undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={executeBulkAction} disabled={bulkProcessing}>
+              {bulkProcessing ? 'Processing...' : 'Confirm'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

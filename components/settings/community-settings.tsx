@@ -21,7 +21,7 @@ import { UnsavedChangesDialog } from '@/components/settings/unsaved-changes-dial
 import { AmenityList } from '@/components/amenities/amenity-list';
 import { EmailSettingsSection } from '@/components/settings/email-settings-section';
 import { StripeMigrationSection } from '@/components/settings/stripe-migration-section';
-import type { PaymentFrequency, BulletinSettings } from '@/lib/types/database';
+import type { PaymentFrequency, BulletinSettings, LateFeeSettings } from '@/lib/types/database';
 
 export function CommunitySettings() {
   const { community } = useCommunity();
@@ -38,6 +38,13 @@ export function CommunitySettings() {
   const [defaultFrequency, setDefaultFrequency] = useState<PaymentFrequency>('quarterly');
   const [bulletinPosting, setBulletinPosting] = useState<BulletinSettings['posting']>('board_only');
   const [bulletinCommenting, setBulletinCommenting] = useState<BulletinSettings['commenting']>('all_households');
+  const [lateFeesEnabled, setLateFeesEnabled] = useState(false);
+  const [gracePeriodDays, setGracePeriodDays] = useState(15);
+  const [feeType, setFeeType] = useState<'flat' | 'percent'>('flat');
+  const [feeAmount, setFeeAmount] = useState(2500); // cents
+  const [maxFee, setMaxFee] = useState<number | undefined>(undefined);
+  const [autoGenerateInvoices, setAutoGenerateInvoices] = useState(false);
+  const [arcEnabled, setArcEnabled] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // Load current values from community context
@@ -55,6 +62,14 @@ export function CommunitySettings() {
       setDefaultFrequency(community.theme?.payment_settings?.default_frequency ?? 'quarterly');
       setBulletinPosting(community.theme?.bulletin_settings?.posting ?? 'board_only');
       setBulletinCommenting(community.theme?.bulletin_settings?.commenting ?? 'all_households');
+      const lfs = community.theme?.payment_settings?.late_fee_settings as LateFeeSettings | undefined;
+      setLateFeesEnabled(lfs?.enabled ?? false);
+      setGracePeriodDays(lfs?.grace_period_days ?? 15);
+      setFeeType(lfs?.fee_type ?? 'flat');
+      setFeeAmount(lfs?.fee_amount ?? 2500);
+      setMaxFee(lfs?.max_fee);
+      setAutoGenerateInvoices(!!community.theme?.payment_settings?.auto_generate_invoices);
+      setArcEnabled(!!community.theme?.arc_enabled);
     }
   }, [community]);
 
@@ -72,13 +87,22 @@ export function CommunitySettings() {
       allowFlexibleFrequency !== (community.theme?.payment_settings?.allow_flexible_frequency ?? false) ||
       defaultFrequency !== (community.theme?.payment_settings?.default_frequency ?? 'quarterly') ||
       bulletinPosting !== (community.theme?.bulletin_settings?.posting ?? 'board_only') ||
-      bulletinCommenting !== (community.theme?.bulletin_settings?.commenting ?? 'all_households')
+      bulletinCommenting !== (community.theme?.bulletin_settings?.commenting ?? 'all_households') ||
+      lateFeesEnabled !== ((community.theme?.payment_settings?.late_fee_settings as LateFeeSettings | undefined)?.enabled ?? false) ||
+      gracePeriodDays !== ((community.theme?.payment_settings?.late_fee_settings as LateFeeSettings | undefined)?.grace_period_days ?? 15) ||
+      feeType !== ((community.theme?.payment_settings?.late_fee_settings as LateFeeSettings | undefined)?.fee_type ?? 'flat') ||
+      feeAmount !== ((community.theme?.payment_settings?.late_fee_settings as LateFeeSettings | undefined)?.fee_amount ?? 2500) ||
+      maxFee !== (community.theme?.payment_settings?.late_fee_settings as LateFeeSettings | undefined)?.max_fee ||
+      autoGenerateInvoices !== (!!community.theme?.payment_settings?.auto_generate_invoices) ||
+      arcEnabled !== (!!community.theme?.arc_enabled)
     );
   }, [
     name, address, phone, email,
     canReserveAmenities, canAttendEvents, canSubmitRequests, canViewDirectory,
     allowFlexibleFrequency, defaultFrequency,
     bulletinPosting, bulletinCommenting,
+    lateFeesEnabled, gracePeriodDays, feeType, feeAmount, maxFee,
+    autoGenerateInvoices, arcEnabled,
     community,
   ]);
 
@@ -113,11 +137,20 @@ export function CommunitySettings() {
           payment_settings: {
             allow_flexible_frequency: allowFlexibleFrequency,
             default_frequency: defaultFrequency,
+            late_fee_settings: {
+              enabled: lateFeesEnabled,
+              grace_period_days: gracePeriodDays,
+              fee_type: feeType,
+              fee_amount: feeAmount,
+              ...(maxFee ? { max_fee: maxFee } : {}),
+            },
+            auto_generate_invoices: autoGenerateInvoices,
           },
           bulletin_settings: {
             posting: bulletinPosting,
             commenting: bulletinCommenting,
           },
+          arc_enabled: arcEnabled,
         },
       })
       .eq('id', community.id);
@@ -413,6 +446,138 @@ export function CommunitySettings() {
               </div>
             </CollapsibleContent>
           </Collapsible>
+
+          <div className="border-t border-stroke-light dark:border-stroke-dark" />
+
+          {/* Auto-generate invoices */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-body text-text-primary-light dark:text-text-primary-dark">
+                Auto-generate invoices
+              </p>
+              <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                Automatically create invoices for upcoming billing periods (14 days ahead)
+              </p>
+            </div>
+            <Switch
+              checked={autoGenerateInvoices}
+              onCheckedChange={setAutoGenerateInvoices}
+            />
+          </div>
+
+          <div className="border-t border-stroke-light dark:border-stroke-dark" />
+
+          {/* Late fees */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-body text-text-primary-light dark:text-text-primary-dark">
+                Late fees
+              </p>
+              <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                Automatically apply late fees to overdue invoices
+              </p>
+            </div>
+            <Switch
+              checked={lateFeesEnabled}
+              onCheckedChange={setLateFeesEnabled}
+            />
+          </div>
+
+          <Collapsible open={lateFeesEnabled}>
+            <CollapsibleContent className="overflow-hidden transition-all data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+              <div className="border-t border-stroke-light dark:border-stroke-dark mt-4" />
+              <div className="space-y-4 pt-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                      Grace period (days)
+                    </Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={90}
+                      value={gracePeriodDays}
+                      onChange={(e) => setGracePeriodDays(Number(e.target.value))}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                      Fee type
+                    </Label>
+                    <Select value={feeType} onValueChange={(v) => setFeeType(v as 'flat' | 'percent')}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="flat">Flat fee</SelectItem>
+                        <SelectItem value="percent">Percentage</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                      {feeType === 'flat' ? 'Fee amount ($)' : 'Fee percentage (%)'}
+                    </Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={feeType === 'flat' ? 0.01 : 1}
+                      value={feeType === 'flat' ? (feeAmount / 100).toFixed(2) : feeAmount}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setFeeAmount(feeType === 'flat' ? Math.round(val * 100) : val);
+                      }}
+                    />
+                  </div>
+                  {feeType === 'percent' && (
+                    <div className="space-y-1.5">
+                      <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                        Max fee ($, optional)
+                      </Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        value={maxFee ? (maxFee / 100).toFixed(2) : ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setMaxFee(val ? Math.round(Number(val) * 100) : undefined);
+                        }}
+                        placeholder="No max"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
+      </div>
+
+      {/* ARC Requests */}
+      <div className="bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark rounded-panel p-card-padding">
+        <h2 className="text-card-title text-text-primary-light dark:text-text-primary-dark mb-1">
+          Architectural Review
+        </h2>
+        <p className="text-meta text-text-muted-light dark:text-text-muted-dark mb-4">
+          Allow homeowners to submit architectural review requests for exterior modifications.
+        </p>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-body text-text-primary-light dark:text-text-primary-dark">
+              Enable ARC requests
+            </p>
+            <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+              Residents can submit requests for exterior modifications
+            </p>
+          </div>
+          <Switch
+            checked={arcEnabled}
+            onCheckedChange={setArcEnabled}
+          />
         </div>
       </div>
 

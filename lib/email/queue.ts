@@ -330,3 +330,63 @@ export async function queuePaymentReminder(
     },
   });
 }
+
+/**
+ * Queue a violation notice email for the head-of-household of the affected unit.
+ */
+export async function queueViolationNotice(
+  communityId: string,
+  communitySlug: string,
+  unitId: string,
+  violationTitle: string,
+  category: string,
+  severity: string,
+  noticeType: string,
+  description?: string,
+) {
+  const supabase = createAdminClient();
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://duesiq.com';
+
+  const { data: community } = await supabase
+    .from('communities')
+    .select('name')
+    .eq('id', communityId)
+    .single();
+
+  // Find head of household
+  const { data: owner } = await supabase
+    .from('members')
+    .select('id, email, first_name, last_name')
+    .eq('unit_id', unitId)
+    .eq('member_role', 'owner')
+    .is('parent_member_id', null)
+    .not('email', 'is', null)
+    .limit(1)
+    .single();
+
+  if (!owner || !owner.email) return null;
+
+  const communityName = community?.name || 'Your Community';
+  const noticeLabel = noticeType.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+
+  return queueEmail({
+    communityId,
+    recipientMemberId: owner.id,
+    recipientEmail: owner.email,
+    recipientName: `${owner.first_name} ${owner.last_name}`,
+    category: 'violation_notice' as EmailCategory,
+    priority: 'normal' as EmailPriority,
+    subject: `${noticeLabel}: ${violationTitle}`,
+    templateId: 'violation-notice',
+    templateData: {
+      communityName,
+      violationTitle,
+      category,
+      severity,
+      noticeType,
+      description,
+      dashboardUrl: `${baseUrl}/${communitySlug}/violations`,
+      unsubscribeUrl: buildUnsubscribeUrl(owner.id, 'violation_notice', communitySlug),
+    },
+  });
+}

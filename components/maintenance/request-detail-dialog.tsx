@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
-import type { MaintenanceRequest, RequestStatus } from '@/lib/types/database';
+import type { MaintenanceRequest, RequestStatus, Vendor } from '@/lib/types/database';
 
 const STATUS_LABELS: Record<RequestStatus, string> = {
   open: 'Open',
@@ -55,9 +55,11 @@ export function RequestDetailDialog({
   onOpenChange,
   onUpdated,
 }: RequestDetailDialogProps) {
-  const { isBoard } = useCommunity();
+  const { isBoard, community } = useCommunity();
   const [status, setStatus] = useState<RequestStatus>('open');
   const [adminNotes, setAdminNotes] = useState('');
+  const [vendorId, setVendorId] = useState<string>('none');
+  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [saving, setSaving] = useState(false);
 
   // Sync local state whenever the selected request changes
@@ -65,8 +67,22 @@ export function RequestDetailDialog({
     if (request) {
       setStatus(request.status);
       setAdminNotes(request.admin_notes ?? '');
+      setVendorId(request.vendor_id ?? 'none');
     }
   }, [request]);
+
+  // Fetch vendors for assignment dropdown
+  useEffect(() => {
+    if (!isBoard || !community) return;
+    const supabase = createClient();
+    supabase
+      .from('vendors')
+      .select('*')
+      .eq('community_id', community.id)
+      .eq('status', 'active')
+      .order('name')
+      .then(({ data }) => setVendors((data as Vendor[]) || []));
+  }, [isBoard, community]);
 
   async function handleSave() {
     if (!request) return;
@@ -79,6 +95,7 @@ export function RequestDetailDialog({
       .update({
         status,
         admin_notes: adminNotes.trim() || null,
+        vendor_id: vendorId === 'none' ? null : vendorId,
       })
       .eq('id', request.id);
 
@@ -181,6 +198,28 @@ export function RequestDetailDialog({
                     rows={4}
                   />
                 </div>
+
+                {/* Vendor assignment */}
+                {vendors.length > 0 && (
+                  <div className="space-y-1.5">
+                    <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                      Assigned Vendor
+                    </label>
+                    <Select value={vendorId} onValueChange={setVendorId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select vendor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {vendors.map((v) => (
+                          <SelectItem key={v.id} value={v.id}>
+                            {v.name}{v.company ? ` (${v.company})` : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
             </>
           )}
