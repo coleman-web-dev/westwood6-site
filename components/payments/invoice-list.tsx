@@ -13,7 +13,8 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
-import { CreditCard } from 'lucide-react';
+import { CreditCard, Download } from 'lucide-react';
+import { downloadCsv } from '@/lib/utils/export-csv';
 import { BounceInvoiceDialog } from '@/components/payments/bounce-invoice-dialog';
 import { PayInvoiceButton } from '@/components/payments/pay-invoice-button';
 import type { Invoice, InvoiceStatus, Unit } from '@/lib/types/database';
@@ -271,6 +272,29 @@ export function InvoiceList({
                 }}
               >
                 Clear Filters
+              </Button>
+            )}
+
+            {/* Export CSV */}
+            {filteredInvoices.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  downloadCsv('invoices.csv', filteredInvoices, [
+                    { header: 'Title', value: (inv) => inv.title },
+                    { header: 'Unit', value: (inv) => units?.find((u) => u.id === inv.unit_id)?.unit_number ?? '' },
+                    { header: 'Owner', value: (inv) => unitOwnerMap?.[inv.unit_id] ?? '' },
+                    { header: 'Amount', value: (inv) => (inv.amount / 100).toFixed(2) },
+                    { header: 'Amount Paid', value: (inv) => (inv.amount_paid / 100).toFixed(2) },
+                    { header: 'Status', value: (inv) => inv.status },
+                    { header: 'Due Date', value: (inv) => inv.due_date },
+                    { header: 'Paid At', value: (inv) => inv.paid_at ?? '' },
+                  ]);
+                }}
+              >
+                <Download className="h-4 w-4 mr-1" />
+                Export CSV
               </Button>
             )}
           </div>

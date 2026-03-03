@@ -263,3 +263,70 @@ export async function queuePaymentConfirmation(
 
   return queueBulkEmails(items);
 }
+
+/**
+ * Queue a payment reminder email for the head-of-household of a unit.
+ */
+export async function queuePaymentReminder(
+  communityId: string,
+  communitySlug: string,
+  invoiceId: string,
+  invoiceTitle: string,
+  invoiceAmount: number,
+  invoiceDueDate: string,
+  isOverdue: boolean,
+  unitId: string,
+) {
+  const supabase = createAdminClient();
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://duesiq.com';
+
+  const { data: community } = await supabase
+    .from('communities')
+    .select('name')
+    .eq('id', communityId)
+    .single();
+
+  // Find the head of household (owner, no parent, has email)
+  const { data: owner } = await supabase
+    .from('members')
+    .select('id, email, first_name, last_name')
+    .eq('unit_id', unitId)
+    .eq('member_role', 'owner')
+    .is('parent_member_id', null)
+    .not('email', 'is', null)
+    .limit(1)
+    .single();
+
+  if (!owner || !owner.email) return null;
+
+  const communityName = community?.name || 'Your Community';
+  const formattedAmount = `$${(invoiceAmount / 100).toFixed(2)}`;
+  const formattedDate = new Date(invoiceDueDate + 'T00:00:00').toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+
+  return queueEmail({
+    communityId,
+    recipientMemberId: owner.id,
+    recipientEmail: owner.email,
+    recipientName: `${owner.first_name} ${owner.last_name}`,
+    category: 'payment_reminder' as EmailCategory,
+    priority: 'normal' as EmailPriority,
+    subject: isOverdue
+      ? `Overdue: ${invoiceTitle} - ${formattedAmount}`
+      : `Reminder: ${invoiceTitle} due ${formattedDate}`,
+    templateId: 'payment-reminder',
+    templateData: {
+      communityName,
+      invoiceTitle,
+      invoiceId,
+      amount: invoiceAmount,
+      dueDate: invoiceDueDate,
+      isOverdue,
+      paymentUrl: `${baseUrl}/${communitySlug}/payments`,
+      unsubscribeUrl: buildUnsubscribeUrl(owner.id, 'payment_reminder', communitySlug),
+    },
+  });
+}

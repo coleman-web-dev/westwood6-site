@@ -1,6 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
+import { Download } from 'lucide-react';
+import { Button } from '@/components/shared/ui/button';
 import {
   Table,
   TableBody,
@@ -9,6 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/shared/ui/table';
+import { downloadCsv } from '@/lib/utils/export-csv';
 import type { Invoice, Unit, Member } from '@/lib/types/database';
 
 interface DelinquentUnitsTableProps {
@@ -70,11 +73,31 @@ export function DelinquentUnitsTable({ invoices, units, members }: DelinquentUni
     return Array.from(unitMap.values()).sort((a, b) => b.amountOwed - a.amountOwed);
   }, [invoices, units, members]);
 
+  function handleExportDelinquents() {
+    downloadCsv('delinquent-units.csv', delinquents, [
+      { header: 'Unit Number', value: (d) => d.unitNumber },
+      { header: 'Owner Name', value: (d) => d.ownerName },
+      { header: 'Email', value: (d) => d.email },
+      { header: 'Phone', value: (d) => d.phone },
+      { header: 'Invoice Count', value: (d) => d.invoiceCount },
+      { header: 'Amount Owed', value: (d) => (d.amountOwed / 100).toFixed(2) },
+      { header: 'Oldest Due Date', value: (d) => d.oldestDueDate },
+    ]);
+  }
+
   return (
     <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding">
-      <h3 className="text-section-title text-text-primary-light dark:text-text-primary-dark mb-4">
-        Delinquent Units
-      </h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-section-title text-text-primary-light dark:text-text-primary-dark">
+          Delinquent Units
+        </h3>
+        {delinquents.length > 0 && (
+          <Button variant="ghost" size="sm" onClick={handleExportDelinquents}>
+            <Download className="h-4 w-4 mr-1" />
+            Export
+          </Button>
+        )}
+      </div>
       {delinquents.length === 0 ? (
         <p className="text-body text-text-muted-light dark:text-text-muted-dark text-center py-6">
           All accounts are current.

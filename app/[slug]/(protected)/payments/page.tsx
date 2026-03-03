@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Plus, DollarSign, ClipboardList } from 'lucide-react';
+import { Plus, DollarSign, ClipboardList, Bell } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Button } from '@/components/shared/ui/button';
@@ -17,6 +17,17 @@ import { AssessmentList } from '@/components/payments/assessment-list';
 import { CreateAssessmentDialog } from '@/components/payments/create-assessment-dialog';
 import { FrequencySelector } from '@/components/payments/frequency-selector';
 import { ManagePaymentMethodButton } from '@/components/payments/manage-payment-method-button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/shared/ui/alert-dialog';
+import { sendPaymentReminders } from '@/lib/actions/email-actions';
 import { toast } from 'sonner';
 import type { Invoice, Payment, Unit, Assessment } from '@/lib/types/database';
 
@@ -38,6 +49,8 @@ export default function PaymentsPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [stripeEnabled, setStripeEnabled] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
+  const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
+  const [sendingReminders, setSendingReminders] = useState(false);
 
   const fetchData = useCallback(async () => {
     const supabase = createClient();
@@ -193,6 +206,29 @@ export default function PaymentsPage() {
   );
   const totalOutstanding = outstandingInvoices.reduce((sum, inv) => sum + inv.amount, 0);
 
+  const delinquentUnitIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const inv of invoices) {
+      if (inv.status === 'overdue' || (inv.status === 'partial' && new Date(inv.due_date) < new Date())) {
+        ids.add(inv.unit_id);
+      }
+    }
+    return ids;
+  }, [invoices]);
+
+  async function handleSendReminders() {
+    setSendingReminders(true);
+    const result = await sendPaymentReminders(community.id);
+    setSendingReminders(false);
+    setReminderDialogOpen(false);
+
+    if (result.success) {
+      toast.success(`Queued ${result.queued} reminder${result.queued === 1 ? '' : 's'}${result.skipped ? `, ${result.skipped} skipped (sent recently)` : ''}`);
+    } else {
+      toast.error(result.error || 'Failed to send reminders');
+    }
+  }
+
   function handleDialogSuccess() {
     fetchData();
   }
@@ -215,6 +251,10 @@ export default function PaymentsPage() {
         </h1>
         {isBoard && (
           <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => setReminderDialogOpen(true)} className="text-meta sm:text-body">
+              <Bell className="h-4 w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Send </span>Reminders
+            </Button>
             <Button variant="outline" onClick={() => setAssessmentDialogOpen(true)} className="text-meta sm:text-body">
               <ClipboardList className="h-4 w-4 mr-1 sm:mr-2" />
               <span className="hidden sm:inline">New </span>Assessment
@@ -344,6 +384,28 @@ export default function PaymentsPage() {
           onSuccess={handleWalletUpdated}
         />
       )}
+
+      {/* Send reminders dialog (board only) */}
+      <AlertDialog open={reminderDialogOpen} onOpenChange={setReminderDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Send Payment Reminders</AlertDialogTitle>
+            <AlertDialogDescription>
+              {delinquentUnitIds.size === 0
+                ? 'No overdue or past-due invoices at this time.'
+                : `${delinquentUnitIds.size} unit${delinquentUnitIds.size === 1 ? ' has' : 's have'} overdue invoices. Reminders will be emailed to the head of each household. Duplicate reminders within 7 days are automatically skipped.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            {delinquentUnitIds.size > 0 && (
+              <AlertDialogAction onClick={handleSendReminders} disabled={sendingReminders}>
+                {sendingReminders ? 'Sending...' : 'Send Reminders'}
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

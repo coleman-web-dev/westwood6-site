@@ -12,6 +12,7 @@ import {
   Megaphone,
   ClipboardList,
   Users,
+  BookUser,
   Vote,
   BarChart3,
   Rocket,
@@ -111,6 +112,14 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
             href={`${basePath}/voting`}
             active={isActive('/voting')}
             label="Voting"
+          />
+        )}
+        {(isBoard || community.tenant_permissions?.can_view_directory) && (
+          <NavItem
+            icon={BookUser}
+            href={`${basePath}/directory`}
+            active={isActive('/directory')}
+            label="Directory"
           />
         )}
         {isBoard && (

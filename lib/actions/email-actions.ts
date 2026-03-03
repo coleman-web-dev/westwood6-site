@@ -34,3 +34,29 @@ export async function sendWelcomeInvites(
     return { success: false, error: 'Failed to queue welcome emails' };
   }
 }
+
+export async function sendPaymentReminders(communityId: string) {
+  try {
+    const cronSecret = process.env.CRON_SECRET;
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://duesiq.com';
+
+    const res = await fetch(`${baseUrl}/api/email/schedule-reminders`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${cronSecret}`,
+      },
+      body: JSON.stringify({ community_id: communityId }),
+    });
+
+    if (!res.ok) {
+      return { success: false, error: 'Failed to trigger reminders' };
+    }
+
+    const data = await res.json();
+    return { success: true, queued: data.queued ?? 0, skipped: data.skipped ?? 0 };
+  } catch (error) {
+    console.error('Failed to send payment reminders:', error);
+    return { success: false, error: 'Failed to send reminders' };
+  }
+}

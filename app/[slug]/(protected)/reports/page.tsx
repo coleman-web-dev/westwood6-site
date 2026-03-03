@@ -3,8 +3,12 @@
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
+import { Button } from '@/components/shared/ui/button';
+import { Download } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/shared/ui/tabs';
 import { ReportPeriodSelector, getDefaultPeriod } from '@/components/reports/report-period-selector';
+import { downloadCsv } from '@/lib/utils/export-csv';
+import type { CsvColumn } from '@/lib/utils/export-csv';
 import { CollectionSummary } from '@/components/reports/financial/collection-summary';
 import { AgingReport } from '@/components/reports/financial/aging-report';
 import { RevenueTrendChart } from '@/components/reports/financial/revenue-trend-chart';
@@ -161,6 +165,60 @@ export default function ReportsPage() {
     }
   }, [fetchData, isBoard]);
 
+  function handleExportFinancial() {
+    interface UnitRow {
+      unitNumber: string;
+      ownerName: string;
+      ownerEmail: string;
+      totalBilled: number;
+      totalCollected: number;
+      outstanding: number;
+      invoiceCount: number;
+    }
+
+    const unitMap = new Map<string, UnitRow>();
+
+    for (const unit of units) {
+      const owner = members.find(
+        (m) => m.unit_id === unit.id && m.member_role === 'owner' && !m.parent_member_id
+      );
+      unitMap.set(unit.id, {
+        unitNumber: unit.unit_number,
+        ownerName: owner ? `${owner.first_name} ${owner.last_name}` : 'N/A',
+        ownerEmail: owner?.email ?? '',
+        totalBilled: 0,
+        totalCollected: 0,
+        outstanding: 0,
+        invoiceCount: 0,
+      });
+    }
+
+    for (const inv of invoices) {
+      const row = unitMap.get(inv.unit_id);
+      if (!row) continue;
+      row.invoiceCount += 1;
+      row.totalBilled += inv.amount;
+      row.totalCollected += inv.amount_paid;
+      row.outstanding += inv.amount - inv.amount_paid;
+    }
+
+    const rows = Array.from(unitMap.values()).sort((a, b) =>
+      a.unitNumber.localeCompare(b.unitNumber, undefined, { numeric: true })
+    );
+
+    const columns: CsvColumn<UnitRow>[] = [
+      { header: 'Unit Number', value: (r) => r.unitNumber },
+      { header: 'Owner Name', value: (r) => r.ownerName },
+      { header: 'Owner Email', value: (r) => r.ownerEmail },
+      { header: 'Total Billed', value: (r) => (r.totalBilled / 100).toFixed(2) },
+      { header: 'Total Collected', value: (r) => (r.totalCollected / 100).toFixed(2) },
+      { header: 'Outstanding', value: (r) => (r.outstanding / 100).toFixed(2) },
+      { header: 'Invoice Count', value: (r) => r.invoiceCount },
+    ];
+
+    downloadCsv(`financial-summary-${period.startDate}-to-${period.endDate}.csv`, rows, columns);
+  }
+
   if (!isBoard) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -178,11 +236,19 @@ export default function ReportsPage() {
         <h1 className="text-page-title text-text-primary-light dark:text-text-primary-dark">
           Reports
         </h1>
-        <ReportPeriodSelector
-          activeAssessment={activeAssessment}
-          value={period}
-          onChange={setPeriod}
-        />
+        <div className="flex items-end gap-3">
+          <ReportPeriodSelector
+            activeAssessment={activeAssessment}
+            value={period}
+            onChange={setPeriod}
+          />
+          {!loading && (
+            <Button variant="outline" size="sm" onClick={handleExportFinancial}>
+              <Download className="h-4 w-4 mr-2" />
+              Export CSV
+            </Button>
+          )}
+        </div>
       </div>
 
       {loading ? (
