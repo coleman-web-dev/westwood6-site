@@ -311,7 +311,7 @@ export function ReservationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={step === 2 ? 'sm:max-w-lg' : 'sm:max-w-md'}>
+      <DialogContent className={`max-h-[85vh] overflow-y-auto ${step === 2 ? 'sm:max-w-lg' : 'sm:max-w-md'}`}>
         <DialogHeader>
           <DialogTitle>
             {step === 2 ? 'Review & Sign Agreement' : `Reserve ${amenity.name}`}
