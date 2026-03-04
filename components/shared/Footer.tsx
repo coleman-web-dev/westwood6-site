@@ -13,6 +13,9 @@ export const Footer = ({ className }: { className?: string }) => {
       withBackgroundGlow={false}
       variant="primary"
       withBackgroundGradient
+      footnote={
+        <span>&copy; {new Date().getFullYear()} DuesIQ. All rights reserved.</span>
+      }
       logoComponent={
         <div className="flex items-center text-primary-900 dark:text-primary-100 gap-2">
           <span className="font-bold text-lg tracking-tight">DuesIQ</span>

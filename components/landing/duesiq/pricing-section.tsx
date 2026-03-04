@@ -31,6 +31,24 @@ export function PricingSection() {
         </LandingPricingPlan>
 
         <LandingPricingPlan
+          title="Professional"
+          description="For growing communities that need more"
+          price="$149"
+          priceSuffix="/month"
+          href="#demo"
+          ctaText="Request a Demo"
+        >
+          <p>Up to 250 units</p>
+          <p>Everything in Essentials</p>
+          <p>Amenity reservations & agreements</p>
+          <p>Voting & ballots with proxy support</p>
+          <p>Maintenance request tracking</p>
+          <p>Late fee automation</p>
+          <p>Violations & ARC tracking</p>
+          <p>Bulk email communications</p>
+        </LandingPricingPlan>
+
+        <LandingPricingPlan
           title="Professional + Accounting"
           description="Full financial management suite"
           price="$249"
@@ -41,11 +59,7 @@ export function PricingSection() {
           highlighted
         >
           <p>Up to 500 units</p>
-          <p>Everything in Essentials</p>
-          <p>Amenity reservations & agreements</p>
-          <p>Voting & ballots with proxy support</p>
-          <p>Maintenance request tracking</p>
-          <p>Late fee automation</p>
+          <p>Everything in Professional</p>
           <p>Double-entry general ledger</p>
           <p>Bank reconciliation (Plaid)</p>
           <p>Auto-categorization rules</p>

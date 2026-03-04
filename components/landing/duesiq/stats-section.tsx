@@ -11,8 +11,8 @@ export function StatsSection() {
       columnsMobile={2}
     >
       <LandingStatItem
-        value="329"
-        description="Homes managed"
+        value="Bank-grade"
+        description="256-bit TLS encryption"
         variant="primary"
       />
       <LandingStatItem
@@ -21,13 +21,13 @@ export function StatsSection() {
         variant="primary"
       />
       <LandingStatItem
-        value="Bank-grade"
-        description="256-bit encryption"
+        value="PCI DSS"
+        description="Compliant payments via Stripe"
         variant="primary"
       />
       <LandingStatItem
-        value="5 min"
-        description="Average setup time"
+        value="SOC 2"
+        description="Compliant infrastructure"
         variant="primary"
       />
     </LandingStatsSection>

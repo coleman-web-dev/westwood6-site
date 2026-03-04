@@ -1,6 +1,6 @@
 'use client';
 
-import { LandingTestimonialGrid } from '@/components/landing';
+import { LandingTestimonial } from '@/components/landing';
 
 const testimonials = [
   {
@@ -28,13 +28,26 @@ const testimonials = [
 
 export function TestimonialsSection() {
   return (
-    <LandingTestimonialGrid
-      title="Trusted by HOA boards"
-      description="See why communities are switching to DuesIQ."
-      testimonialItems={testimonials}
-      withBackground
-      variant="primary"
-      containerClassName="!columns-3 !gap-6"
-    />
+    <section className="w-full flex flex-col justify-center items-center gap-8 py-12 lg:py-16 bg-primary-100/20 dark:bg-primary-900/10">
+      <div className="w-full p-6 max-w-full container-wide relative flex flex-col items-center">
+        <h2 className="md:text-center text-2xl md:text-3xl lg:text-4xl font-semibold leading-tight md:leading-tight">
+          Trusted by HOA boards
+        </h2>
+        <p className="mt-6 md:text-xl">
+          See why communities are switching to DuesIQ.
+        </p>
+      </div>
+
+      <div className="mx-auto max-w-7xl px-6 lg:px-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {testimonials.map((testimonial, index) => (
+            <LandingTestimonial
+              key={index}
+              {...testimonial}
+            />
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
