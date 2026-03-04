@@ -69,37 +69,37 @@ export function PricingSection() {
 
   return (
     <section id="pricing">
+      {/* Billing toggle */}
+      <div className="w-full flex justify-center mb-2">
+        <div className="inline-flex items-center gap-1 rounded-full bg-primary-100/30 dark:bg-primary-900/30 p-1">
+          <button
+            onClick={() => setBilling('annual')}
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+              billing === 'annual'
+                ? 'bg-white dark:bg-gray-800 shadow-sm text-gray-900 dark:text-gray-100'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+            }`}
+          >
+            Annual <span className="text-xs text-secondary-400 font-semibold ml-1">Save 20%</span>
+          </button>
+          <button
+            onClick={() => setBilling('monthly')}
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+              billing === 'monthly'
+                ? 'bg-white dark:bg-gray-800 shadow-sm text-gray-900 dark:text-gray-100'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+            }`}
+          >
+            Monthly
+          </button>
+        </div>
+      </div>
+
       <LandingPricingSection
         title="Simple, transparent pricing"
         description="No setup fees. No hidden charges. Cancel monthly anytime."
         variant="primary"
       >
-        {/* Billing toggle */}
-        <div className="w-full flex justify-center -mt-4 mb-4">
-          <div className="inline-flex items-center gap-1 rounded-full bg-primary-100/30 dark:bg-primary-900/30 p-1">
-            <button
-              onClick={() => setBilling('annual')}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                billing === 'annual'
-                  ? 'bg-white dark:bg-gray-800 shadow-sm text-gray-900 dark:text-gray-100'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-              }`}
-            >
-              Annual <span className="text-xs text-secondary-400 font-semibold ml-1">Save 20%</span>
-            </button>
-            <button
-              onClick={() => setBilling('monthly')}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                billing === 'monthly'
-                  ? 'bg-white dark:bg-gray-800 shadow-sm text-gray-900 dark:text-gray-100'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-              }`}
-            >
-              Monthly
-            </button>
-          </div>
-        </div>
-
         {plans.map((plan) => (
           <LandingPricingPlan
             key={plan.title}
