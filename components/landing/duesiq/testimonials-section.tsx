@@ -34,6 +34,7 @@ export function TestimonialsSection() {
       testimonialItems={testimonials}
       withBackground
       variant="primary"
+      containerClassName="!columns-3 !gap-6"
     />
   );
 }

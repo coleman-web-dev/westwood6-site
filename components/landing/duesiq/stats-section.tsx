@@ -11,8 +11,8 @@ export function StatsSection() {
       columnsMobile={2}
     >
       <LandingStatItem
-        value="$2M+"
-        description="Collected in HOA dues"
+        value="329"
+        description="Homes managed"
         variant="primary"
       />
       <LandingStatItem

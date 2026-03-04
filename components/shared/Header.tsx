@@ -5,7 +5,7 @@ import Link from 'next/link';
 export const Header = ({ className }: { className?: string }) => {
   return (
     <LandingHeader
-      className={className}
+      className={`max-w-7xl mx-auto ${className ?? ''}`}
       fixed
       withBackground
       variant="primary"

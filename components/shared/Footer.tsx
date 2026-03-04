@@ -8,7 +8,6 @@ export const Footer = ({ className }: { className?: string }) => {
   return (
     <LandingFooter
       className={className}
-      title="DuesIQ"
       description="Modern HOA management for self-managed communities"
       withBackground
       withBackgroundGlow={false}

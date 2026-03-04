@@ -36,14 +36,14 @@ export function FeaturesSection() {
           topText="Accounting"
           bottomText="Double-entry general ledger, chart of accounts, journal entries, and financial statements."
           colSpan={2}
-          variant="secondary"
+          variant="primary"
         />
         <LandingBentoGridIconItem
           icon={<Landmark className="w-8 h-8" />}
           topText="Bank Reconciliation"
           bottomText="Connect your bank via Plaid, auto-match transactions, and reconcile in minutes instead of hours."
           colSpan={2}
-          variant="secondary"
+          variant="primary"
         />
         <LandingBentoGridIconItem
           icon={<CalendarCheck className="w-8 h-8" />}
@@ -63,15 +63,15 @@ export function FeaturesSection() {
           icon={<FileText className="w-8 h-8" />}
           topText="Documents & Announcements"
           bottomText="Centralized document storage and community announcements with email notifications."
-          colSpan={1}
-          variant="secondary"
+          colSpan={2}
+          variant="primary"
         />
         <LandingBentoGridIconItem
           icon={<Wrench className="w-8 h-8" />}
           topText="Maintenance Requests"
           bottomText="Homeowners submit requests, board tracks and resolves them."
-          colSpan={1}
-          variant="secondary"
+          colSpan={2}
+          variant="primary"
         />
         <LandingBentoGridIconItem
           icon={<Users className="w-8 h-8" />}
