@@ -37,6 +37,7 @@ export function PricingSection() {
           priceSuffix="/month"
           href="#demo"
           ctaText="Request a Demo"
+          highlighted
         >
           <p>Up to 250 units</p>
           <p>Everything in Essentials</p>
@@ -55,7 +56,6 @@ export function PricingSection() {
           priceSuffix="/month"
           href="#demo"
           ctaText="Request a Demo"
-          featured
           highlighted
         >
           <p>Up to 500 units</p>
@@ -74,14 +74,13 @@ export function PricingSection() {
           priceSuffix=""
           href="#demo"
           ctaText="Contact Us"
+          highlighted
         >
           <p>500+ units</p>
           <p>Everything in Professional + Accounting</p>
-          <p>Dedicated account manager</p>
-          <p>Custom integrations</p>
-          <p>Priority support</p>
           <p>Multi-community management</p>
           <p>Custom reporting</p>
+          <p>Priority support</p>
         </LandingPricingPlan>
       </LandingPricingSection>
 
