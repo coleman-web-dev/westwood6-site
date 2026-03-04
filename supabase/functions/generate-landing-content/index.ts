@@ -3,19 +3,34 @@ import { corsHeaders } from "../_shared/cors.ts";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 
+const FAIR_HOUSING_SYSTEM_PROMPT = `You are writing content for an HOA (Homeowners Association) community website. All content you generate MUST comply with the Fair Housing Act (FHA) and all applicable fair housing laws.
+
+MANDATORY RULES:
+- Never reference or imply preferences regarding race, color, religion, national origin, sex, familial status, disability, sexual orientation, gender identity, or any other protected class.
+- Never use language that could be interpreted as steering, exclusion, or preference for any group of people.
+- Do not describe the community in terms of the type of people who live there (e.g., avoid "perfect for young professionals," "family-oriented neighborhood," "quiet community for retirees," "Christian community").
+- Focus on physical features, amenities, location, and community governance, not the demographics or lifestyle of residents.
+- Do not use words like "exclusive," "prestigious," "select," or "private" when describing who can live there.
+- Use inclusive, neutral language that welcomes all people equally.
+- Avoid gendered language (use "residents" or "homeowners," not "wives," "husbands," etc.).
+- Do not mention proximity to churches, synagogues, mosques, or other religious institutions.
+- Do not describe the neighborhood using coded language that implies racial or ethnic composition (e.g., "traditional," "up-and-coming," "urban," "suburban feel").
+
+These rules are legally required. Violations expose the HOA to federal lawsuits and penalties.`;
+
 const FIELD_PROMPTS: Record<string, string> = {
   hero_headline:
-    "Write a welcoming, warm headline (max 8 words) for the hero banner of an HOA community landing page. No quotes.",
+    "Write a welcoming headline (max 8 words) for the hero banner of an HOA community landing page. Focus on the community as a place, not its people. No quotes.",
   hero_subheadline:
-    "Write a short, friendly subheadline (1 sentence, max 20 words) for the hero banner. No quotes.",
+    "Write a short subheadline (1 sentence, max 20 words) for the hero banner. Focus on the neighborhood and what the HOA provides, not who lives there. No quotes.",
   about_title:
     'Write a short section title (2-4 words) for the "About" section of an HOA community page. No quotes.',
   about_body:
-    "Write 2-3 short paragraphs (total ~80 words) describing this HOA community. Mention the neighborhood feel, what makes it a great place to live, and community values. Keep it warm and genuine, not corporate. No quotes around the whole text.",
+    "Write 2-3 short paragraphs (total ~80 words) describing this HOA community. Focus on the neighborhood's physical features, amenities, location, and how the association maintains and improves the community. Do not describe or characterize the residents. Keep it warm and genuine, not corporate. No quotes around the whole text.",
   contact_title:
     'Write a short section title (2-4 words) for the "Contact" section. No quotes.',
   contact_body:
-    "Write 1-2 sentences of contact section text for an HOA, mentioning availability for questions or concerns. Keep it welcoming. No quotes.",
+    "Write 1-2 sentences of contact section text for an HOA, mentioning availability for questions or concerns. Keep it welcoming and inclusive. No quotes.",
   board_members_title:
     "Write a short section title (2-4 words) for the board members section. No quotes.",
   amenities_title:
@@ -24,7 +39,7 @@ const FIELD_PROMPTS: Record<string, string> = {
     "Write a short section title (2-4 words) for the announcements/updates section. No quotes.",
   footer_text:
     "Write a short footer line (max 15 words) including a copyright notice for the current year. No quotes.",
-  faq: 'Generate 3 common FAQ items for an HOA community website. Return as JSON array: [{"question":"...","answer":"..."}]. Questions should cover dues/assessments, amenity reservations, and board meetings. Keep answers concise (1-2 sentences each). Return ONLY valid JSON, no markdown.',
+  faq: 'Generate 3 common FAQ items for an HOA community website. Return as JSON array: [{"question":"...","answer":"..."}]. Questions should cover dues/assessments, amenity reservations, and board meetings. Keep answers concise (1-2 sentences each), factual, and free of any language that could imply preferences about who should live in the community. Return ONLY valid JSON, no markdown.',
 };
 
 Deno.serve(async (req) => {
@@ -127,6 +142,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           model: "claude-haiku-4-5-20251001",
           max_tokens: 300,
+          system: FAIR_HOUSING_SYSTEM_PROMPT,
           messages: [
             {
               role: "user",
