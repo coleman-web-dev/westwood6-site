@@ -86,7 +86,14 @@ export function LandingPageSettings() {
   useEffect(() => {
     if (!community?.theme?.landing_page) return;
     const lp = community.theme.landing_page;
-    setSections(lp.sections || DEFAULT_LANDING_CONFIG.sections);
+    // Merge saved sections with defaults so newly added section types appear
+    const saved = lp.sections || [];
+    const savedIds = new Set(saved.map((s: LandingPageSection) => s.id));
+    const maxOrder = saved.length > 0 ? Math.max(...saved.map((s: LandingPageSection) => s.order)) : -1;
+    const missing = DEFAULT_LANDING_CONFIG.sections
+      .filter((d) => !savedIds.has(d.id))
+      .map((d, i) => ({ ...d, enabled: false, order: maxOrder + 1 + i }));
+    setSections(saved.length > 0 ? [...saved, ...missing] : DEFAULT_LANDING_CONFIG.sections);
     setThemePreset(lp.theme_preset ?? DEFAULT_LANDING_CONFIG.theme_preset);
     setCustomPrimary(lp.custom_primary_color);
     setCustomAccent(lp.custom_accent_color);
