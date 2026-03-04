@@ -195,9 +195,20 @@ export async function POST(req: NextRequest) {
         }
 
         try {
+          // Anchor new subscriptions to the 1st of next month
+          const now = new Date();
+          const anchorDate = new Date(Date.UTC(
+            now.getUTCFullYear(),
+            now.getUTCMonth() + 1,
+            1, 0, 0, 0
+          ));
+          const billingCycleAnchor = Math.floor(anchorDate.getTime() / 1000);
+
           const subscription = await stripe.subscriptions.create({
             customer: owner.stripe_customer_id,
             items: [{ price: priceId! }],
+            billing_cycle_anchor: billingCycleAnchor,
+            proration_behavior: 'none',
             metadata: {
               unit_id: unit.id,
               community_id: communityId,
