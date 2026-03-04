@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Eye, ExternalLink } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Eye, ExternalLink, GripVertical } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Button } from '@/components/shared/ui/button';
@@ -38,6 +38,8 @@ export function LandingPageSettings() {
   const { community } = useCommunity();
   const [saving, setSaving] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [previewWidth, setPreviewWidth] = useState(480);
+  const isDragging = useRef(false);
 
   // Preview data fetched on mount
   const [previewData, setPreviewData] = useState<LandingPageData>({
@@ -173,6 +175,33 @@ export function LandingPageSettings() {
 
   const currentConfig = useMemo(() => buildConfig(), [buildConfig]);
 
+  function handleDividerPointerDown(e: React.PointerEvent) {
+    e.preventDefault();
+    isDragging.current = true;
+    const startX = e.clientX;
+    const startWidth = previewWidth;
+
+    function onPointerMove(ev: PointerEvent) {
+      if (!isDragging.current) return;
+      const delta = startX - ev.clientX;
+      const newWidth = Math.min(Math.max(startWidth + delta, 320), 720);
+      setPreviewWidth(newWidth);
+    }
+
+    function onPointerUp() {
+      isDragging.current = false;
+      document.removeEventListener('pointermove', onPointerMove);
+      document.removeEventListener('pointerup', onPointerUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('pointermove', onPointerMove);
+    document.addEventListener('pointerup', onPointerUp);
+  }
+
   async function handleSave() {
     setSaving(true);
     const supabase = createClient();
@@ -208,9 +237,9 @@ export function LandingPageSettings() {
 
   return (
     <>
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_480px] gap-grid-gap">
+      <div className="flex gap-0 xl:gap-0">
         {/* Editor column */}
-        <div className="space-y-6">
+        <div className="flex-1 min-w-0 space-y-6">
           {/* Theme & Colors */}
           <Section title="Theme & Colors" description="Choose a color preset or set custom colors.">
             <LandingPageThemePicker
@@ -422,8 +451,20 @@ export function LandingPageSettings() {
           </div>
         </div>
 
+        {/* Draggable divider - xl+ only */}
+        <div
+          className="hidden xl:flex items-stretch justify-center w-4 cursor-col-resize group shrink-0"
+          onPointerDown={handleDividerPointerDown}
+        >
+          <div className="flex items-center">
+            <div className="w-1 h-12 rounded-full bg-stroke-light dark:bg-stroke-dark group-hover:bg-text-muted-light dark:group-hover:bg-text-muted-dark group-active:bg-secondary-400 transition-colors">
+              <GripVertical className="h-4 w-4 text-text-muted-light dark:text-text-muted-dark opacity-0 group-hover:opacity-100 transition-opacity -ml-1.5 mt-4" />
+            </div>
+          </div>
+        </div>
+
         {/* Preview column - xl+ only */}
-        <div className="hidden xl:block">
+        <div className="hidden xl:block shrink-0" style={{ width: previewWidth }}>
           <div className="sticky top-[calc(var(--topbar-height,64px)+24px)]">
             {previewElement}
           </div>
