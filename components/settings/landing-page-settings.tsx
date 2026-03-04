@@ -83,6 +83,9 @@ export function LandingPageSettings() {
   const [vendors, setVendors] = useState<LandingVendor[]>([]);
   const [footerText, setFooterText] = useState<string | null>(null);
 
+  // Track the last-saved config for dirty detection
+  const savedConfigRef = useRef<string>('');
+
   // Load existing config
   useEffect(() => {
     if (!community?.theme?.landing_page) return;
@@ -112,6 +115,8 @@ export function LandingPageSettings() {
     setVendorsDisclaimer(lp.vendors_disclaimer);
     setVendors(lp.vendors || []);
     setFooterText(lp.footer_text);
+    // Snapshot the saved state for dirty detection
+    savedConfigRef.current = JSON.stringify(lp);
   }, [community]);
 
   // Fetch preview data on mount
@@ -198,6 +203,22 @@ export function LandingPageSettings() {
 
   const currentConfig = useMemo(() => buildConfig(), [buildConfig]);
 
+  // Dirty detection: compare current config against last-saved snapshot
+  const isDirty = useMemo(() => {
+    if (!savedConfigRef.current) return false;
+    return JSON.stringify(currentConfig) !== savedConfigRef.current;
+  }, [currentConfig]);
+
+  // Warn on tab close / refresh when there are unsaved changes
+  useEffect(() => {
+    if (!isDirty) return;
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      e.preventDefault();
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isDirty]);
+
   function handleDividerPointerDown(e: React.PointerEvent) {
     e.preventDefault();
     isDragging.current = true;
@@ -247,6 +268,7 @@ export function LandingPageSettings() {
       return;
     }
 
+    savedConfigRef.current = JSON.stringify(config);
     toast.success('Landing page saved.');
     router.refresh();
   }
@@ -547,7 +569,7 @@ export function LandingPageSettings() {
           {/* Actions */}
           <div className="flex items-center gap-3 pt-2">
             <Button onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving...' : 'Save Landing Page'}
+              {saving ? 'Saving...' : isDirty ? 'Save Landing Page *' : 'Save Landing Page'}
             </Button>
             <Button
               variant="outline"

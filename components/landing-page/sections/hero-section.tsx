@@ -16,10 +16,10 @@ const IMAGE_HEIGHT: Record<HeroThickness, string> = {
   tall: 'h-[560px]',
 };
 
-const TEXT_PADDING: Record<HeroThickness, string> = {
-  compact: 'py-12',
-  medium: 'py-20',
-  tall: 'py-28',
+const TEXT_BLOCK_HEIGHT: Record<HeroThickness, string> = {
+  compact: 'min-h-[200px]',
+  medium: 'min-h-[300px]',
+  tall: 'min-h-[420px]',
 };
 
 function LogoAndText({
@@ -90,7 +90,7 @@ export function HeroSection({ community, config }: Props) {
     return (
       <section className="relative overflow-hidden">
         <div
-          className={`${TEXT_PADDING[thickness]} px-6`}
+          className={`flex items-center justify-center px-6 ${TEXT_BLOCK_HEIGHT[thickness]}`}
           style={{ backgroundColor: 'var(--landing-primary)' }}
         >
           <LogoAndText
@@ -119,7 +119,7 @@ export function HeroSection({ community, config }: Props) {
           </div>
         )}
         <div
-          className={`${TEXT_PADDING[thickness]} px-6`}
+          className={`flex items-center justify-center px-6 ${TEXT_BLOCK_HEIGHT[thickness]}`}
           style={{ backgroundColor: 'var(--landing-primary)' }}
         >
           <LogoAndText
@@ -136,7 +136,7 @@ export function HeroSection({ community, config }: Props) {
   return (
     <section className="relative overflow-hidden">
       <div
-        className={`${TEXT_PADDING[thickness]} px-6`}
+        className={`flex items-center justify-center px-6 ${TEXT_BLOCK_HEIGHT[thickness]}`}
         style={{ backgroundColor: 'var(--landing-primary)' }}
       >
         <LogoAndText
