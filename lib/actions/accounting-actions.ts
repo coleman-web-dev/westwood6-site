@@ -153,16 +153,28 @@ export async function seedChartOfAccountsAction(communityId: string) {
       { code: '5900', name: 'Reserve Fund Expenses', account_type: 'expense', fund: 'reserve', is_system: false, normal_balance: 'debit', display_order: 590 },
     ].map((a) => ({ ...a, community_id: communityId }));
 
+    // First verify we can access the table at all
+    const { error: checkError } = await supabase
+      .from('accounts')
+      .select('id')
+      .limit(0);
+
+    if (checkError) {
+      console.error('Accounts table check failed:', checkError);
+      return { success: false, error: `Table access failed: ${checkError.message}` };
+    }
+
     const { error } = await supabase.from('accounts').insert(accounts);
 
     if (error) {
-      console.error('Failed to seed chart of accounts:', error);
+      console.error('Failed to seed chart of accounts:', JSON.stringify(error));
       return { success: false, error: error.message };
     }
     return { success: true };
   } catch (error) {
-    console.error('Failed to seed chart of accounts:', error);
-    return { success: false, error: 'Failed to seed accounts' };
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('Failed to seed chart of accounts (exception):', msg);
+    return { success: false, error: msg };
   }
 }
 
