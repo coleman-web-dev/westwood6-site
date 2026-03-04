@@ -17,6 +17,40 @@ interface InvoiceRow {
 }
 
 /**
+ * Generate installment periods for a special assessment.
+ * Returns N monthly periods starting from startDate.
+ */
+export function getSpecialAssessmentPeriods(
+  installments: number,
+  startDate: string
+): Period[] {
+  if (installments <= 0) return [];
+
+  if (installments === 1) {
+    const d = new Date(startDate + 'T00:00:00');
+    return [{
+      label: 'Lump Sum',
+      dueDate: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+    }];
+  }
+
+  const periods: Period[] = [];
+  const cursor = new Date(startDate + 'T00:00:00');
+
+  for (let i = 0; i < installments; i++) {
+    const y = cursor.getFullYear();
+    const m = cursor.getMonth();
+    periods.push({
+      label: `Installment ${i + 1} of ${installments}`,
+      dueDate: `${y}-${String(m + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`,
+    });
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+
+  return periods;
+}
+
+/**
  * Given a frequency, fiscal start, and fiscal end, return an array of periods
  * with a label and due date for each invoice.
  */
@@ -95,9 +129,13 @@ export function generateInvoicesForAssessment(
 ): InvoiceRow[] {
   const invoices: InvoiceRow[] = [];
 
+  // Special assessments use installment periods; all units get the same schedule
+  const isSpecial = assessment.type === 'special' && assessment.installments && assessment.installment_start_date;
+
   for (const unit of units) {
-    const freq = unit.payment_frequency ?? defaultFrequency;
-    const periods = getPeriods(freq, assessment.fiscal_year_start, assessment.fiscal_year_end);
+    const periods = isSpecial
+      ? getSpecialAssessmentPeriods(assessment.installments!, assessment.installment_start_date!)
+      : getPeriods(unit.payment_frequency ?? defaultFrequency, assessment.fiscal_year_start, assessment.fiscal_year_end);
     if (periods.length === 0) continue;
 
     const perPeriodAmount = Math.round(assessment.annual_amount / periods.length);

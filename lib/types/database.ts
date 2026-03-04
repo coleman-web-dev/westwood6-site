@@ -335,6 +335,8 @@ export interface LedgerEntry {
   member_name: string | null;
 }
 
+export type AssessmentType = 'regular' | 'special';
+
 export interface Assessment {
   id: string;
   community_id: string;
@@ -344,6 +346,9 @@ export interface Assessment {
   fiscal_year_start: string;
   fiscal_year_end: string;
   is_active: boolean;
+  type: AssessmentType;
+  installments: number | null;
+  installment_start_date: string | null;
   created_by: string | null;
   created_at: string;
 }

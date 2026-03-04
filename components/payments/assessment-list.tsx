@@ -148,6 +148,10 @@ export function AssessmentList({ assessments, loading, onAssessmentUpdated }: As
                   <Badge variant={assessment.is_active ? 'secondary' : 'outline'}>
                     {assessment.is_active ? 'Active' : 'Inactive'}
                   </Badge>
+                  <Badge variant={assessment.type === 'special' ? 'default' : 'outline'}
+                    className={assessment.type === 'special' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200' : ''}>
+                    {assessment.type === 'special' ? 'Special' : 'Regular'}
+                  </Badge>
                 </div>
 
                 {assessment.description && (
@@ -156,11 +160,19 @@ export function AssessmentList({ assessments, loading, onAssessmentUpdated }: As
                   </p>
                 )}
 
-                <p className="text-meta text-text-muted-light dark:text-text-muted-dark mt-2">
-                  {startDate.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
-                  {' - '}
-                  {endDate.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
-                </p>
+                {assessment.type === 'special' && assessment.installments && assessment.installment_start_date ? (
+                  <p className="text-meta text-text-muted-light dark:text-text-muted-dark mt-2">
+                    {assessment.installments === 1
+                      ? `Lump sum due ${new Date(assessment.installment_start_date + 'T00:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}`
+                      : `${assessment.installments} monthly installments starting ${new Date(assessment.installment_start_date + 'T00:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'short' })}`}
+                  </p>
+                ) : (
+                  <p className="text-meta text-text-muted-light dark:text-text-muted-dark mt-2">
+                    {startDate.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                    {' - '}
+                    {endDate.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                  </p>
+                )}
               </div>
 
               <div className="text-right shrink-0">
@@ -168,7 +180,7 @@ export function AssessmentList({ assessments, loading, onAssessmentUpdated }: As
                   ${(assessment.annual_amount / 100).toFixed(2)}
                 </p>
                 <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                  per year
+                  {assessment.type === 'special' ? 'total' : 'per year'}
                 </p>
               </div>
             </div>

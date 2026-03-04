@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Plus, DollarSign, ClipboardList, Bell } from 'lucide-react';
+import { Plus, DollarSign, ClipboardList, Bell, AlertTriangle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Button } from '@/components/shared/ui/button';
@@ -15,6 +15,7 @@ import { ManageWalletDialog } from '@/components/payments/manage-wallet-dialog';
 import { HouseholdLedger } from '@/components/payments/household-ledger';
 import { AssessmentList } from '@/components/payments/assessment-list';
 import { CreateAssessmentDialog } from '@/components/payments/create-assessment-dialog';
+import { CreateSpecialAssessmentDialog } from '@/components/payments/create-special-assessment-dialog';
 import { FrequencySelector } from '@/components/payments/frequency-selector';
 import { ManagePaymentMethodButton } from '@/components/payments/manage-payment-method-button';
 import {
@@ -44,6 +45,7 @@ export default function PaymentsPage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [assessmentDialogOpen, setAssessmentDialogOpen] = useState(false);
+  const [specialAssessmentDialogOpen, setSpecialAssessmentDialogOpen] = useState(false);
   const [walletDialogOpen, setWalletDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('invoices');
   const [refreshKey, setRefreshKey] = useState(0);
@@ -255,6 +257,10 @@ export default function PaymentsPage() {
               <Bell className="h-4 w-4 mr-1 sm:mr-2" />
               <span className="hidden sm:inline">Send </span>Reminders
             </Button>
+            <Button variant="outline" onClick={() => setSpecialAssessmentDialogOpen(true)} className="text-meta sm:text-body">
+              <AlertTriangle className="h-4 w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Special </span>Assessment
+            </Button>
             <Button variant="outline" onClick={() => setAssessmentDialogOpen(true)} className="text-meta sm:text-body">
               <ClipboardList className="h-4 w-4 mr-1 sm:mr-2" />
               <span className="hidden sm:inline">New </span>Assessment
@@ -371,6 +377,13 @@ export default function PaymentsPage() {
       <CreateAssessmentDialog
         open={assessmentDialogOpen}
         onOpenChange={setAssessmentDialogOpen}
+        onSuccess={fetchData}
+      />
+
+      {/* Create special assessment dialog (board only) */}
+      <CreateSpecialAssessmentDialog
+        open={specialAssessmentDialogOpen}
+        onOpenChange={setSpecialAssessmentDialogOpen}
         onSuccess={fetchData}
       />
 
