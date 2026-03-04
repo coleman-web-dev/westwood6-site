@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { Eye, ExternalLink, GripVertical, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
@@ -25,18 +26,23 @@ import { LandingPageGalleryEditor } from './landing-page-gallery-editor';
 import { LandingPageFaqEditor } from './landing-page-faq-editor';
 import { LandingPagePreview } from './landing-page-preview';
 import { AiGenerateButton } from './ai-generate-button';
-import { DEFAULT_LANDING_CONFIG } from '@/lib/types/landing';
+import { LandingPageVendorsEditor } from './landing-page-vendors-editor';
+import { DEFAULT_LANDING_CONFIG, DEFAULT_VENDORS_DISCLAIMER } from '@/lib/types/landing';
 import type {
   LandingPageConfig,
   LandingPageSection,
   LandingQuickLink,
   LandingGalleryImage,
   LandingFaqItem,
+  LandingVendor,
+  HeroLayout,
+  HeroThickness,
 } from '@/lib/types/landing';
 import type { LandingPageData } from '@/components/landing-page/landing-page-shell';
 
 export function LandingPageSettings() {
   const { community } = useCommunity();
+  const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [previewWidth, setPreviewWidth] = useState(480);
@@ -58,6 +64,8 @@ export function LandingPageSettings() {
   const [heroImageUrl, setHeroImageUrl] = useState<string | null>(null);
   const [heroHeadline, setHeroHeadline] = useState<string | null>(null);
   const [heroSubheadline, setHeroSubheadline] = useState<string | null>(null);
+  const [heroLayout, setHeroLayout] = useState<HeroLayout>(DEFAULT_LANDING_CONFIG.hero_layout);
+  const [heroThickness, setHeroThickness] = useState<HeroThickness>(DEFAULT_LANDING_CONFIG.hero_thickness);
   const [aboutTitle, setAboutTitle] = useState<string | null>(null);
   const [aboutBody, setAboutBody] = useState<string | null>(null);
   const [boardMembersTitle, setBoardMembersTitle] = useState<string | null>(null);
@@ -70,6 +78,9 @@ export function LandingPageSettings() {
   const [faqItems, setFaqItems] = useState<LandingFaqItem[]>([]);
   const [announcementsTitle, setAnnouncementsTitle] = useState<string | null>(null);
   const [maxPublicAnnouncements, setMaxPublicAnnouncements] = useState(5);
+  const [vendorsTitle, setVendorsTitle] = useState<string | null>(null);
+  const [vendorsDisclaimer, setVendorsDisclaimer] = useState<string | null>(null);
+  const [vendors, setVendors] = useState<LandingVendor[]>([]);
   const [footerText, setFooterText] = useState<string | null>(null);
 
   // Load existing config
@@ -83,6 +94,8 @@ export function LandingPageSettings() {
     setHeroImageUrl(lp.hero_image_url);
     setHeroHeadline(lp.hero_headline);
     setHeroSubheadline(lp.hero_subheadline);
+    setHeroLayout(lp.hero_layout ?? DEFAULT_LANDING_CONFIG.hero_layout);
+    setHeroThickness(lp.hero_thickness ?? DEFAULT_LANDING_CONFIG.hero_thickness);
     setAboutTitle(lp.about_title);
     setAboutBody(lp.about_body);
     setBoardMembersTitle(lp.board_members_title);
@@ -95,6 +108,9 @@ export function LandingPageSettings() {
     setFaqItems(lp.faq_items || []);
     setAnnouncementsTitle(lp.announcements_title);
     setMaxPublicAnnouncements(lp.max_public_announcements ?? 5);
+    setVendorsTitle(lp.vendors_title);
+    setVendorsDisclaimer(lp.vendors_disclaimer);
+    setVendors(lp.vendors || []);
     setFooterText(lp.footer_text);
   }, [community]);
 
@@ -153,6 +169,8 @@ export function LandingPageSettings() {
     hero_image_url: heroImageUrl,
     hero_headline: heroHeadline,
     hero_subheadline: heroSubheadline,
+    hero_layout: heroLayout,
+    hero_thickness: heroThickness,
     about_title: aboutTitle,
     about_body: aboutBody,
     board_members_title: boardMembersTitle,
@@ -165,13 +183,17 @@ export function LandingPageSettings() {
     faq_items: faqItems,
     announcements_title: announcementsTitle,
     max_public_announcements: maxPublicAnnouncements,
+    vendors_title: vendorsTitle,
+    vendors_disclaimer: vendorsDisclaimer,
+    vendors,
     footer_text: footerText,
   }), [
     sections, themePreset, customPrimary, customAccent,
-    heroImageUrl, heroHeadline, heroSubheadline,
+    heroImageUrl, heroHeadline, heroSubheadline, heroLayout, heroThickness,
     aboutTitle, aboutBody, boardMembersTitle, showBoardTitles,
     contactTitle, contactBody, quickLinks, amenitiesTitle,
-    galleryImages, faqItems, announcementsTitle, maxPublicAnnouncements, footerText,
+    galleryImages, faqItems, announcementsTitle, maxPublicAnnouncements,
+    vendorsTitle, vendorsDisclaimer, vendors, footerText,
   ]);
 
   const currentConfig = useMemo(() => buildConfig(), [buildConfig]);
@@ -226,6 +248,7 @@ export function LandingPageSettings() {
     }
 
     toast.success('Landing page saved.');
+    router.refresh();
   }
 
   const previewElement = (
@@ -269,9 +292,13 @@ export function LandingPageSettings() {
               heroImageUrl={heroImageUrl}
               heroHeadline={heroHeadline}
               heroSubheadline={heroSubheadline}
+              heroLayout={heroLayout}
+              heroThickness={heroThickness}
               onImageChange={setHeroImageUrl}
               onHeadlineChange={setHeroHeadline}
               onSubheadlineChange={setHeroSubheadline}
+              onLayoutChange={setHeroLayout}
+              onThicknessChange={setHeroThickness}
             />
           </Section>
 
@@ -283,6 +310,20 @@ export function LandingPageSettings() {
               aboutBody={aboutBody}
               onTitleChange={setAboutTitle}
               onBodyChange={setAboutBody}
+            />
+          </Section>
+
+          {/* Vendors */}
+          <Section title="Vendors & Businesses" description="Promote local businesses and service providers to your community.">
+            <LandingPageVendorsEditor
+              communityId={community.id}
+              communityName={community.name}
+              vendorsTitle={vendorsTitle}
+              vendorsDisclaimer={vendorsDisclaimer}
+              vendors={vendors}
+              onTitleChange={setVendorsTitle}
+              onDisclaimerChange={setVendorsDisclaimer}
+              onVendorsChange={setVendors}
             />
           </Section>
 

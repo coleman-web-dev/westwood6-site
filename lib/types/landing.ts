@@ -3,6 +3,7 @@
 export type LandingSectionId =
   | 'hero'
   | 'about'
+  | 'vendors'
   | 'board_members'
   | 'documents'
   | 'amenities'
@@ -11,6 +12,9 @@ export type LandingSectionId =
   | 'faq'
   | 'contact'
   | 'announcements';
+
+export type HeroLayout = 'image_only' | 'image_above' | 'image_below';
+export type HeroThickness = 'compact' | 'medium' | 'tall';
 
 export interface LandingPageSection {
   id: LandingSectionId;
@@ -34,6 +38,16 @@ export interface LandingFaqItem {
   answer: string;
 }
 
+export interface LandingVendor {
+  name: string;
+  description: string;
+  image_url: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  category: string | null;
+}
+
 export interface LandingPageConfig {
   sections: LandingPageSection[];
 
@@ -46,6 +60,8 @@ export interface LandingPageConfig {
   hero_image_url: string | null;
   hero_headline: string | null;
   hero_subheadline: string | null;
+  hero_layout: HeroLayout;
+  hero_thickness: HeroThickness;
 
   // About
   about_title: string | null;
@@ -75,6 +91,11 @@ export interface LandingPageConfig {
   announcements_title: string | null;
   max_public_announcements: number;
 
+  // Vendors
+  vendors_title: string | null;
+  vendors_disclaimer: string | null;
+  vendors: LandingVendor[];
+
   // Footer
   footer_text: string | null;
 }
@@ -102,6 +123,7 @@ export const THEME_PRESETS: ThemePreset[] = [
 export const SECTION_LABELS: Record<LandingSectionId, string> = {
   hero: 'Hero Banner',
   about: 'About',
+  vendors: 'Vendors & Businesses',
   board_members: 'Board Members',
   documents: 'Documents',
   amenities: 'Amenities',
@@ -117,15 +139,18 @@ export const SECTION_LABELS: Record<LandingSectionId, string> = {
 export const DEFAULT_SECTIONS: LandingPageSection[] = [
   { id: 'hero', enabled: true, order: 0 },
   { id: 'about', enabled: false, order: 1 },
-  { id: 'announcements', enabled: false, order: 2 },
-  { id: 'board_members', enabled: false, order: 3 },
-  { id: 'documents', enabled: false, order: 4 },
-  { id: 'amenities', enabled: false, order: 5 },
-  { id: 'quick_links', enabled: false, order: 6 },
-  { id: 'gallery', enabled: false, order: 7 },
-  { id: 'faq', enabled: false, order: 8 },
-  { id: 'contact', enabled: true, order: 9 },
+  { id: 'vendors', enabled: false, order: 2 },
+  { id: 'announcements', enabled: false, order: 3 },
+  { id: 'board_members', enabled: false, order: 4 },
+  { id: 'documents', enabled: false, order: 5 },
+  { id: 'amenities', enabled: false, order: 6 },
+  { id: 'quick_links', enabled: false, order: 7 },
+  { id: 'gallery', enabled: false, order: 8 },
+  { id: 'faq', enabled: false, order: 9 },
+  { id: 'contact', enabled: true, order: 10 },
 ];
+
+export const DEFAULT_VENDORS_DISCLAIMER = 'At {community_name}, we value local businesses that serve our residences with quality, reliability, and integrity. From landscapers, realtors, cleaning companies and caterers, these recommendations are shared to help our community connect with highly recommended professionals. We encourage you to do your own diligence before hiring a service.';
 
 export const DEFAULT_LANDING_CONFIG: LandingPageConfig = {
   sections: DEFAULT_SECTIONS,
@@ -135,6 +160,8 @@ export const DEFAULT_LANDING_CONFIG: LandingPageConfig = {
   hero_image_url: null,
   hero_headline: null,
   hero_subheadline: null,
+  hero_layout: 'image_only',
+  hero_thickness: 'medium',
   about_title: null,
   about_body: null,
   board_members_title: null,
@@ -147,6 +174,9 @@ export const DEFAULT_LANDING_CONFIG: LandingPageConfig = {
   faq_items: [],
   announcements_title: null,
   max_public_announcements: 5,
+  vendors_title: null,
+  vendors_disclaimer: null,
+  vendors: [],
   footer_text: null,
 };
 

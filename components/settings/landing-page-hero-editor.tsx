@@ -5,8 +5,16 @@ import { Upload, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/shared/ui/button';
 import { Input } from '@/components/shared/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/shared/ui/select';
 import { AiGenerateButton } from './ai-generate-button';
 import { toast } from 'sonner';
+import type { HeroLayout, HeroThickness } from '@/lib/types/landing';
 
 interface HeroEditorProps {
   communityId: string;
@@ -14,9 +22,13 @@ interface HeroEditorProps {
   heroImageUrl: string | null;
   heroHeadline: string | null;
   heroSubheadline: string | null;
+  heroLayout: HeroLayout;
+  heroThickness: HeroThickness;
   onImageChange: (url: string | null) => void;
   onHeadlineChange: (val: string | null) => void;
   onSubheadlineChange: (val: string | null) => void;
+  onLayoutChange: (val: HeroLayout) => void;
+  onThicknessChange: (val: HeroThickness) => void;
 }
 
 export function LandingPageHeroEditor({
@@ -25,9 +37,13 @@ export function LandingPageHeroEditor({
   heroImageUrl,
   heroHeadline,
   heroSubheadline,
+  heroLayout,
+  heroThickness,
   onImageChange,
   onHeadlineChange,
   onSubheadlineChange,
+  onLayoutChange,
+  onThicknessChange,
 }: HeroEditorProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -122,6 +138,42 @@ export function LandingPageHeroEditor({
           className="hidden"
           onChange={handleUpload}
         />
+      </div>
+
+      {/* Layout select - shown when image uploaded */}
+      {heroImageUrl && (
+        <div className="space-y-1.5">
+          <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+            Layout
+          </label>
+          <Select value={heroLayout} onValueChange={(v) => onLayoutChange(v as HeroLayout)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="image_only">Image with text overlay</SelectItem>
+              <SelectItem value="image_above">Image above, text below</SelectItem>
+              <SelectItem value="image_below">Text above, image below</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {/* Thickness select */}
+      <div className="space-y-1.5">
+        <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+          Banner Size
+        </label>
+        <Select value={heroThickness} onValueChange={(v) => onThicknessChange(v as HeroThickness)}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="compact">Compact</SelectItem>
+            <SelectItem value="medium">Medium</SelectItem>
+            <SelectItem value="tall">Tall</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Headline */}

@@ -11,7 +11,9 @@ import { AmenitiesSection } from './sections/amenities-section';
 import { GallerySection } from './sections/gallery-section';
 import { FaqSection } from './sections/faq-section';
 import { PublicAnnouncementsSection } from './sections/public-announcements-section';
+import { VendorsSection } from './sections/vendors-section';
 import { LoginCtaSection } from './sections/login-cta-section';
+import { LandingNavBar } from './landing-nav-bar';
 
 interface BoardMember {
   first_name: string;
@@ -72,6 +74,7 @@ const SECTION_COMPONENTS: Record<
   gallery: GallerySection,
   faq: FaqSection,
   announcements: PublicAnnouncementsSection,
+  vendors: VendorsSection,
 };
 
 export function LandingPageShell({
@@ -87,6 +90,10 @@ export function LandingPageShell({
     .filter((s) => s.enabled)
     .sort((a, b) => a.order - b.order);
 
+  // Show nav bar when 2+ non-hero sections are enabled
+  const nonHeroEnabled = enabledSections.filter((s) => s.id !== 'hero');
+  const showNavBar = nonHeroEnabled.length >= 2;
+
   return (
     <div
       className="min-h-screen bg-white"
@@ -97,17 +104,28 @@ export function LandingPageShell({
         } as React.CSSProperties
       }
     >
+      {showNavBar && (
+        <LandingNavBar
+          communityName={community.name}
+          logoUrl={community.logo_url}
+          sections={config.sections}
+          slug={slug}
+          isMember={isMember}
+        />
+      )}
+
       {enabledSections.map((section) => {
         const Component = SECTION_COMPONENTS[section.id];
         if (!Component) return null;
         return (
-          <Component
-            key={section.id}
-            community={community}
-            config={config}
-            data={data}
-            slug={slug}
-          />
+          <div key={section.id} id={`section-${section.id}`}>
+            <Component
+              community={community}
+              config={config}
+              data={data}
+              slug={slug}
+            />
+          </div>
         );
       })}
 

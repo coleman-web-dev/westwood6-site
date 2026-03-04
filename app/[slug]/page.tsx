@@ -40,80 +40,98 @@ export default async function CommunityLandingPage({ params }: Props) {
     isMember = !!member;
   }
 
-  const landingConfig: LandingPageConfig | undefined = c.theme?.landing_page;
+  const rawLandingConfig: LandingPageConfig | undefined = c.theme?.landing_page;
 
   // If no landing page config exists, render the legacy minimal page
-  if (!landingConfig) {
+  if (!rawLandingConfig) {
     return <LegacyLandingPage community={c} slug={slug} isMember={isMember} />;
   }
 
-  // Fetch all public data in parallel using admin client (bypasses RLS for unauthenticated visitors)
-  const admin = createAdminClient();
-  const enabledSectionIds = new Set(
-    landingConfig.sections.filter((s) => s.enabled).map((s) => s.id)
-  );
-
-  const [boardResult, docsResult, amenitiesResult, announcementsResult] =
-    await Promise.all([
-      enabledSectionIds.has('board_members')
-        ? admin
-            .from('members')
-            .select('first_name, last_name, board_title, system_role')
-            .eq('community_id', c.id)
-            .in('system_role', ['board', 'manager', 'super_admin'])
-            .eq('is_approved', true)
-        : Promise.resolve({ data: [] }),
-
-      enabledSectionIds.has('documents')
-        ? admin
-            .from('documents')
-            .select('id, title, category, file_path, file_size')
-            .eq('community_id', c.id)
-            .eq('is_public', true)
-            .order('created_at', { ascending: false })
-        : Promise.resolve({ data: [] }),
-
-      enabledSectionIds.has('amenities')
-        ? admin
-            .from('amenities')
-            .select('id, name, description, icon')
-            .eq('community_id', c.id)
-            .eq('active', true)
-        : Promise.resolve({ data: [] }),
-
-      enabledSectionIds.has('announcements')
-        ? admin
-            .from('announcements')
-            .select('id, title, body, priority, created_at')
-            .eq('community_id', c.id)
-            .eq('is_public', true)
-            .order('created_at', { ascending: false })
-            .limit(landingConfig.max_public_announcements || 5)
-        : Promise.resolve({ data: [] }),
-    ]);
-
-  // Generate signed URLs for public documents (they're in the private hoa-documents bucket)
-  const publicDocs = await Promise.all(
-    (docsResult.data || []).map(async (doc: { id: string; title: string; category: string; file_path: string; file_size: number | null }) => {
-      const { data } = await admin.storage
-        .from('hoa-documents')
-        .createSignedUrl(doc.file_path, 3600);
-      return {
-        id: doc.id,
-        title: doc.title,
-        category: doc.category,
-        file_size: doc.file_size,
-        signed_url: data?.signedUrl || '#',
-      };
-    })
-  );
-
-  const landingData: LandingPageData = {
-    boardMembers: (boardResult.data || []) as LandingPageData['boardMembers'],
-    publicDocs,
-    amenities: (amenitiesResult.data || []) as LandingPageData['amenities'],
-    announcements: (announcementsResult.data || []) as LandingPageData['announcements'],
+  // Normalize config: protect against partially saved config where sections may be undefined
+  const landingConfig: LandingPageConfig = {
+    ...DEFAULT_LANDING_CONFIG,
+    ...rawLandingConfig,
+    sections: rawLandingConfig.sections ?? DEFAULT_LANDING_CONFIG.sections,
   };
+
+  // Fetch all public data in parallel using admin client (bypasses RLS for unauthenticated visitors)
+  let landingData: LandingPageData = {
+    boardMembers: [],
+    publicDocs: [],
+    amenities: [],
+    announcements: [],
+  };
+
+  try {
+    const admin = createAdminClient();
+    const enabledSectionIds = new Set(
+      landingConfig.sections.filter((s) => s.enabled).map((s) => s.id)
+    );
+
+    const [boardResult, docsResult, amenitiesResult, announcementsResult] =
+      await Promise.all([
+        enabledSectionIds.has('board_members')
+          ? admin
+              .from('members')
+              .select('first_name, last_name, board_title, system_role')
+              .eq('community_id', c.id)
+              .in('system_role', ['board', 'manager', 'super_admin'])
+              .eq('is_approved', true)
+          : Promise.resolve({ data: [] }),
+
+        enabledSectionIds.has('documents')
+          ? admin
+              .from('documents')
+              .select('id, title, category, file_path, file_size')
+              .eq('community_id', c.id)
+              .eq('is_public', true)
+              .order('created_at', { ascending: false })
+          : Promise.resolve({ data: [] }),
+
+        enabledSectionIds.has('amenities')
+          ? admin
+              .from('amenities')
+              .select('id, name, description, icon')
+              .eq('community_id', c.id)
+              .eq('active', true)
+          : Promise.resolve({ data: [] }),
+
+        enabledSectionIds.has('announcements')
+          ? admin
+              .from('announcements')
+              .select('id, title, body, priority, created_at')
+              .eq('community_id', c.id)
+              .eq('is_public', true)
+              .order('created_at', { ascending: false })
+              .limit(landingConfig.max_public_announcements || 5)
+          : Promise.resolve({ data: [] }),
+      ]);
+
+    // Generate signed URLs for public documents (they're in the private hoa-documents bucket)
+    const publicDocs = await Promise.all(
+      (docsResult.data || []).map(async (doc: { id: string; title: string; category: string; file_path: string; file_size: number | null }) => {
+        const { data } = await admin.storage
+          .from('hoa-documents')
+          .createSignedUrl(doc.file_path, 3600);
+        return {
+          id: doc.id,
+          title: doc.title,
+          category: doc.category,
+          file_size: doc.file_size,
+          signed_url: data?.signedUrl || '#',
+        };
+      })
+    );
+
+    landingData = {
+      boardMembers: (boardResult.data || []) as LandingPageData['boardMembers'],
+      publicDocs,
+      amenities: (amenitiesResult.data || []) as LandingPageData['amenities'],
+      announcements: (announcementsResult.data || []) as LandingPageData['announcements'],
+    };
+  } catch (err) {
+    console.error('Landing page data fetch error:', err);
+  }
 
   return (
     <LandingPageShell
