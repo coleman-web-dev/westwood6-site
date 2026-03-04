@@ -18,6 +18,7 @@ import { CreateAssessmentDialog } from '@/components/payments/create-assessment-
 import { CreateSpecialAssessmentDialog } from '@/components/payments/create-special-assessment-dialog';
 import { FrequencySelector } from '@/components/payments/frequency-selector';
 import { ManagePaymentMethodButton } from '@/components/payments/manage-payment-method-button';
+import { BillingDatePicker } from '@/components/payments/billing-date-picker';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -310,11 +311,14 @@ export default function PaymentsPage() {
 
       {/* Manage payment method (if subscription active) */}
       {subscriptionStatus && !isBoard && (
-        <div className="flex items-center gap-3">
-          <ManagePaymentMethodButton />
-          <span className="text-meta text-text-muted-light dark:text-text-muted-dark">
-            Auto-pay is {subscriptionStatus === 'active' ? 'enabled' : subscriptionStatus}
-          </span>
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <ManagePaymentMethodButton />
+            <span className="text-meta text-text-muted-light dark:text-text-muted-dark">
+              Auto-pay is {subscriptionStatus === 'active' ? 'enabled' : subscriptionStatus}
+            </span>
+          </div>
+          <BillingDatePicker />
         </div>
       )}
 

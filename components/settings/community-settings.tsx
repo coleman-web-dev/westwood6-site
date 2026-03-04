@@ -21,7 +21,6 @@ import { UnsavedChangesDialog } from '@/components/settings/unsaved-changes-dial
 import { AmenityList } from '@/components/amenities/amenity-list';
 import { EmailSettingsSection } from '@/components/settings/email-settings-section';
 import { StripeMigrationSection } from '@/components/settings/stripe-migration-section';
-import { BillingAnchorSection } from '@/components/settings/billing-anchor-section';
 import type { PaymentFrequency, BulletinSettings, LateFeeSettings } from '@/lib/types/database';
 
 export function CommunitySettings() {
@@ -394,9 +393,6 @@ export function CommunitySettings() {
 
       {/* Stripe payment setup (direct mode) */}
       <StripeMigrationSection />
-
-      {/* Auto-pay billing date */}
-      <BillingAnchorSection />
 
       {/* Email notifications (board config) */}
       <EmailSettingsSection />

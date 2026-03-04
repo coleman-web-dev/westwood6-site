@@ -49,12 +49,6 @@ export interface PreCreateAccountsResponse {
   errors: string[];
 }
 
-export interface UpdateBillingAnchorResponse {
-  updated: number;
-  skipped: number;
-  errors: string[];
-}
-
 export interface CustomerPortalResponse {
   url: string;
 }
