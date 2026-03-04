@@ -24,6 +24,7 @@ import {
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
 import { applyWalletToInvoice } from '@/lib/utils/apply-wallet-to-invoices';
+import { postInvoiceCreatedAction, postWalletAppliedAction } from '@/lib/actions/accounting-actions';
 import type { Unit } from '@/lib/types/database';
 
 interface CreateInvoiceDialogProps {
@@ -116,6 +117,9 @@ export function CreateInvoiceDialog({
       return;
     }
 
+    // Post accounting journal entry (silently skips if not set up)
+    await postInvoiceCreatedAction(community.id, inserted.id, unitId, amountCents, title.trim());
+
     // Auto-apply wallet balance
     const result = await applyWalletToInvoice(
       supabase,
@@ -126,6 +130,11 @@ export function CreateInvoiceDialog({
       community.id,
       member?.id ?? null
     );
+
+    // Post wallet applied accounting entry if wallet was used
+    if (result.applied > 0) {
+      await postWalletAppliedAction(community.id, inserted.id, unitId, result.applied);
+    }
 
     setSubmitting(false);
 

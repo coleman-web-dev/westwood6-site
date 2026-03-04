@@ -24,6 +24,7 @@ import {
   Ruler,
   PiggyBank,
   HardHat,
+  BookOpen,
 } from 'lucide-react';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { createClient } from '@/lib/supabase/client';
@@ -156,6 +157,14 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
             href={`${basePath}/vendors`}
             active={isActive('/vendors')}
             label="Vendors"
+          />
+        )}
+        {isBoard && (
+          <NavItem
+            icon={BookOpen}
+            href={`${basePath}/accounting`}
+            active={isActive('/accounting')}
+            label="Accounting"
           />
         )}
         {isBoard && (

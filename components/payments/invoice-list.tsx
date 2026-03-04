@@ -26,6 +26,7 @@ import {
   AlertDialogTitle,
 } from '@/components/shared/ui/alert-dialog';
 import { downloadCsv } from '@/lib/utils/export-csv';
+import { postInvoiceWaivedAction, postInvoiceVoidedAction, postPaymentReceivedAction } from '@/lib/actions/accounting-actions';
 import { BounceInvoiceDialog } from '@/components/payments/bounce-invoice-dialog';
 import { PayInvoiceButton } from '@/components/payments/pay-invoice-button';
 import type { Invoice, InvoiceStatus, Unit } from '@/lib/types/database';
@@ -128,6 +129,7 @@ export function InvoiceList({
     }
 
     toast.success('Invoice marked as paid.');
+    await postPaymentReceivedAction(community.id, invoice.id, invoice.unit_id, invoice.amount, invoice.title);
     onInvoiceUpdated();
   }
 
@@ -148,6 +150,10 @@ export function InvoiceList({
     }
 
     toast.success('Invoice waived.');
+    const remaining = invoice.amount - (invoice.amount_paid || 0);
+    if (remaining > 0) {
+      await postInvoiceWaivedAction(community.id, invoice.id, invoice.unit_id, remaining, invoice.title);
+    }
     onInvoiceUpdated();
   }
 
@@ -168,6 +174,7 @@ export function InvoiceList({
     }
 
     toast.success('Invoice voided.');
+    await postInvoiceVoidedAction(community.id, invoice.id, invoice.unit_id, invoice.amount, invoice.title);
     onInvoiceUpdated();
   }
 

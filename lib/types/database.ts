@@ -654,6 +654,18 @@ export interface BudgetLineItem {
   created_at: string;
 }
 
+// ─── Accounting (re-exported from accounting.ts) ────
+export type {
+  AccountType,
+  AccountFund,
+  JournalSource,
+  JournalStatus,
+  Account,
+  JournalEntry,
+  JournalLine,
+  FiscalPeriod,
+} from './accounting';
+
 // ─── Vendors ────────────────────────────────────────
 
 export interface Vendor {

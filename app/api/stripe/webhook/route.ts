@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getStripeClient } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { queuePaymentConfirmation } from '@/lib/email/queue';
+import { postPaymentReceived, postOverpaymentWalletCredit } from '@/lib/utils/accounting-entries';
 import type Stripe from 'stripe';
 
 export const runtime = 'nodejs';
@@ -99,6 +100,9 @@ export async function POST(req: NextRequest) {
           paid_by: invoice.paid_by || 'stripe',
         });
 
+        // Post accounting journal entries (silently skips if not set up)
+        await postPaymentReceived(communityId, invoiceId, invoice.unit_id, Math.min(stripePaidAmount, invoice.amount), invoice.title);
+
         // Check for overpayment: credit excess to unit wallet
         if (totalPaid > invoice.amount) {
           const excess = totalPaid - invoice.amount;
@@ -134,6 +138,9 @@ export async function POST(req: NextRequest) {
             reference_id: invoiceId,
             description: `Overpayment on: ${invoice.title}`,
           });
+
+          // Post overpayment accounting entry
+          await postOverpaymentWalletCredit(communityId, invoiceId, invoice.unit_id, excess);
         }
 
         // Queue payment confirmation email
@@ -221,6 +228,9 @@ export async function POST(req: NextRequest) {
           paid_by: 'stripe',
         });
 
+        // Post accounting journal entries (silently skips if not set up)
+        await postPaymentReceived(unit.community_id, duesiqInvoice.id, unit.id, Math.min(amountPaid, duesiqInvoice.amount), duesiqInvoice.title);
+
         // Handle overpayment: credit excess to unit wallet
         if (totalPaid > duesiqInvoice.amount) {
           const excess = totalPaid - duesiqInvoice.amount;
@@ -248,6 +258,9 @@ export async function POST(req: NextRequest) {
             reference_id: duesiqInvoice.id,
             description: `Overpayment on: ${duesiqInvoice.title}`,
           });
+
+          // Post overpayment accounting entry
+          await postOverpaymentWalletCredit(unit.community_id, duesiqInvoice.id, unit.id, excess);
         }
 
         // Queue payment confirmation email
