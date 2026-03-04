@@ -12,7 +12,8 @@ export type JournalSource =
   | 'wallet_credit'
   | 'wallet_debit'
   | 'refund'
-  | 'assessment_generated';
+  | 'assessment_generated'
+  | 'bank_sync';
 export type JournalStatus = 'draft' | 'posted' | 'reversed';
 
 // ─── Row Types ─────────────────────────────────────────────────────

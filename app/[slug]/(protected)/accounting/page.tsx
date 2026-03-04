@@ -11,11 +11,17 @@ import { TrialBalance } from '@/components/accounting/trial-balance';
 import { BalanceSheet } from '@/components/accounting/balance-sheet';
 import { IncomeStatement } from '@/components/accounting/income-statement';
 import { FundSummaryCards } from '@/components/accounting/fund-summary';
+import { BankConnectionManager } from '@/components/accounting/bank-connection-manager';
+import { BankTransactionList } from '@/components/accounting/bank-transaction-list';
+import { CategorizationRulesManager } from '@/components/accounting/categorization-rules-manager';
+import { ReconciliationList } from '@/components/accounting/reconciliation-list';
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'chart', label: 'Chart of Accounts' },
   { id: 'journal', label: 'Journal Entries' },
+  { id: 'banking', label: 'Banking' },
+  { id: 'reconciliation', label: 'Reconciliation' },
   { id: 'reports', label: 'Reports' },
 ] as const;
 
@@ -29,10 +35,19 @@ const REPORT_SUBTABS = [
 
 type ReportSubtab = (typeof REPORT_SUBTABS)[number]['id'];
 
+const BANKING_SUBTABS = [
+  { id: 'connections', label: 'Connections' },
+  { id: 'transactions', label: 'Transactions' },
+  { id: 'rules', label: 'Categorization Rules' },
+] as const;
+
+type BankingSubtab = (typeof BANKING_SUBTABS)[number]['id'];
+
 export default function AccountingPage() {
   const { isBoard, community } = useCommunity();
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [reportTab, setReportTab] = useState<ReportSubtab>('trial-balance');
+  const [bankingTab, setBankingTab] = useState<BankingSubtab>('connections');
   const [isSetUp, setIsSetUp] = useState<boolean | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -130,6 +145,52 @@ export default function AccountingPage() {
 
       {activeTab === 'journal' && (
         <JournalEntryList key={`je-${refreshKey}`} communityId={community.id} />
+      )}
+
+      {activeTab === 'banking' && (
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            {BANKING_SUBTABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setBankingTab(tab.id)}
+                className={`px-3 py-1.5 rounded-pill text-meta transition-colors ${
+                  bankingTab === tab.id
+                    ? 'bg-secondary-400/15 text-secondary-400'
+                    : 'bg-surface-light-2 dark:bg-surface-dark-2 text-text-muted-light dark:text-text-muted-dark hover:text-text-secondary-light dark:hover:text-text-secondary-dark'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {bankingTab === 'connections' && (
+            <BankConnectionManager
+              key={`bc-${refreshKey}`}
+              communityId={community.id}
+              onSync={() => setRefreshKey((k) => k + 1)}
+            />
+          )}
+          {bankingTab === 'transactions' && (
+            <BankTransactionList
+              key={`bt-${refreshKey}`}
+              communityId={community.id}
+              refreshKey={refreshKey}
+            />
+          )}
+          {bankingTab === 'rules' && (
+            <CategorizationRulesManager
+              key={`cr-${refreshKey}`}
+              communityId={community.id}
+            />
+          )}
+        </div>
+      )}
+
+      {activeTab === 'reconciliation' && (
+        <ReconciliationList key={`recon-${refreshKey}`} communityId={community.id} />
       )}
 
       {activeTab === 'reports' && (

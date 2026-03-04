@@ -20,6 +20,7 @@ const SOURCE_LABELS: Record<JournalSource, string> = {
   wallet_debit: 'Wallet Debit',
   refund: 'Refund',
   assessment_generated: 'Assessment',
+  bank_sync: 'Bank Sync',
 };
 
 const STATUS_VARIANT: Record<JournalStatus, 'outline' | 'secondary' | 'destructive'> = {
