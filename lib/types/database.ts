@@ -31,7 +31,7 @@ export type BudgetCategory = 'dues' | 'assessments' | 'amenity_fees' | 'interest
 export type VendorCategory = 'landscaping' | 'plumbing' | 'electrical' | 'hvac' | 'painting' | 'roofing' | 'cleaning' | 'security' | 'general' | 'other';
 export type VendorStatus = 'active' | 'inactive';
 
-import type { LandingPageConfig } from './landing';
+import type { LandingPageConfig, CommunityVendorsConfig } from './landing';
 
 // ─── Community theme config ─────────────────────────
 
@@ -79,6 +79,7 @@ export interface CommunityTheme {
   onboarding?: OnboardingState;
   arc_enabled?: boolean;
   landing_page?: LandingPageConfig;
+  vendors_config?: CommunityVendorsConfig;
   [key: string]: unknown;
 }
 

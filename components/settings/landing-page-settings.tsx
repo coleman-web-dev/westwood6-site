@@ -26,15 +26,14 @@ import { LandingPageGalleryEditor } from './landing-page-gallery-editor';
 import { LandingPageFaqEditor } from './landing-page-faq-editor';
 import { LandingPagePreview } from './landing-page-preview';
 import { AiGenerateButton } from './ai-generate-button';
-import { LandingPageVendorsEditor } from './landing-page-vendors-editor';
-import { DEFAULT_LANDING_CONFIG, DEFAULT_VENDORS_DISCLAIMER } from '@/lib/types/landing';
+import { LandingPageVendorsToggles } from './landing-page-vendors-toggles';
+import { DEFAULT_LANDING_CONFIG } from '@/lib/types/landing';
 import type {
   LandingPageConfig,
   LandingPageSection,
   LandingQuickLink,
   LandingGalleryImage,
   LandingFaqItem,
-  LandingVendor,
   HeroLayout,
   HeroThickness,
 } from '@/lib/types/landing';
@@ -78,9 +77,6 @@ export function LandingPageSettings() {
   const [faqItems, setFaqItems] = useState<LandingFaqItem[]>([]);
   const [announcementsTitle, setAnnouncementsTitle] = useState<string | null>(null);
   const [maxPublicAnnouncements, setMaxPublicAnnouncements] = useState(5);
-  const [vendorsTitle, setVendorsTitle] = useState<string | null>(null);
-  const [vendorsDisclaimer, setVendorsDisclaimer] = useState<string | null>(null);
-  const [vendors, setVendors] = useState<LandingVendor[]>([]);
   const [footerText, setFooterText] = useState<string | null>(null);
 
   // Track the last-saved config for dirty detection
@@ -111,9 +107,6 @@ export function LandingPageSettings() {
     setFaqItems(lp.faq_items || []);
     setAnnouncementsTitle(lp.announcements_title);
     setMaxPublicAnnouncements(lp.max_public_announcements ?? 5);
-    setVendorsTitle(lp.vendors_title);
-    setVendorsDisclaimer(lp.vendors_disclaimer);
-    setVendors(lp.vendors || []);
     setFooterText(lp.footer_text);
     // Snapshot the saved state for dirty detection
     savedConfigRef.current = JSON.stringify(lp);
@@ -188,9 +181,6 @@ export function LandingPageSettings() {
     faq_items: faqItems,
     announcements_title: announcementsTitle,
     max_public_announcements: maxPublicAnnouncements,
-    vendors_title: vendorsTitle,
-    vendors_disclaimer: vendorsDisclaimer,
-    vendors,
     footer_text: footerText,
   }), [
     sections, themePreset, customPrimary, customAccent,
@@ -198,7 +188,7 @@ export function LandingPageSettings() {
     aboutTitle, aboutBody, boardMembersTitle, showBoardTitles,
     contactTitle, contactBody, quickLinks, amenitiesTitle,
     galleryImages, faqItems, announcementsTitle, maxPublicAnnouncements,
-    vendorsTitle, vendorsDisclaimer, vendors, footerText,
+    footerText,
   ]);
 
   const currentConfig = useMemo(() => buildConfig(), [buildConfig]);
@@ -336,17 +326,8 @@ export function LandingPageSettings() {
           </Section>
 
           {/* Vendors */}
-          <Section title="Vendors & Businesses" description="Promote local businesses and service providers to your community.">
-            <LandingPageVendorsEditor
-              communityId={community.id}
-              communityName={community.name}
-              vendorsTitle={vendorsTitle}
-              vendorsDisclaimer={vendorsDisclaimer}
-              vendors={vendors}
-              onTitleChange={setVendorsTitle}
-              onDisclaimerChange={setVendorsDisclaimer}
-              onVendorsChange={setVendors}
-            />
+          <Section title="Vendors & Businesses" description="Control which vendors appear on the landing page. Manage vendors in Settings > Community.">
+            <LandingPageVendorsToggles />
           </Section>
 
           {/* Board Members */}

@@ -1,11 +1,19 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Plus, Trash2, Upload, X, Pencil } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Plus, Trash2, Upload, X, Pencil, Eye, EyeOff, Globe } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/shared/ui/button';
 import { Input } from '@/components/shared/ui/input';
 import { Textarea } from '@/components/shared/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/shared/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -14,21 +22,17 @@ import {
   DialogFooter,
 } from '@/components/shared/ui/dialog';
 import { toast } from 'sonner';
-import { DEFAULT_VENDORS_DISCLAIMER } from '@/lib/types/landing';
-import type { LandingVendor } from '@/lib/types/landing';
+import { DEFAULT_VENDORS_DISCLAIMER, DEFAULT_VENDORS_CONFIG } from '@/lib/types/landing';
+import type { CommunityVendor, CommunityVendorsConfig, VendorVisibility } from '@/lib/types/landing';
+import type { CommunityTheme } from '@/lib/types/database';
 
-interface VendorsEditorProps {
+interface Props {
   communityId: string;
   communityName: string;
-  vendorsTitle: string | null;
-  vendorsDisclaimer: string | null;
-  vendors: LandingVendor[];
-  onTitleChange: (val: string | null) => void;
-  onDisclaimerChange: (val: string | null) => void;
-  onVendorsChange: (vendors: LandingVendor[]) => void;
+  communityTheme: CommunityTheme;
 }
 
-const EMPTY_VENDOR: LandingVendor = {
+const EMPTY_VENDOR: CommunityVendor = {
   name: '',
   description: '',
   image_url: null,
@@ -36,31 +40,63 @@ const EMPTY_VENDOR: LandingVendor = {
   email: null,
   website: null,
   category: null,
+  visibility: 'public',
 };
 
-export function LandingPageVendorsEditor({
-  communityId,
-  communityName,
-  vendorsTitle,
-  vendorsDisclaimer,
-  vendors,
-  onTitleChange,
-  onDisclaimerChange,
-  onVendorsChange,
-}: VendorsEditorProps) {
+const VISIBILITY_LABELS: Record<VendorVisibility, string> = {
+  public: 'Public',
+  community: 'Community Only',
+  hidden: 'Hidden',
+};
+
+const VISIBILITY_DESCRIPTIONS: Record<VendorVisibility, string> = {
+  public: 'Landing page + dashboard',
+  community: 'Dashboard only',
+  hidden: 'Board management only',
+};
+
+export function VendorsManager({ communityId, communityName, communityTheme }: Props) {
+  const router = useRouter();
+  const config = communityTheme.vendors_config ?? DEFAULT_VENDORS_CONFIG;
+  const vendors = config.vendors ?? [];
+
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [draft, setDraft] = useState<LandingVendor>(EMPTY_VENDOR);
+  const [draft, setDraft] = useState<CommunityVendor>(EMPTY_VENDOR);
   const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [title, setTitle] = useState(config.title ?? '');
+  const [disclaimer, setDisclaimer] = useState(config.disclaimer ?? '');
+  const [savingMeta, setSavingMeta] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  async function saveConfig(updated: CommunityVendorsConfig) {
+    setSaving(true);
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('communities')
+      .update({
+        theme: {
+          ...communityTheme,
+          vendors_config: updated,
+        },
+      })
+      .eq('id', communityId);
+
+    setSaving(false);
+    if (error) {
+      toast.error('Failed to save vendors.');
+      return false;
+    }
+    router.refresh();
+    return true;
+  }
 
   function openNew() {
     setEditingIndex(-1);
     setDraft(EMPTY_VENDOR);
     // Auto-populate disclaimer on first vendor add
-    if (vendors.length === 0 && !vendorsDisclaimer) {
-      onDisclaimerChange(
-        DEFAULT_VENDORS_DISCLAIMER.replace('{community_name}', communityName)
-      );
+    if (vendors.length === 0 && !config.disclaimer) {
+      setDisclaimer(DEFAULT_VENDORS_DISCLAIMER.replace('{community_name}', communityName));
     }
   }
 
@@ -74,7 +110,7 @@ export function LandingPageVendorsEditor({
     setDraft(EMPTY_VENDOR);
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!draft.name.trim()) {
       toast.error('Vendor name is required.');
       return;
@@ -84,16 +120,45 @@ export function LandingPageVendorsEditor({
       return;
     }
 
+    let newVendors: CommunityVendor[];
     if (editingIndex === -1) {
-      onVendorsChange([...vendors, draft]);
+      newVendors = [...vendors, draft];
     } else if (editingIndex !== null) {
-      onVendorsChange(vendors.map((v, i) => (i === editingIndex ? draft : v)));
+      newVendors = vendors.map((v, i) => (i === editingIndex ? draft : v));
+    } else {
+      return;
     }
-    handleClose();
+
+    const ok = await saveConfig({
+      title: title || null,
+      disclaimer: disclaimer || null,
+      vendors: newVendors,
+    });
+    if (ok) {
+      toast.success(editingIndex === -1 ? 'Vendor added.' : 'Vendor updated.');
+      handleClose();
+    }
   }
 
-  function handleDelete(index: number) {
-    onVendorsChange(vendors.filter((_, i) => i !== index));
+  async function handleDelete(index: number) {
+    const newVendors = vendors.filter((_, i) => i !== index);
+    const ok = await saveConfig({
+      title: title || null,
+      disclaimer: disclaimer || null,
+      vendors: newVendors,
+    });
+    if (ok) toast.success('Vendor removed.');
+  }
+
+  async function handleSaveMeta() {
+    setSavingMeta(true);
+    const ok = await saveConfig({
+      title: title || null,
+      disclaimer: disclaimer || null,
+      vendors,
+    });
+    setSavingMeta(false);
+    if (ok) toast.success('Vendor settings updated.');
   }
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -111,9 +176,7 @@ export function LandingPageVendorsEditor({
 
     setUploading(true);
     const supabase = createClient();
-    const safeName = file.name
-      .replace(/[^a-zA-Z0-9._-]/g, '-')
-      .replace(/-+/g, '-');
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-').replace(/-+/g, '-');
     const path = `${communityId}/landing/vendors/${Date.now()}_${safeName}`;
 
     const { error } = await supabase.storage
@@ -137,22 +200,58 @@ export function LandingPageVendorsEditor({
     toast.success('Vendor image uploaded.');
   }
 
+  function visibilityIcon(vis: VendorVisibility) {
+    switch (vis) {
+      case 'public': return <Globe className="h-3.5 w-3.5 text-green-500" />;
+      case 'community': return <Eye className="h-3.5 w-3.5 text-blue-500" />;
+      case 'hidden': return <EyeOff className="h-3.5 w-3.5 text-text-muted-light dark:text-text-muted-dark" />;
+    }
+  }
+
   const dialogOpen = editingIndex !== null;
 
   return (
     <div className="space-y-4">
-      {/* Title */}
+      {/* Section title */}
       <div className="space-y-1.5">
         <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
           Section Title
         </label>
         <Input
           placeholder="Local Vendors & Businesses"
-          value={vendorsTitle || ''}
-          onChange={(e) => onTitleChange(e.target.value || null)}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
           maxLength={100}
         />
       </div>
+
+      {/* Disclaimer */}
+      {vendors.length > 0 && (
+        <div className="space-y-1.5">
+          <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+            Disclaimer
+          </label>
+          <Textarea
+            placeholder="Optional disclaimer text..."
+            value={disclaimer}
+            onChange={(e) => setDisclaimer(e.target.value)}
+            rows={3}
+            className="resize-none"
+          />
+        </div>
+      )}
+
+      {/* Save title/disclaimer */}
+      {vendors.length > 0 && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleSaveMeta}
+          disabled={savingMeta}
+        >
+          {savingMeta ? 'Saving...' : 'Save Title & Disclaimer'}
+        </Button>
+      )}
 
       {/* Vendor list */}
       {vendors.length > 0 && (
@@ -169,9 +268,7 @@ export function LandingPageVendorsEditor({
                   className="h-10 w-10 rounded-lg object-cover shrink-0"
                 />
               ) : (
-                <div
-                  className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0 bg-gray-100 dark:bg-gray-800"
-                >
+                <div className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0 bg-gray-100 dark:bg-gray-800">
                   <span className="text-sm font-bold text-gray-400">
                     {vendor.name.charAt(0).toUpperCase()}
                   </span>
@@ -181,11 +278,19 @@ export function LandingPageVendorsEditor({
                 <p className="text-body font-medium text-text-primary-light dark:text-text-primary-dark truncate">
                   {vendor.name}
                 </p>
-                {vendor.category && (
-                  <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                    {vendor.category}
-                  </p>
-                )}
+                <div className="flex items-center gap-2">
+                  {vendor.category && (
+                    <span className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                      {vendor.category}
+                    </span>
+                  )}
+                  <span className="flex items-center gap-1 text-meta">
+                    {visibilityIcon(vendor.visibility)}
+                    <span className="text-text-muted-light dark:text-text-muted-dark">
+                      {VISIBILITY_LABELS[vendor.visibility]}
+                    </span>
+                  </span>
+                </div>
               </div>
               <Button
                 variant="ghost"
@@ -208,26 +313,10 @@ export function LandingPageVendorsEditor({
         </div>
       )}
 
-      <Button variant="outline" size="sm" onClick={openNew}>
+      <Button variant="outline" size="sm" onClick={openNew} disabled={saving}>
         <Plus className="h-4 w-4 mr-1.5" />
         Add Vendor
       </Button>
-
-      {/* Disclaimer */}
-      {vendors.length > 0 && (
-        <div className="space-y-1.5">
-          <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-            Disclaimer
-          </label>
-          <Textarea
-            placeholder="Optional disclaimer text..."
-            value={vendorsDisclaimer || ''}
-            onChange={(e) => onDisclaimerChange(e.target.value || null)}
-            rows={3}
-            className="resize-none"
-          />
-        </div>
-      )}
 
       {/* Add/Edit dialog */}
       <Dialog open={dialogOpen} onOpenChange={(open) => !open && handleClose()}>
@@ -310,6 +399,33 @@ export function LandingPageVendorsEditor({
               />
             </div>
 
+            {/* Visibility */}
+            <div className="space-y-1.5">
+              <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                Visibility
+              </label>
+              <Select
+                value={draft.visibility}
+                onValueChange={(v) => setDraft({ ...draft, visibility: v as VendorVisibility })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(['public', 'community', 'hidden'] as VendorVisibility[]).map((vis) => (
+                    <SelectItem key={vis} value={vis}>
+                      <div className="flex items-center gap-2">
+                        {VISIBILITY_LABELS[vis]}
+                        <span className="text-text-muted-light dark:text-text-muted-dark text-meta">
+                          ({VISIBILITY_DESCRIPTIONS[vis]})
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Description */}
             <div className="space-y-1.5">
               <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
@@ -372,8 +488,8 @@ export function LandingPageVendorsEditor({
             <Button variant="outline" onClick={handleClose}>
               Cancel
             </Button>
-            <Button onClick={handleSave}>
-              {editingIndex === -1 ? 'Add' : 'Save'}
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? 'Saving...' : editingIndex === -1 ? 'Add' : 'Save'}
             </Button>
           </DialogFooter>
         </DialogContent>

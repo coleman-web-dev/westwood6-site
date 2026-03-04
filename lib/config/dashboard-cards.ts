@@ -114,4 +114,13 @@ export const CARD_REGISTRY: Record<DashboardCardId, DashboardCardConfig> = {
     defaultW: 6,
     defaultH: 5,
   },
+  vendors: {
+    id: 'vendors',
+    title: 'Vendors & Businesses',
+    icon: 'Store',
+    minW: 3,
+    minH: 4,
+    defaultW: 6,
+    defaultH: 6,
+  },
 };

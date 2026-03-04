@@ -48,6 +48,20 @@ export interface LandingVendor {
   category: string | null;
 }
 
+// ─── Community-level Vendor Types ─────────────────
+
+export type VendorVisibility = 'public' | 'community' | 'hidden';
+
+export interface CommunityVendor extends LandingVendor {
+  visibility: VendorVisibility;
+}
+
+export interface CommunityVendorsConfig {
+  title: string | null;
+  disclaimer: string | null;
+  vendors: CommunityVendor[];
+}
+
 export interface LandingPageConfig {
   sections: LandingPageSection[];
 
@@ -90,11 +104,6 @@ export interface LandingPageConfig {
   // Announcements
   announcements_title: string | null;
   max_public_announcements: number;
-
-  // Vendors
-  vendors_title: string | null;
-  vendors_disclaimer: string | null;
-  vendors: LandingVendor[];
 
   // Footer
   footer_text: string | null;
@@ -152,6 +161,12 @@ export const DEFAULT_SECTIONS: LandingPageSection[] = [
 
 export const DEFAULT_VENDORS_DISCLAIMER = 'At {community_name}, we value local businesses that serve our residences with quality, reliability, and integrity. From landscapers, realtors, cleaning companies and caterers, these recommendations are shared to help our community connect with highly recommended professionals. We encourage you to do your own diligence before hiring a service.';
 
+export const DEFAULT_VENDORS_CONFIG: CommunityVendorsConfig = {
+  title: null,
+  disclaimer: null,
+  vendors: [],
+};
+
 export const DEFAULT_LANDING_CONFIG: LandingPageConfig = {
   sections: DEFAULT_SECTIONS,
   theme_preset: 'classic',
@@ -174,9 +189,6 @@ export const DEFAULT_LANDING_CONFIG: LandingPageConfig = {
   faq_items: [],
   announcements_title: null,
   max_public_announcements: 5,
-  vendors_title: null,
-  vendors_disclaimer: null,
-  vendors: [],
   footer_text: null,
 };
 

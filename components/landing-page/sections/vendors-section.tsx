@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from '@/components/shared/ui/dialog';
 import type { Community } from '@/lib/types/database';
-import type { LandingPageConfig, LandingVendor } from '@/lib/types/landing';
+import type { LandingPageConfig, CommunityVendor } from '@/lib/types/landing';
 import type { LandingPageData } from '../landing-page-shell';
 
 interface Props {
@@ -19,14 +19,15 @@ interface Props {
   slug: string;
 }
 
-export function VendorsSection({ community, config }: Props) {
-  const [selected, setSelected] = useState<LandingVendor | null>(null);
-  const vendors = config.vendors || [];
+export function VendorsSection({ community }: Props) {
+  const [selected, setSelected] = useState<CommunityVendor | null>(null);
+  const vendorsConfig = community.theme?.vendors_config;
+  const vendors = (vendorsConfig?.vendors ?? []).filter((v) => v.visibility === 'public');
   if (vendors.length === 0) return null;
 
-  const title = config.vendors_title || 'Local Vendors & Businesses';
-  const disclaimer = config.vendors_disclaimer
-    ? config.vendors_disclaimer.replace('{community_name}', community.name)
+  const title = vendorsConfig?.title || 'Local Vendors & Businesses';
+  const disclaimer = vendorsConfig?.disclaimer
+    ? vendorsConfig.disclaimer.replace('{community_name}', community.name)
     : null;
 
   return (

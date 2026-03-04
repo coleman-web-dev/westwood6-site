@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes';
 import { UnsavedChangesDialog } from '@/components/settings/unsaved-changes-dialog';
 import { AmenityList } from '@/components/amenities/amenity-list';
+import { VendorsManager } from '@/components/settings/vendors-manager';
 import { EmailSettingsSection } from '@/components/settings/email-settings-section';
 import { StripeMigrationSection } from '@/components/settings/stripe-migration-section';
 import type { PaymentFrequency, BulletinSettings, LateFeeSettings } from '@/lib/types/database';
@@ -408,6 +409,24 @@ export function CommunitySettings() {
             and, when reservable, in the member booking system.
           </p>
           <AmenityList communityId={community.id} />
+        </div>
+      )}
+
+      {/* Vendors */}
+      {community && (
+        <div className="bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark rounded-panel p-card-padding">
+          <h2 className="text-card-title text-text-primary-light dark:text-text-primary-dark mb-1">
+            Vendors & Businesses
+          </h2>
+          <p className="text-meta text-text-muted-light dark:text-text-muted-dark mb-4">
+            Manage recommended vendors and service providers. Control visibility per vendor:
+            public (landing page + dashboard), community (dashboard only), or hidden (board only).
+          </p>
+          <VendorsManager
+            communityId={community.id}
+            communityName={community.name}
+            communityTheme={community.theme}
+          />
         </div>
       )}
 
