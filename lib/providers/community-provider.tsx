@@ -78,7 +78,7 @@ export function CommunityProvider({
       viewMode,
       setViewMode,
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [community, member, unit, householdMembers, viewMode]);
 
   return (

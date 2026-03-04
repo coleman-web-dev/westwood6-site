@@ -16,6 +16,11 @@ const PUBLIC_ROUTES = new Set([
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Public API routes
+  if (pathname.startsWith('/api/demo-request') || pathname.startsWith('/api/newsletter')) {
+    return NextResponse.next();
+  }
+
   // Static public routes + auth callback
   if (PUBLIC_ROUTES.has(pathname) || pathname.startsWith('/auth/')) {
     const { supabaseResponse } = await updateSession(request);

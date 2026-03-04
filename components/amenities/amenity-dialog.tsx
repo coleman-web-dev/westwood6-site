@@ -388,7 +388,7 @@ export function AmenityDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+        { }
         <div className="space-y-4 py-2" onChangeCapture={touch}>
           {/* ── BASIC INFO ── */}
 
