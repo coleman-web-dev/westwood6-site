@@ -17,6 +17,8 @@ import {
   DrawerClose,
 } from '@/components/shared/ui/drawer';
 import { toast } from 'sonner';
+import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes';
+import { UnsavedChangesDialog } from '@/components/settings/unsaved-changes-dialog';
 import { LandingPageThemePicker } from './landing-page-theme-picker';
 import { LandingPageSectionManager } from './landing-page-section-manager';
 import { LandingPageHeroEditor } from './landing-page-hero-editor';
@@ -206,15 +208,34 @@ export function LandingPageSettings() {
     return JSON.stringify(currentConfig) !== savedConfigRef.current;
   }, [currentConfig]);
 
-  // Warn on tab close / refresh when there are unsaved changes
-  useEffect(() => {
-    if (!isDirty) return;
-    function handleBeforeUnload(e: BeforeUnloadEvent) {
-      e.preventDefault();
+  const handleSave = useCallback(async () => {
+    setSaving(true);
+    const supabase = createClient();
+    const config = buildConfig();
+
+    const updatedTheme = {
+      ...community.theme,
+      landing_page: config,
+    };
+
+    const { error } = await supabase
+      .from('communities')
+      .update({ theme: updatedTheme })
+      .eq('id', community.id);
+
+    setSaving(false);
+
+    if (error) {
+      toast.error('Failed to save landing page settings.');
+      return;
     }
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [isDirty]);
+
+    savedConfigRef.current = JSON.stringify(config);
+    toast.success('Landing page saved.');
+    router.refresh();
+  }, [buildConfig, community, router]);
+
+  const unsaved = useUnsavedChanges({ isDirty, onSave: handleSave });
 
   function handleDividerPointerDown(e: React.PointerEvent) {
     e.preventDefault();
@@ -241,33 +262,6 @@ export function LandingPageSettings() {
     document.body.style.userSelect = 'none';
     document.addEventListener('pointermove', onPointerMove);
     document.addEventListener('pointerup', onPointerUp);
-  }
-
-  async function handleSave() {
-    setSaving(true);
-    const supabase = createClient();
-    const config = buildConfig();
-
-    const updatedTheme = {
-      ...community.theme,
-      landing_page: config,
-    };
-
-    const { error } = await supabase
-      .from('communities')
-      .update({ theme: updatedTheme })
-      .eq('id', community.id);
-
-    setSaving(false);
-
-    if (error) {
-      toast.error('Failed to save landing page settings.');
-      return;
-    }
-
-    savedConfigRef.current = JSON.stringify(config);
-    toast.success('Landing page saved.');
-    router.refresh();
   }
 
   const previewElement = (
@@ -617,6 +611,8 @@ export function LandingPageSettings() {
           </div>
         </DrawerContent>
       </Drawer>
+
+      <UnsavedChangesDialog {...unsaved} />
     </>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Button } from '@/components/shared/ui/button';
@@ -8,6 +8,8 @@ import { Input } from '@/components/shared/ui/input';
 import { Label } from '@/components/shared/ui/label';
 import { toast } from 'sonner';
 import { Mail, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes';
+import { UnsavedChangesDialog } from '@/components/settings/unsaved-changes-dialog';
 import type { EmailSettings } from '@/lib/types/database';
 
 interface RecentLog {
@@ -25,13 +27,19 @@ export function EmailSettingsSection() {
   const [saving, setSaving] = useState(false);
   const [recentLogs, setRecentLogs] = useState<RecentLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(true);
+  const savedReplyTo = useRef('');
+  const savedFromName = useRef('');
 
   useEffect(() => {
     if (!community) return;
 
     const settings = community.theme?.email_settings as EmailSettings | undefined;
-    setReplyTo(settings?.reply_to || '');
-    setFromName(settings?.from_name || '');
+    const r = settings?.reply_to || '';
+    const f = settings?.from_name || '';
+    setReplyTo(r);
+    setFromName(f);
+    savedReplyTo.current = r;
+    savedFromName.current = f;
 
     // Fetch recent email logs
     async function fetchLogs() {
@@ -50,7 +58,12 @@ export function EmailSettingsSection() {
     fetchLogs();
   }, [community]);
 
-  async function handleSave() {
+  const isDirty = useMemo(
+    () => replyTo !== savedReplyTo.current || fromName !== savedFromName.current,
+    [replyTo, fromName],
+  );
+
+  const handleSave = useCallback(async () => {
     if (!community) return;
 
     setSaving(true);
@@ -77,8 +90,12 @@ export function EmailSettingsSection() {
       return;
     }
 
+    savedReplyTo.current = replyTo;
+    savedFromName.current = fromName;
     toast.success('Email settings updated.');
-  }
+  }, [community, replyTo, fromName]);
+
+  const unsaved = useUnsavedChanges({ isDirty, onSave: handleSave });
 
   const statusIcon = (status: string) => {
     switch (status) {
@@ -93,6 +110,7 @@ export function EmailSettingsSection() {
   };
 
   return (
+    <>
     <div className="bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark rounded-panel p-card-padding">
       <div className="flex items-center gap-2 mb-1">
         <Mail className="h-5 w-5 text-secondary-500" />
@@ -191,5 +209,7 @@ export function EmailSettingsSection() {
         )}
       </div>
     </div>
+    <UnsavedChangesDialog {...unsaved} />
+    </>
   );
 }
