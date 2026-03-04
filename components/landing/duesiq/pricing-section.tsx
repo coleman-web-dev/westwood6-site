@@ -71,7 +71,7 @@ export function PricingSection() {
     <section id="pricing">
       <LandingPricingSection
         title="Simple, transparent pricing"
-        description="No setup fees. No long-term contracts. Your first month is free on annual plans."
+        description="No setup fees. No hidden charges. Cancel monthly anytime."
         variant="primary"
       >
         {/* Billing toggle */}
@@ -135,7 +135,7 @@ export function PricingSection() {
       </LandingPricingSection>
 
       <p className="text-center text-text-secondary-light dark:text-text-secondary-dark text-sm pb-12 -mt-8">
-        Annual plans are billed upfront with your first month free. Monthly plans can be cancelled anytime.{' '}
+        Annual plans are billed upfront. Monthly plans can be cancelled anytime.{' '}
         <a href="#demo" className="underline hover:text-secondary-400">Request a demo</a> to get started.
       </p>
     </section>
