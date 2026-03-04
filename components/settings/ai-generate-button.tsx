@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Sparkles, Loader2 } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/shared/ui/button';
 import { toast } from 'sonner';
 
@@ -23,16 +24,19 @@ export function AiGenerateButton({
   async function handleGenerate() {
     setGenerating(true);
     try {
-      const res = await fetch('/api/ai/generate-landing-content', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ field, communityName }),
-      });
+      const supabase = createClient();
+      const { data, error } = await supabase.functions.invoke(
+        'generate-landing-content',
+        { body: { field, communityName } },
+      );
 
-      const data = await res.json();
+      if (error) {
+        toast.error(error.message || 'Failed to generate content.');
+        return;
+      }
 
-      if (!res.ok) {
-        toast.error(data.error || 'Failed to generate content.');
+      if (data?.error) {
+        toast.error(data.error);
         return;
       }
 
