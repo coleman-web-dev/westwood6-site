@@ -22,18 +22,30 @@ export function LandingPageFaqEditor({ communityName, items, onChange }: FaqEdit
     setGenerating(true);
     try {
       const supabase = createClient();
-      const { data, error } = await supabase.functions.invoke(
-        'generate-landing-content',
-        { body: { field: 'faq', communityName } },
-      );
+      const { data: { session } } = await supabase.auth.getSession();
 
-      if (error) {
-        toast.error(error.message || 'Failed to generate FAQ.');
+      if (!session) {
+        toast.error('You must be logged in to generate content.');
         return;
       }
 
-      if (data?.error) {
-        toast.error(data.error);
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/generate-landing-content`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
+          },
+          body: JSON.stringify({ field: 'faq', communityName }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.error || 'Failed to generate FAQ.');
         return;
       }
 
