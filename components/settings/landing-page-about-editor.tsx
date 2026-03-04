@@ -2,8 +2,10 @@
 
 import { Input } from '@/components/shared/ui/input';
 import { Textarea } from '@/components/shared/ui/textarea';
+import { AiGenerateButton } from './ai-generate-button';
 
 interface AboutEditorProps {
+  communityName: string;
   aboutTitle: string | null;
   aboutBody: string | null;
   onTitleChange: (val: string | null) => void;
@@ -11,6 +13,7 @@ interface AboutEditorProps {
 }
 
 export function LandingPageAboutEditor({
+  communityName,
   aboutTitle,
   aboutBody,
   onTitleChange,
@@ -19,9 +22,16 @@ export function LandingPageAboutEditor({
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
-        <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-          Section Title
-        </label>
+        <div className="flex items-center justify-between">
+          <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+            Section Title
+          </label>
+          <AiGenerateButton
+            field="about_title"
+            communityName={communityName}
+            onGenerated={(text) => onTitleChange(text)}
+          />
+        </div>
         <Input
           placeholder="About Our Community"
           value={aboutTitle || ''}
@@ -30,9 +40,16 @@ export function LandingPageAboutEditor({
         />
       </div>
       <div className="space-y-1.5">
-        <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-          Description
-        </label>
+        <div className="flex items-center justify-between">
+          <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+            Description
+          </label>
+          <AiGenerateButton
+            field="about_body"
+            communityName={communityName}
+            onGenerated={(text) => onBodyChange(text)}
+          />
+        </div>
         <Textarea
           placeholder="Tell visitors about your community..."
           value={aboutBody || ''}

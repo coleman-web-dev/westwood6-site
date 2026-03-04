@@ -37,13 +37,17 @@ export function LandingPageGalleryEditor({
         continue;
       }
 
-      const path = `${communityId}/landing/${Date.now()}_${file.name}`;
+      const safeName = file.name
+        .replace(/[^a-zA-Z0-9._-]/g, '-')
+        .replace(/-+/g, '-');
+      const path = `${communityId}/landing/${Date.now()}_${safeName}`;
       const { error } = await supabase.storage
         .from('community-assets')
-        .upload(path, file);
+        .upload(path, file, { contentType: file.type, upsert: false });
 
       if (error) {
-        toast.error(`Failed to upload ${file.name}.`);
+        console.error('Gallery upload error:', error);
+        toast.error(error.message || `Failed to upload ${file.name}.`);
         continue;
       }
 

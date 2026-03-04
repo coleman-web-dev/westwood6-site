@@ -10,6 +10,7 @@ import { StepImportUnits } from './step-import-units';
 import { StepImportMembers } from './step-import-members';
 import { StepAssessmentConfig } from './step-assessment-config';
 import { StepSendInvites } from './step-send-invites';
+import { StepLandingPage } from './step-landing-page';
 
 const STEPS = [
   { key: 'info', label: 'Community Info' },
@@ -17,6 +18,7 @@ const STEPS = [
   { key: 'members', label: 'Import Members' },
   { key: 'assessments', label: 'Assessments' },
   { key: 'invites', label: 'Send Invites' },
+  { key: 'landing', label: 'Landing Page' },
 ] as const;
 
 type StepKey = (typeof STEPS)[number]['key'];
@@ -104,7 +106,9 @@ export function OnboardingWizard() {
       case 3:
         return <StepAssessmentConfig onNext={handleNext} onBack={goBack} />;
       case 4:
-        return <StepSendInvites onBack={goBack} />;
+        return <StepSendInvites onNext={handleNext} onBack={goBack} />;
+      case 5:
+        return <StepLandingPage onBack={goBack} />;
       default:
         return null;
     }

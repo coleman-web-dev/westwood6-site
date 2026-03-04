@@ -1,5 +1,6 @@
 'use client';
 
+import { useSearchParams } from 'next/navigation';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/shared/ui/tabs';
 import { ProfileSettings } from '@/components/settings/profile-settings';
@@ -9,6 +10,9 @@ import { LandingPageSettings } from '@/components/settings/landing-page-settings
 
 export default function SettingsPage() {
   const { isBoard } = useCommunity();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const defaultTab = isBoard && tabParam === 'landing' ? 'landing' : 'profile';
 
   return (
     <div className="space-y-6">
@@ -16,7 +20,7 @@ export default function SettingsPage() {
         Settings
       </h1>
 
-      <Tabs defaultValue="profile">
+      <Tabs defaultValue={defaultTab}>
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>
           {isBoard && <TabsTrigger value="community">Community</TabsTrigger>}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Eye, ExternalLink, GripVertical } from 'lucide-react';
+import { Eye, ExternalLink, GripVertical, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Button } from '@/components/shared/ui/button';
@@ -24,6 +24,7 @@ import { LandingPageLinksEditor } from './landing-page-links-editor';
 import { LandingPageGalleryEditor } from './landing-page-gallery-editor';
 import { LandingPageFaqEditor } from './landing-page-faq-editor';
 import { LandingPagePreview } from './landing-page-preview';
+import { AiGenerateButton } from './ai-generate-button';
 import { DEFAULT_LANDING_CONFIG } from '@/lib/types/landing';
 import type {
   LandingPageConfig,
@@ -264,6 +265,7 @@ export function LandingPageSettings() {
           <Section title="Hero Banner" description="Customize the hero area at the top of the page.">
             <LandingPageHeroEditor
               communityId={community.id}
+              communityName={community.name}
               heroImageUrl={heroImageUrl}
               heroHeadline={heroHeadline}
               heroSubheadline={heroSubheadline}
@@ -276,6 +278,7 @@ export function LandingPageSettings() {
           {/* About */}
           <Section title="About" description="Introduce your community to visitors.">
             <LandingPageAboutEditor
+              communityName={community.name}
               aboutTitle={aboutTitle}
               aboutBody={aboutBody}
               onTitleChange={setAboutTitle}
@@ -290,9 +293,16 @@ export function LandingPageSettings() {
           >
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-                  Section Title
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                    Section Title
+                  </label>
+                  <AiGenerateButton
+                    field="board_members_title"
+                    communityName={community.name}
+                    onGenerated={(text) => setBoardMembersTitle(text)}
+                  />
+                </div>
                 <Input
                   placeholder="Board of Directors"
                   value={boardMembersTitle || ''}
@@ -336,9 +346,16 @@ export function LandingPageSettings() {
             description="Active amenities are shown automatically."
           >
             <div className="space-y-1.5">
-              <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-                Section Title
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                  Section Title
+                </label>
+                <AiGenerateButton
+                  field="amenities_title"
+                  communityName={community.name}
+                  onGenerated={(text) => setAmenitiesTitle(text)}
+                />
+              </div>
               <Input
                 placeholder="Community Amenities"
                 value={amenitiesTitle || ''}
@@ -360,6 +377,7 @@ export function LandingPageSettings() {
           {/* FAQ */}
           <Section title="FAQ" description="Add frequently asked questions.">
             <LandingPageFaqEditor
+              communityName={community.name}
               items={faqItems}
               onChange={setFaqItems}
             />
@@ -372,9 +390,16 @@ export function LandingPageSettings() {
           >
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-                  Section Title
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                    Section Title
+                  </label>
+                  <AiGenerateButton
+                    field="announcements_title"
+                    communityName={community.name}
+                    onGenerated={(text) => setAnnouncementsTitle(text)}
+                  />
+                </div>
                 <Input
                   placeholder="Community Updates"
                   value={announcementsTitle || ''}
@@ -401,9 +426,16 @@ export function LandingPageSettings() {
           <Section title="Contact" description="Customize the contact section. Email, phone, and address come from Community settings.">
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-                  Section Title
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                    Section Title
+                  </label>
+                  <AiGenerateButton
+                    field="contact_title"
+                    communityName={community.name}
+                    onGenerated={(text) => setContactTitle(text)}
+                  />
+                </div>
                 <Input
                   placeholder="Contact Us"
                   value={contactTitle || ''}
@@ -412,9 +444,16 @@ export function LandingPageSettings() {
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-                  Additional Text
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                    Additional Text
+                  </label>
+                  <AiGenerateButton
+                    field="contact_body"
+                    communityName={community.name}
+                    onGenerated={(text) => setContactBody(text)}
+                  />
+                </div>
                 <Textarea
                   placeholder="Office hours, mailing address, etc."
                   value={contactBody || ''}
@@ -428,12 +467,40 @@ export function LandingPageSettings() {
 
           {/* Footer */}
           <Section title="Footer" description="Optional footer text at the bottom of the page.">
-            <Input
-              placeholder="&copy; 2026 Your Community HOA"
-              value={footerText || ''}
-              onChange={(e) => setFooterText(e.target.value || null)}
-              maxLength={200}
-            />
+            <div className="space-y-2">
+              <div className="relative">
+                <Input
+                  placeholder="© 2026 Your Community HOA"
+                  value={footerText || ''}
+                  onChange={(e) => setFooterText(e.target.value || null)}
+                  maxLength={200}
+                  className={footerText ? 'pr-8' : ''}
+                />
+                {footerText && (
+                  <button
+                    type="button"
+                    onClick={() => setFooterText(null)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted-light dark:text-text-muted-dark hover:text-text-primary-light dark:hover:text-text-primary-dark"
+                    title="Clear footer text"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              {!footerText && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setFooterText(
+                      `\u00A9 ${new Date().getFullYear()} ${community.name}. All rights reserved.`,
+                    )
+                  }
+                >
+                  Insert copyright notice
+                </Button>
+              )}
+            </div>
           </Section>
 
           {/* Actions */}

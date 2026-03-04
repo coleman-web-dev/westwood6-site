@@ -5,10 +5,12 @@ import { Upload, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/shared/ui/button';
 import { Input } from '@/components/shared/ui/input';
+import { AiGenerateButton } from './ai-generate-button';
 import { toast } from 'sonner';
 
 interface HeroEditorProps {
   communityId: string;
+  communityName: string;
   heroImageUrl: string | null;
   heroHeadline: string | null;
   heroSubheadline: string | null;
@@ -19,6 +21,7 @@ interface HeroEditorProps {
 
 export function LandingPageHeroEditor({
   communityId,
+  communityName,
   heroImageUrl,
   heroHeadline,
   heroSubheadline,
@@ -45,15 +48,20 @@ export function LandingPageHeroEditor({
 
     setUploading(true);
     const supabase = createClient();
-    const path = `${communityId}/landing/${Date.now()}_${file.name}`;
+    const safeName = file.name
+      .replace(/[^a-zA-Z0-9._-]/g, '-')
+      .replace(/-+/g, '-');
+    const path = `${communityId}/landing/${Date.now()}_${safeName}`;
 
     const { error } = await supabase.storage
       .from('community-assets')
-      .upload(path, file);
+      .upload(path, file, { contentType: file.type, upsert: false });
 
     if (error) {
-      toast.error('Failed to upload image.');
+      console.error('Hero image upload error:', error);
+      toast.error(error.message || 'Failed to upload image.');
       setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
       return;
     }
 
@@ -63,6 +71,7 @@ export function LandingPageHeroEditor({
 
     onImageChange(urlData.publicUrl);
     setUploading(false);
+    if (fileRef.current) fileRef.current.value = '';
     toast.success('Hero image uploaded.');
   }
 
@@ -117,9 +126,16 @@ export function LandingPageHeroEditor({
 
       {/* Headline */}
       <div className="space-y-1.5">
-        <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-          Headline
-        </label>
+        <div className="flex items-center justify-between">
+          <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+            Headline
+          </label>
+          <AiGenerateButton
+            field="hero_headline"
+            communityName={communityName}
+            onGenerated={(text) => onHeadlineChange(text)}
+          />
+        </div>
         <Input
           placeholder="Welcome to our community"
           value={heroHeadline || ''}
@@ -133,9 +149,16 @@ export function LandingPageHeroEditor({
 
       {/* Subheadline */}
       <div className="space-y-1.5">
-        <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-          Subheadline
-        </label>
+        <div className="flex items-center justify-between">
+          <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+            Subheadline
+          </label>
+          <AiGenerateButton
+            field="hero_subheadline"
+            communityName={communityName}
+            onGenerated={(text) => onSubheadlineChange(text)}
+          />
+        </div>
         <Input
           placeholder="A brief welcome message"
           value={heroSubheadline || ''}

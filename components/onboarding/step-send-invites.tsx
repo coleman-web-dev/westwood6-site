@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/shared/ui/button';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
@@ -16,9 +15,14 @@ interface InvitableMember {
   email: string;
 }
 
-export function StepSendInvites({ onBack }: { onBack: () => void }) {
+export function StepSendInvites({
+  onNext,
+  onBack,
+}: {
+  onNext: () => void;
+  onBack: () => void;
+}) {
   const { community } = useCommunity();
-  const router = useRouter();
   const [members, setMembers] = useState<InvitableMember[]>([]);
   const [signedUpCount, setSignedUpCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -146,10 +150,6 @@ export function StepSendInvites({ onBack }: { onBack: () => void }) {
     },
     [community.slug],
   );
-
-  function handleComplete() {
-    router.push(`/${community.slug}/dashboard`);
-  }
 
   return (
     <div className="bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark rounded-panel p-card-padding">
@@ -284,8 +284,8 @@ export function StepSendInvites({ onBack }: { onBack: () => void }) {
           Back
         </Button>
 
-        <Button type="button" onClick={handleComplete}>
-          Complete Setup
+        <Button type="button" onClick={onNext}>
+          Next
         </Button>
       </div>
     </div>
