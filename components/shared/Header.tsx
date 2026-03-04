@@ -1,6 +1,6 @@
 import { LandingHeader, LandingHeaderMenuItem } from '@/components/landing';
 import ThemeSwitch from '@/components/shared/ThemeSwitch';
-import Image from 'next/image';
+import Link from 'next/link';
 
 export const Header = ({ className }: { className?: string }) => {
   return (
@@ -10,28 +10,22 @@ export const Header = ({ className }: { className?: string }) => {
       withBackground
       variant="primary"
       logoComponent={
-        <div className="flex items-center text-primary-500 dark:text-primary-500 gap-3">
-          <Image
-            src="/static/images/logo.png"
-            alt="Mevolut logo"
-            width={200}
-            height={200}
-            className="h-8 w-8 rounded-full"
-          />
-          <span className="font-bold text-lg">Mevolut</span>
-        </div>
+        <Link
+          href="/"
+          className="flex items-center text-primary-900 dark:text-primary-100 gap-2"
+        >
+          <span className="font-bold text-lg tracking-tight">DuesIQ</span>
+        </Link>
       }
     >
-      <LandingHeaderMenuItem href="/features">
-        {'Features'}
+      <LandingHeaderMenuItem href="#features">
+        Features
       </LandingHeaderMenuItem>
-      <LandingHeaderMenuItem href="/pricing">{'Pricing'}</LandingHeaderMenuItem>
-      <LandingHeaderMenuItem href="/security">
-        {'Security'}
-      </LandingHeaderMenuItem>
-      <LandingHeaderMenuItem href="/help">{'Help'}</LandingHeaderMenuItem>
-      <LandingHeaderMenuItem type="button" href="/dashboard">
-        Dashboard
+      <LandingHeaderMenuItem href="#pricing">Pricing</LandingHeaderMenuItem>
+      <LandingHeaderMenuItem href="#faq">FAQ</LandingHeaderMenuItem>
+      <LandingHeaderMenuItem href="/login">Log In</LandingHeaderMenuItem>
+      <LandingHeaderMenuItem type="button" href="#demo">
+        Request a Demo
       </LandingHeaderMenuItem>
 
       <ThemeSwitch />

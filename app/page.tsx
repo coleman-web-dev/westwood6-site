@@ -1,5 +1,16 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { Header } from '@/components/shared/Header';
+import { Footer } from '@/components/shared/Footer';
+import { HeroSection } from '@/components/landing/duesiq/hero-section';
+import { PainPointsSection } from '@/components/landing/duesiq/pain-points-section';
+import { FeaturesSection } from '@/components/landing/duesiq/features-section';
+import { HowItWorksSection } from '@/components/landing/duesiq/how-it-works-section';
+import { StatsSection } from '@/components/landing/duesiq/stats-section';
+import { PricingSection } from '@/components/landing/duesiq/pricing-section';
+import { TestimonialsSection } from '@/components/landing/duesiq/testimonials-section';
+import { FaqSection } from '@/components/landing/duesiq/faq-section';
+import { DemoRequestSection } from '@/components/landing/duesiq/demo-request-section';
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -8,7 +19,6 @@ export default async function HomePage() {
   } = await supabase.auth.getUser();
 
   if (user) {
-    // Redirect logged-in users to their community dashboard
     const { data: member } = await supabase
       .from('members')
       .select('community_id')
@@ -29,6 +39,21 @@ export default async function HomePage() {
     }
   }
 
-  // Not logged in or no approved membership
-  redirect('/login');
+  return (
+    <div className="flex flex-col min-h-screen">
+      <Header />
+      <main className="flex-1">
+        <HeroSection />
+        <PainPointsSection />
+        <FeaturesSection />
+        <HowItWorksSection />
+        <StatsSection />
+        <PricingSection />
+        <TestimonialsSection />
+        <FaqSection />
+        <DemoRequestSection />
+      </main>
+      <Footer />
+    </div>
+  );
 }

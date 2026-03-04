@@ -1,0 +1,57 @@
+'use client';
+
+import {
+  LandingPrimaryImageCtaSection,
+  LandingLeadingPill,
+  LandingFlickeringGridCtaBg,
+} from '@/components/landing';
+import { Button } from '@/components/shared/ui/button';
+
+export function HeroSection() {
+  return (
+    <LandingPrimaryImageCtaSection
+      title="Dues collection, accounting, and community management. All in one place."
+      description="Stop chasing payments and juggling spreadsheets. DuesIQ gives your HOA board a single platform to manage finances, communications, amenities, and more."
+      leadingComponent={
+        <LandingLeadingPill
+          text="Built for self-managed HOAs"
+          textVariant="primary"
+          borderVariant="primary"
+        />
+      }
+      footerComponent={
+        <div className="flex flex-wrap gap-3 mt-2">
+          <Button
+            size="lg"
+            asChild
+          >
+            <a href="#demo">Request a Demo</a>
+          </Button>
+          <Button
+            variant="outline"
+            size="lg"
+            asChild
+          >
+            <a href="#pricing">See Pricing</a>
+          </Button>
+        </div>
+      }
+      imageSrc="/static/images/dashboard-preview.png"
+      imageAlt="DuesIQ dashboard preview"
+      imagePerspective="right"
+      imageShadow="soft"
+      imagePosition="right"
+      textPosition="left"
+      withBackground
+      withBackgroundGlow
+      variant="primary"
+      effectComponent={
+        <LandingFlickeringGridCtaBg
+          variant="primary"
+          maxOpacity={0.15}
+          flickerChance={0.05}
+        />
+      }
+    />
+  );
+}
