@@ -1,71 +1,121 @@
 'use client';
 
+import { useState } from 'react';
 import {
   LandingPricingSection,
   LandingPricingPlan,
 } from '@/components/landing';
 
+const plans = [
+  {
+    title: 'Essentials',
+    description: 'For small communities getting started',
+    annual: 89,
+    monthly: 109,
+    href: '#demo',
+    ctaText: 'Request a Demo',
+    highlighted: false,
+    features: [
+      'Up to 100 units',
+      'Dues collection & auto-invoicing',
+      'Stripe payment processing',
+      'Homeowner portal',
+      'Announcements & documents',
+      'Email notifications',
+      'Basic financial reports',
+    ],
+  },
+  {
+    title: 'Professional',
+    description: 'For growing communities that need more',
+    annual: 179,
+    monthly: 219,
+    href: '#demo',
+    ctaText: 'Request a Demo',
+    highlighted: true,
+    features: [
+      'Up to 350 units',
+      'Everything in Essentials',
+      'Amenity reservations & agreements',
+      'Voting & ballots with proxy support',
+      'Maintenance request tracking',
+      'Late fee automation',
+      'Violations & ARC tracking',
+      'Bulk email communications',
+    ],
+  },
+  {
+    title: 'Professional + Accounting',
+    description: 'Full financial management suite',
+    annual: 249,
+    monthly: 299,
+    href: '#demo',
+    ctaText: 'Request a Demo',
+    highlighted: true,
+    features: [
+      'Up to 350 units',
+      'Everything in Professional',
+      'Double-entry general ledger',
+      'Bank reconciliation (Plaid)',
+      'Auto-categorization rules',
+      'Balance sheet & income statement',
+      'Budget tracking & vendor management',
+    ],
+  },
+];
+
 export function PricingSection() {
+  const [billing, setBilling] = useState<'annual' | 'monthly'>('annual');
+
   return (
     <section id="pricing">
       <LandingPricingSection
         title="Simple, transparent pricing"
-        description="No setup fees. No hidden charges. Cancel anytime."
+        description="No setup fees. No long-term contracts. Your first month is free on annual plans."
         variant="primary"
       >
-        <LandingPricingPlan
-          title="Essentials"
-          description="For small communities getting started"
-          price="$79"
-          priceSuffix="/month"
-          href="#demo"
-          ctaText="Request a Demo"
-        >
-          <p>Up to 75 units</p>
-          <p>Dues collection & auto-invoicing</p>
-          <p>Stripe payment processing</p>
-          <p>Homeowner portal</p>
-          <p>Announcements & documents</p>
-          <p>Email notifications</p>
-          <p>Basic financial reports</p>
-        </LandingPricingPlan>
+        {/* Billing toggle */}
+        <div className="w-full flex justify-center -mt-4 mb-4">
+          <div className="inline-flex items-center gap-1 rounded-full bg-primary-100/30 dark:bg-primary-900/30 p-1">
+            <button
+              onClick={() => setBilling('annual')}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                billing === 'annual'
+                  ? 'bg-white dark:bg-gray-800 shadow-sm text-gray-900 dark:text-gray-100'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              }`}
+            >
+              Annual <span className="text-xs text-secondary-400 font-semibold ml-1">Save 20%</span>
+            </button>
+            <button
+              onClick={() => setBilling('monthly')}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                billing === 'monthly'
+                  ? 'bg-white dark:bg-gray-800 shadow-sm text-gray-900 dark:text-gray-100'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              }`}
+            >
+              Monthly
+            </button>
+          </div>
+        </div>
 
-        <LandingPricingPlan
-          title="Professional"
-          description="For growing communities that need more"
-          price="$149"
-          priceSuffix="/month"
-          href="#demo"
-          ctaText="Request a Demo"
-          highlighted
-        >
-          <p>Up to 250 units</p>
-          <p>Everything in Essentials</p>
-          <p>Amenity reservations & agreements</p>
-          <p>Voting & ballots with proxy support</p>
-          <p>Maintenance request tracking</p>
-          <p>Late fee automation</p>
-          <p>Violations & ARC tracking</p>
-          <p>Bulk email communications</p>
-        </LandingPricingPlan>
-
-        <LandingPricingPlan
-          title="Professional + Accounting"
-          description="Full financial management suite"
-          price="$249"
-          priceSuffix="/month"
-          href="#demo"
-          ctaText="Request a Demo"
-          highlighted
-        >
-          <p>Up to 500 units</p>
-          <p>Everything in Professional</p>
-          <p>Double-entry general ledger</p>
-          <p>Bank reconciliation (Plaid)</p>
-          <p>Auto-categorization rules</p>
-          <p>Balance sheet & income statement</p>
-          <p>Budget tracking & vendor management</p>
-        </LandingPricingPlan>
+        {plans.map((plan) => (
+          <LandingPricingPlan
+            key={plan.title}
+            title={plan.title}
+            description={plan.description}
+            price={`$${billing === 'annual' ? plan.annual : plan.monthly}`}
+            priceSuffix="/month"
+            href={plan.href}
+            ctaText={plan.ctaText}
+            highlighted={plan.highlighted}
+          >
+            {plan.features.map((feature) => (
+              <p key={feature}>{feature}</p>
+            ))}
+          </LandingPricingPlan>
+        ))}
 
         <LandingPricingPlan
           title="Enterprise"
@@ -76,7 +126,7 @@ export function PricingSection() {
           ctaText="Contact Us"
           highlighted
         >
-          <p>500+ units</p>
+          <p>350+ units</p>
           <p>Everything in Professional + Accounting</p>
           <p>Multi-community management</p>
           <p>Custom reporting</p>
@@ -85,7 +135,8 @@ export function PricingSection() {
       </LandingPricingSection>
 
       <p className="text-center text-text-secondary-light dark:text-text-secondary-dark text-sm pb-12 -mt-8">
-        All plans include a free onboarding call. <a href="#demo" className="underline hover:text-secondary-400">Request a demo</a> to get started.
+        Annual plans are billed upfront with your first month free. Monthly plans can be cancelled anytime.{' '}
+        <a href="#demo" className="underline hover:text-secondary-400">Request a demo</a> to get started.
       </p>
     </section>
   );
