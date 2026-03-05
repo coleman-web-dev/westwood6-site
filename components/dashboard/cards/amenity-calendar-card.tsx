@@ -230,11 +230,11 @@ export function AmenityCalendarCard() {
                 numberOfMonths={showTwoMonths ? 2 : 1}
                 navLayout="around"
                 classNames={{
-                  months: showTwoMonths ? 'flex flex-row gap-4' : undefined,
-                  month: 'flex flex-col [&>button]:absolute [&>button:first-of-type]:left-1 [&>button:last-of-type]:right-1 [&>button]:top-1 relative',
-                  month_caption: 'flex justify-center py-1 relative items-center',
-                  button_previous: 'absolute left-1 top-1 z-10 inline-flex items-center justify-center h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 rounded-md border border-input',
-                  button_next: 'absolute right-1 top-1 z-10 inline-flex items-center justify-center h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 rounded-md border border-input',
+                  months: `relative flex ${showTwoMonths ? 'flex-row gap-4' : 'flex-col'}`,
+                  month: 'space-y-3',
+                  month_caption: 'flex justify-center pt-1 pb-2 items-center',
+                  button_previous: '!absolute left-0 top-0 z-10 inline-flex items-center justify-center h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 rounded-md border border-input',
+                  button_next: '!absolute right-0 top-0 z-10 inline-flex items-center justify-center h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 rounded-md border border-input',
                 }}
                 mode="single"
                 onSelect={(date) => {
