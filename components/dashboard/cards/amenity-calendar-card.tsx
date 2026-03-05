@@ -7,6 +7,7 @@ import {
   startOfMonth,
   endOfMonth,
   addMonths,
+  subMonths,
   startOfDay,
   isSameDay,
   eachDayOfInterval,
@@ -38,6 +39,7 @@ export function AmenityCalendarCard() {
 
   const calendarContainerRef = useRef<HTMLDivElement>(null);
   const [showTwoMonths, setShowTwoMonths] = useState(true);
+  const [displayMonth, setDisplayMonth] = useState(startOfMonth(new Date()));
 
   // Observe container width to decide 1 vs 2 months
   useEffect(() => {
@@ -170,9 +172,20 @@ export function AmenityCalendarCard() {
   }
 
   function handleMonthChange(month: Date) {
+    setDisplayMonth(startOfMonth(month));
     if (selectedAmenity) {
       fetchBlockedDates(selectedAmenity.id, month);
     }
+  }
+
+  function handlePrevMonth() {
+    const prev = subMonths(displayMonth, showTwoMonths ? 2 : 1);
+    handleMonthChange(prev);
+  }
+
+  function handleNextMonth() {
+    const next = addMonths(displayMonth, showTwoMonths ? 2 : 1);
+    handleMonthChange(next);
   }
 
   const amenitiesHref = `/${community.slug}/amenities`;
@@ -218,7 +231,7 @@ export function AmenityCalendarCard() {
 
           {/* Calendar */}
           {selectedAmenity && (
-            <div ref={calendarContainerRef} className="relative flex-1 min-h-0 flex items-start justify-center">
+            <div ref={calendarContainerRef} className="relative flex-1 min-h-0 flex flex-col items-center">
               {calendarLoading && (
                 <div className="absolute inset-0 bg-surface-light/60 dark:bg-surface-dark/60 z-10 flex items-center justify-center rounded-inner-card">
                   <div className="animate-pulse text-body text-text-muted-light dark:text-text-muted-dark">
@@ -226,15 +239,36 @@ export function AmenityCalendarCard() {
                   </div>
                 </div>
               )}
+              {/* Custom month nav header */}
+              <div className="flex items-center justify-between w-full px-1 mb-1">
+                <button
+                  onClick={handlePrevMonth}
+                  className="p-1 rounded-md text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors"
+                >
+                  <ChevronLeftIcon className="w-4 h-4" />
+                </button>
+                <span className="text-sm font-medium text-text-primary-light dark:text-text-primary-dark">
+                  {format(displayMonth, 'MMMM yyyy')}
+                  {showTwoMonths && (
+                    <span className="mx-3 text-text-muted-light dark:text-text-muted-dark">/</span>
+                  )}
+                  {showTwoMonths && format(addMonths(displayMonth, 1), 'MMMM yyyy')}
+                </span>
+                <button
+                  onClick={handleNextMonth}
+                  className="p-1 rounded-md text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors"
+                >
+                  <ChevronRightIcon className="w-4 h-4" />
+                </button>
+              </div>
               <Calendar
                 numberOfMonths={showTwoMonths ? 2 : 1}
-                navLayout="around"
+                month={displayMonth}
+                hideNavigation
                 classNames={{
-                  months: `relative flex ${showTwoMonths ? 'flex-row gap-4' : 'flex-col'}`,
+                  months: `flex ${showTwoMonths ? 'flex-row gap-4' : 'flex-col'}`,
                   month: 'space-y-3',
-                  month_caption: 'flex justify-center pt-1 pb-2 items-center',
-                  button_previous: '!absolute left-0 top-0 z-10 inline-flex items-center justify-center h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 rounded-md border border-input',
-                  button_next: '!absolute right-0 top-0 z-10 inline-flex items-center justify-center h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 rounded-md border border-input',
+                  month_caption: 'hidden',
                 }}
                 mode="single"
                 onSelect={(date) => {
