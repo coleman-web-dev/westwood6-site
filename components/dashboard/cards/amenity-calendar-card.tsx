@@ -40,6 +40,7 @@ export function AmenityCalendarCard() {
   const [showTwoMonths, setShowTwoMonths] = useState(false);
 
   // Observe container width to decide 1 vs 2 months
+  // Re-run when loading finishes so the ref is attached
   useEffect(() => {
     const el = calendarContainerRef.current;
     if (!el) return;
@@ -50,7 +51,7 @@ export function AmenityCalendarCard() {
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [loading, selectedAmenity]);
 
   const selectedAmenity = amenities[selectedIndex] ?? null;
 
