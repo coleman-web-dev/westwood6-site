@@ -7,6 +7,7 @@ import {
   startOfMonth,
   endOfMonth,
   addMonths,
+  subMonths,
   startOfDay,
   isSameDay,
   eachDayOfInterval,
@@ -166,14 +167,25 @@ export function AmenityCalendarCard() {
     return matchers;
   }, [today, blockedDays, selectedAmenity]);
 
+  const [displayMonth, setDisplayMonth] = useState(startOfMonth(new Date()));
+
   function handleDateSelect() {
     router.push(`/${community.slug}/amenities`);
   }
 
   function handleMonthChange(month: Date) {
+    setDisplayMonth(startOfMonth(month));
     if (selectedAmenity) {
       fetchBlockedDates(selectedAmenity.id, month);
     }
+  }
+
+  function handlePrevMonth() {
+    handleMonthChange(subMonths(displayMonth, 1));
+  }
+
+  function handleNextMonth() {
+    handleMonthChange(addMonths(displayMonth, 1));
   }
 
   const amenitiesHref = `/${community.slug}/amenities`;
@@ -219,7 +231,7 @@ export function AmenityCalendarCard() {
 
           {/* Calendar */}
           {selectedAmenity && (
-            <div className="relative flex-1 min-h-0 flex items-start justify-center">
+            <div className="relative flex-1 min-h-0">
               {calendarLoading && (
                 <div className="absolute inset-0 bg-surface-light/60 dark:bg-surface-dark/60 z-10 flex items-center justify-center rounded-inner-card">
                   <div className="animate-pulse text-body text-text-muted-light dark:text-text-muted-dark">
@@ -227,68 +239,102 @@ export function AmenityCalendarCard() {
                   </div>
                 </div>
               )}
-              <Calendar
-                numberOfMonths={showTwoMonths ? 2 : 1}
-                mode="single"
-                onSelect={(date) => {
-                  if (date) handleDateSelect();
-                }}
-                onMonthChange={handleMonthChange}
-                disabled={disabledDates}
-                modifiers={{
-                  blocked: selectedAmenity.booking_type === 'full_day' ? blockedDays : [],
-                  partiallyBooked: selectedAmenity.booking_type !== 'full_day' ? partialDays : [],
-                  hasEvent: eventDays,
-                }}
-                modifiersClassNames={{
-                  blocked:
-                    '!bg-primary-200 dark:!bg-primary-700/50 !text-text-muted-light dark:!text-text-muted-dark !cursor-not-allowed',
-                  partiallyBooked:
-                    'bg-secondary-100 dark:bg-secondary-900/30 border border-secondary-300/50 dark:border-secondary-700/50',
-                  hasEvent: 'bg-mint/20 dark:bg-mint/10',
-                }}
-                components={{
-                  DayButton: ({ day, ...buttonProps }) => {
-                    const dateKey = format(day.date, 'yyyy-MM-dd');
-                    const dayEvents = eventByDate.get(dateKey);
+              {/* Custom month nav: < March  April > */}
+              <div className="flex items-center mb-2">
+                <button
+                  onClick={handlePrevMonth}
+                  className="p-1.5 rounded-md text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors shrink-0"
+                >
+                  <ChevronLeftIcon className="w-4 h-4" />
+                </button>
+                <div className={`flex-1 flex ${showTwoMonths ? 'flex-row' : 'justify-center'}`}>
+                  <span className={`text-sm font-medium text-text-primary-light dark:text-text-primary-dark ${showTwoMonths ? 'flex-1 text-center' : ''}`}>
+                    {format(displayMonth, 'MMMM yyyy')}
+                  </span>
+                  {showTwoMonths && (
+                    <span className="flex-1 text-center text-sm font-medium text-text-primary-light dark:text-text-primary-dark">
+                      {format(addMonths(displayMonth, 1), 'MMMM yyyy')}
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={handleNextMonth}
+                  className="p-1.5 rounded-md text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors shrink-0"
+                >
+                  <ChevronRightIcon className="w-4 h-4" />
+                </button>
+              </div>
+              {/* Calendar grid(s) */}
+              <div className="flex justify-center">
+                <Calendar
+                  numberOfMonths={showTwoMonths ? 2 : 1}
+                  month={displayMonth}
+                  hideNavigation
+                  classNames={{
+                    months: `flex ${showTwoMonths ? 'flex-row gap-6' : ''}`,
+                    month_caption: 'hidden',
+                  }}
+                  mode="single"
+                  onSelect={(date) => {
+                    if (date) handleDateSelect();
+                  }}
+                  onMonthChange={handleMonthChange}
+                  disabled={disabledDates}
+                  modifiers={{
+                    blocked: selectedAmenity.booking_type === 'full_day' ? blockedDays : [],
+                    partiallyBooked: selectedAmenity.booking_type !== 'full_day' ? partialDays : [],
+                    hasEvent: eventDays,
+                  }}
+                  modifiersClassNames={{
+                    blocked:
+                      '!bg-primary-200 dark:!bg-primary-700/50 !text-text-muted-light dark:!text-text-muted-dark !cursor-not-allowed',
+                    partiallyBooked:
+                      'bg-secondary-100 dark:bg-secondary-900/30 border border-secondary-300/50 dark:border-secondary-700/50',
+                    hasEvent: 'bg-mint/20 dark:bg-mint/10',
+                  }}
+                  components={{
+                    DayButton: ({ day, ...buttonProps }) => {
+                      const dateKey = format(day.date, 'yyyy-MM-dd');
+                      const dayEvents = eventByDate.get(dateKey);
 
-                    if (dayEvents && dayEvents.length > 0) {
-                      return (
-                        <HoverCard openDelay={200} closeDelay={100}>
-                          <HoverCardTrigger asChild>
-                            <button {...buttonProps} />
-                          </HoverCardTrigger>
-                          <HoverCardContent side="top" className="w-56 p-3">
-                            <div className="space-y-2">
-                              {dayEvents.map((evt, i) => (
-                                <div key={i}>
-                                  <div className="flex items-center gap-1.5">
-                                    <CalendarDays className="h-3.5 w-3.5 text-mint shrink-0" />
-                                    <p className="text-label text-text-primary-light dark:text-text-primary-dark leading-tight">
-                                      {evt.title}
+                      if (dayEvents && dayEvents.length > 0) {
+                        return (
+                          <HoverCard openDelay={200} closeDelay={100}>
+                            <HoverCardTrigger asChild>
+                              <button {...buttonProps} />
+                            </HoverCardTrigger>
+                            <HoverCardContent side="top" className="w-56 p-3">
+                              <div className="space-y-2">
+                                {dayEvents.map((evt, i) => (
+                                  <div key={i}>
+                                    <div className="flex items-center gap-1.5">
+                                      <CalendarDays className="h-3.5 w-3.5 text-mint shrink-0" />
+                                      <p className="text-label text-text-primary-light dark:text-text-primary-dark leading-tight">
+                                        {evt.title}
+                                      </p>
+                                    </div>
+                                    <p className="text-meta text-text-muted-light dark:text-text-muted-dark mt-0.5 ml-5">
+                                      {format(new Date(evt.start), 'h:mm a')} &ndash; {format(new Date(evt.end), 'h:mm a')}
                                     </p>
+                                    {evt.description && (
+                                      <p className="text-meta text-text-secondary-light dark:text-text-secondary-dark mt-1 ml-5 line-clamp-3">
+                                        {evt.description}
+                                      </p>
+                                    )}
                                   </div>
-                                  <p className="text-meta text-text-muted-light dark:text-text-muted-dark mt-0.5 ml-5">
-                                    {format(new Date(evt.start), 'h:mm a')} &ndash; {format(new Date(evt.end), 'h:mm a')}
-                                  </p>
-                                  {evt.description && (
-                                    <p className="text-meta text-text-secondary-light dark:text-text-secondary-dark mt-1 ml-5 line-clamp-3">
-                                      {evt.description}
-                                    </p>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </HoverCardContent>
-                        </HoverCard>
-                      );
-                    }
+                                ))}
+                              </div>
+                            </HoverCardContent>
+                          </HoverCard>
+                        );
+                      }
 
-                    return <button {...buttonProps} />;
-                  },
-                }}
-                className="rounded-inner-card border border-stroke-light dark:border-stroke-dark"
-              />
+                      return <button {...buttonProps} />;
+                    },
+                  }}
+                  className="rounded-inner-card border border-stroke-light dark:border-stroke-dark"
+                />
+              </div>
             </div>
           )}
 
