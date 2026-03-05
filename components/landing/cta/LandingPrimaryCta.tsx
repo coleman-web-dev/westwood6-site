@@ -226,7 +226,7 @@ export const LandingPrimaryImageCtaSection = ({
             {imageComponent ? (
               <div
                 className={clsx(
-                  'w-full relative z-10',
+                  'w-full relative z-0 lg:w-[140%] lg:-ml-[15%]',
                   imagePerspective === 'left' && 'lg:perspective-left',
                   imagePerspective === 'right' && 'lg:perspective-right',
                   imagePerspective === 'bottom' && 'lg:perspective-bottom',
