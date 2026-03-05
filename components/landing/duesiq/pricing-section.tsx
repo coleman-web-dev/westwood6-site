@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import {
   LandingPricingSection,
   LandingPricingPlan,
@@ -136,7 +137,8 @@ export function PricingSection() {
 
       <p className="text-center text-text-secondary-light dark:text-text-secondary-dark text-sm pb-12 -mt-8">
         Annual plans are billed upfront. Monthly plans can be cancelled anytime.{' '}
-        <a href="#demo" className="underline hover:text-secondary-400">Request a demo</a> to get started.
+        <a href="#demo" className="underline hover:text-secondary-400">Request a demo</a> or{' '}
+        <Link href="/signup" className="underline hover:text-secondary-400">sign up now</Link> to get started.
       </p>
     </section>
   );

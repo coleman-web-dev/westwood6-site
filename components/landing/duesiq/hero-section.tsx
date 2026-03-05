@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import {
   LandingPrimaryImageCtaSection,
   LandingLeadingPill,
@@ -54,7 +55,7 @@ export function HeroSection() {
             size="lg"
             asChild
           >
-            <a href="#pricing">See Pricing</a>
+            <Link href="/signup">Sign Up Free</Link>
           </Button>
         </div>
       }

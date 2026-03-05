@@ -10,6 +10,7 @@ import { Label } from '@/components/shared/ui/label';
 import { Textarea } from '@/components/shared/ui/textarea';
 import { LandingFlickeringGridCtaBg } from '@/components/landing';
 import { CheckCircle2 } from 'lucide-react';
+import Link from 'next/link';
 
 const demoSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -70,6 +71,14 @@ export function DemoRequestSection() {
           </h2>
           <p className="mt-4 text-lg text-text-secondary-light dark:text-text-secondary-dark">
             Tell us about your community and we will schedule a personalized demo.
+            <br />
+            <span className="text-base">
+              Or{' '}
+              <Link href="/signup" className="underline hover:text-secondary-400 transition-colors">
+                sign up directly
+              </Link>{' '}
+              if you are ready to get started.
+            </span>
           </p>
         </div>
 
