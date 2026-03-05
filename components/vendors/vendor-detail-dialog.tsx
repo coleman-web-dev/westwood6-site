@@ -24,6 +24,8 @@ import {
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
 import { Upload, FileText, CheckCircle, DollarSign } from 'lucide-react';
+import { useCommunity } from '@/lib/providers/community-provider';
+import { VendorDocumentsSection } from '@/components/vendors/vendor-documents-section';
 import type { Vendor, VendorCategory, VendorStatus } from '@/lib/types/database';
 
 const CATEGORY_LABELS: Record<VendorCategory, string> = {
@@ -54,6 +56,7 @@ export function VendorDetailDialog({
   onUpdated,
   onRecordPayment,
 }: VendorDetailDialogProps) {
+  const { isBoard, member } = useCommunity();
   const [name, setName] = useState('');
   const [company, setCompany] = useState('');
   const [phone, setPhone] = useState('');
@@ -321,6 +324,14 @@ export function VendorDetailDialog({
               />
             </div>
           </div>
+
+          {/* Vendor Documents */}
+          <VendorDocumentsSection
+            vendorId={vendor.id}
+            communityId={vendor.community_id}
+            memberId={member?.id ?? ''}
+            isBoard={isBoard}
+          />
 
           <div className="space-y-1.5">
             <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">

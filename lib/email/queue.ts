@@ -332,6 +332,66 @@ export async function queuePaymentReminder(
 }
 
 /**
+ * Queue vendor insurance expiry reminder emails for all board members of a community.
+ */
+export async function queueVendorInsuranceReminder(
+  communityId: string,
+  communitySlug: string,
+  vendorId: string,
+  vendorName: string,
+  vendorCompany: string | null,
+  insuranceExpiry: string,
+  daysUntilExpiry: number,
+) {
+  const supabase = createAdminClient();
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://duesiq.com';
+
+  const { data: community } = await supabase
+    .from('communities')
+    .select('name')
+    .eq('id', communityId)
+    .single();
+
+  // Get all board members with email
+  const { data: boardMembers } = await supabase
+    .from('members')
+    .select('id, email, first_name, last_name')
+    .eq('community_id', communityId)
+    .eq('is_approved', true)
+    .in('system_role', ['board', 'manager', 'super_admin'])
+    .not('email', 'is', null);
+
+  if (!boardMembers || boardMembers.length === 0) return;
+
+  const communityName = community?.name || 'Your Community';
+  const isExpired = daysUntilExpiry <= 0;
+  const urgencyLabel = isExpired ? 'Expired' : daysUntilExpiry <= 7 ? 'Expiring Soon' : 'Upcoming Expiry';
+
+  const items: QueueEmailParams[] = boardMembers.map((m) => ({
+    communityId,
+    recipientMemberId: m.id,
+    recipientEmail: m.email!,
+    recipientName: `${m.first_name} ${m.last_name}`,
+    category: 'insurance_reminder_email' as EmailCategory,
+    priority: 'normal' as EmailPriority,
+    subject: `Vendor Insurance ${urgencyLabel}: ${vendorName}`,
+    templateId: 'vendor-insurance-reminder',
+    templateData: {
+      communityName,
+      vendorName,
+      vendorCompany,
+      vendorId,
+      insuranceExpiry,
+      daysUntilExpiry,
+      vendorDetailUrl: `${baseUrl}/${communitySlug}/vendors`,
+      unsubscribeUrl: buildUnsubscribeUrl(m.id, 'insurance_reminder_email', communitySlug),
+    },
+  }));
+
+  return queueBulkEmails(items);
+}
+
+/**
  * Queue a violation notice email for the head-of-household of the affected unit.
  */
 export async function queueViolationNotice(

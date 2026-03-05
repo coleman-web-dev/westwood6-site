@@ -30,6 +30,7 @@ export type BudgetCategory = 'dues' | 'assessments' | 'amenity_fees' | 'interest
 // ─── Vendor Enums ─────────────────────────────────────
 export type VendorCategory = 'landscaping' | 'plumbing' | 'electrical' | 'hvac' | 'painting' | 'roofing' | 'cleaning' | 'security' | 'general' | 'other';
 export type VendorStatus = 'active' | 'inactive';
+export type VendorDocumentType = 'contract' | 'insurance_cert' | 'license' | 'w9' | 'other';
 
 import type { LandingPageConfig, CommunityVendorsConfig } from './landing';
 
@@ -65,6 +66,10 @@ export interface EmailSettings {
   primary_color?: string;
 }
 
+export interface VendorSettings {
+  insurance_reminder_days: number[];
+}
+
 export interface OnboardingState {
   completed_steps: ('info' | 'units' | 'members' | 'assessments' | 'invites')[];
   completed_at: string | null;
@@ -80,6 +85,7 @@ export interface CommunityTheme {
   arc_enabled?: boolean;
   landing_page?: LandingPageConfig;
   vendors_config?: CommunityVendorsConfig;
+  vendor_settings?: VendorSettings;
   [key: string]: unknown;
 }
 
@@ -530,7 +536,7 @@ export interface BulletinComment {
 
 // ─── Email System ─────────────────────────────────
 
-export type EmailCategory = 'payment_confirmation' | 'payment_reminder' | 'announcement' | 'maintenance_update' | 'voting_notice' | 'reservation_update' | 'weekly_digest' | 'system' | 'violation_notice';
+export type EmailCategory = 'payment_confirmation' | 'payment_reminder' | 'announcement' | 'maintenance_update' | 'voting_notice' | 'reservation_update' | 'weekly_digest' | 'system' | 'violation_notice' | 'insurance_reminder_email';
 export type EmailStatus = 'queued' | 'sending' | 'sent' | 'failed' | 'bounced';
 export type EmailPriority = 'immediate' | 'normal' | 'scheduled';
 
@@ -683,5 +689,17 @@ export interface Vendor {
   tax_id: string | null;
   w9_on_file: boolean;
   w9_document_path: string | null;
+  created_at: string;
+}
+
+export interface VendorDocument {
+  id: string;
+  vendor_id: string;
+  community_id: string;
+  document_type: VendorDocumentType;
+  title: string;
+  file_path: string;
+  file_size: number | null;
+  uploaded_by: string | null;
   created_at: string;
 }
