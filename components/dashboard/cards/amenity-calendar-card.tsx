@@ -45,6 +45,7 @@ export function AmenityCalendarCard() {
     if (!el) return;
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
+        console.log('[calendar] container width:', entry.contentRect.width);
         setShowTwoMonths(entry.contentRect.width >= 480);
       }
     });
