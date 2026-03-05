@@ -14,6 +14,7 @@ export async function createJournalEntry(params: {
   referenceType?: string;
   referenceId?: string;
   unitId?: string;
+  vendorId?: string;
   memo?: string;
   createdBy?: string;
   lines: { accountCode: string; debit: number; credit: number; description?: string }[];
@@ -72,6 +73,7 @@ export async function createJournalEntry(params: {
       reference_type: params.referenceType || null,
       reference_id: params.referenceId || null,
       unit_id: params.unitId || null,
+      vendor_id: params.vendorId || null,
       memo: params.memo || null,
       created_by: params.createdBy || null,
     })
@@ -274,6 +276,34 @@ export async function postRefund(
     unitId,
     lines: [
       { accountCode: '1100', debit: amount, credit: 0, description: 'Accounts Receivable' },
+      { accountCode: '1000', debit: 0, credit: amount, description: 'Operating Cash' },
+    ],
+  });
+}
+
+/** Vendor payment: DR expense account, CR Operating Cash */
+export async function postVendorPayment(
+  communityId: string,
+  vendorId: string,
+  amount: number,
+  expenseAccountCode: string,
+  description: string,
+  entryDate?: string,
+  memo?: string,
+  createdBy?: string,
+) {
+  return createJournalEntry({
+    communityId,
+    entryDate,
+    description: `Vendor payment: ${description}`,
+    source: 'vendor_payment',
+    referenceType: 'vendor',
+    referenceId: vendorId,
+    vendorId,
+    memo,
+    createdBy,
+    lines: [
+      { accountCode: expenseAccountCode, debit: amount, credit: 0, description },
       { accountCode: '1000', debit: 0, credit: amount, description: 'Operating Cash' },
     ],
   });

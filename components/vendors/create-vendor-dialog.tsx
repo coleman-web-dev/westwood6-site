@@ -44,6 +44,7 @@ export function CreateVendorDialog({
   const [category, setCategory] = useState<VendorCategory>('general');
   const [licenseNumber, setLicenseNumber] = useState('');
   const [insuranceExpiry, setInsuranceExpiry] = useState('');
+  const [taxId, setTaxId] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -65,6 +66,7 @@ export function CreateVendorDialog({
       category,
       license_number: licenseNumber.trim() || null,
       insurance_expiry: insuranceExpiry || null,
+      tax_id: taxId.trim() || null,
       notes: notes.trim() || null,
     });
 
@@ -83,6 +85,7 @@ export function CreateVendorDialog({
     setCategory('general');
     setLicenseNumber('');
     setInsuranceExpiry('');
+    setTaxId('');
     setNotes('');
     onOpenChange(false);
     onCreated();
@@ -157,11 +160,19 @@ export function CreateVendorDialog({
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-              Insurance expiry
-            </Label>
-            <Input type="date" value={insuranceExpiry} onChange={(e) => setInsuranceExpiry(e.target.value)} />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                Tax ID (EIN/SSN)
+              </Label>
+              <Input value={taxId} onChange={(e) => setTaxId(e.target.value)} placeholder="XX-XXXXXXX" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                Insurance expiry
+              </Label>
+              <Input type="date" value={insuranceExpiry} onChange={(e) => setInsuranceExpiry(e.target.value)} />
+            </div>
           </div>
 
           <div className="space-y-1.5">

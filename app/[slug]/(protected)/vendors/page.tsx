@@ -8,6 +8,7 @@ import { HardHat } from 'lucide-react';
 import { VendorList } from '@/components/vendors/vendor-list';
 import { CreateVendorDialog } from '@/components/vendors/create-vendor-dialog';
 import { VendorDetailDialog } from '@/components/vendors/vendor-detail-dialog';
+import { RecordVendorPaymentDialog } from '@/components/vendors/record-vendor-payment-dialog';
 import type { Vendor, VendorCategory } from '@/lib/types/database';
 
 const CATEGORY_FILTERS: { value: string; label: string }[] = [
@@ -25,12 +26,13 @@ const CATEGORY_FILTERS: { value: string; label: string }[] = [
 ];
 
 export default function VendorsPage() {
-  const { isBoard, community } = useCommunity();
+  const { isBoard, community, member } = useCommunity();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
+  const [paymentVendor, setPaymentVendor] = useState<Vendor | null>(null);
 
   const fetchVendors = useCallback(async () => {
     const supabase = createClient();
@@ -110,6 +112,16 @@ export default function VendorsPage() {
         open={selectedVendor !== null}
         onOpenChange={(open) => { if (!open) setSelectedVendor(null); }}
         onUpdated={fetchVendors}
+        onRecordPayment={(v) => setPaymentVendor(v)}
+      />
+
+      <RecordVendorPaymentDialog
+        vendor={paymentVendor}
+        open={paymentVendor !== null}
+        onOpenChange={(open) => { if (!open) setPaymentVendor(null); }}
+        communityId={community.id}
+        memberId={member?.id}
+        onRecorded={fetchVendors}
       />
     </div>
   );

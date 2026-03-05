@@ -6,6 +6,7 @@ import {
   postInvoiceVoided,
   postPaymentReceived,
   postWalletApplied,
+  postVendorPayment,
   reverseJournalEntry,
 } from '@/lib/utils/accounting-entries';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -203,6 +204,36 @@ export async function postManualJournalEntryAction(params: {
   } catch (error) {
     console.error('Failed to create manual journal entry:', error);
     return { success: false, error: 'Failed to create entry' };
+  }
+}
+
+/** Post journal entry for a vendor payment */
+export async function postVendorPaymentAction(params: {
+  communityId: string;
+  vendorId: string;
+  amount: number;
+  expenseAccountCode: string;
+  description: string;
+  entryDate?: string;
+  memo?: string;
+  createdBy?: string;
+}) {
+  try {
+    const entryId = await postVendorPayment(
+      params.communityId,
+      params.vendorId,
+      params.amount,
+      params.expenseAccountCode,
+      params.description,
+      params.entryDate,
+      params.memo,
+      params.createdBy,
+    );
+    if (!entryId) return { success: false, error: 'Failed to create vendor payment entry.' };
+    return { success: true, entryId };
+  } catch (error) {
+    console.error('Failed to post vendor payment journal entry:', error);
+    return { success: false, error: 'Failed to record vendor payment' };
   }
 }
 

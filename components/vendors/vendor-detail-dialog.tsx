@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import {
   Dialog,
@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
+import { Upload, FileText, CheckCircle, DollarSign } from 'lucide-react';
 import type { Vendor, VendorCategory, VendorStatus } from '@/lib/types/database';
 
 const CATEGORY_LABELS: Record<VendorCategory, string> = {
@@ -43,6 +44,7 @@ interface VendorDetailDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdated: () => void;
+  onRecordPayment?: (vendor: Vendor) => void;
 }
 
 export function VendorDetailDialog({
@@ -50,6 +52,7 @@ export function VendorDetailDialog({
   open,
   onOpenChange,
   onUpdated,
+  onRecordPayment,
 }: VendorDetailDialogProps) {
   const [name, setName] = useState('');
   const [company, setCompany] = useState('');
@@ -59,6 +62,12 @@ export function VendorDetailDialog({
   const [licenseNumber, setLicenseNumber] = useState('');
   const [insuranceExpiry, setInsuranceExpiry] = useState('');
   const [notes, setNotes] = useState('');
+  const [taxId, setTaxId] = useState('');
+  const [showTaxId, setShowTaxId] = useState(false);
+  const [w9OnFile, setW9OnFile] = useState(false);
+  const [w9Path, setW9Path] = useState('');
+  const [uploadingW9, setUploadingW9] = useState(false);
+  const w9InputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<VendorStatus>('active');
   const [saving, setSaving] = useState(false);
 
@@ -72,6 +81,10 @@ export function VendorDetailDialog({
       setLicenseNumber(vendor.license_number ?? '');
       setInsuranceExpiry(vendor.insurance_expiry ?? '');
       setNotes(vendor.notes ?? '');
+      setTaxId(vendor.tax_id ?? '');
+      setShowTaxId(false);
+      setW9OnFile(vendor.w9_on_file);
+      setW9Path(vendor.w9_document_path ?? '');
       setStatus(vendor.status);
     }
   }, [vendor]);
@@ -92,6 +105,7 @@ export function VendorDetailDialog({
         category,
         license_number: licenseNumber.trim() || null,
         insurance_expiry: insuranceExpiry || null,
+        tax_id: taxId.trim() || null,
         notes: notes.trim() || null,
         status,
       })
@@ -107,6 +121,56 @@ export function VendorDetailDialog({
     toast.success('Vendor updated.');
     onOpenChange(false);
     onUpdated();
+  }
+
+  function maskTaxId(id: string) {
+    if (!id || id.length < 4) return id;
+    return '***-**-' + id.replace(/\D/g, '').slice(-4);
+  }
+
+  async function handleW9Upload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !vendor) return;
+    if (file.type !== 'application/pdf') {
+      toast.error('Please upload a PDF file.');
+      return;
+    }
+    setUploadingW9(true);
+    const supabase = createClient();
+    const path = `${vendor.community_id}/w9/${vendor.id}_${Date.now()}.pdf`;
+    const { error: uploadError } = await supabase.storage
+      .from('hoa-documents')
+      .upload(path, file, { upsert: true });
+    if (uploadError) {
+      toast.error('Failed to upload W-9.');
+      setUploadingW9(false);
+      return;
+    }
+    const { error: updateError } = await supabase
+      .from('vendors')
+      .update({ w9_on_file: true, w9_document_path: path })
+      .eq('id', vendor.id);
+    if (updateError) {
+      toast.error('Failed to update vendor record.');
+      setUploadingW9(false);
+      return;
+    }
+    setW9OnFile(true);
+    setW9Path(path);
+    toast.success('W-9 uploaded.');
+    setUploadingW9(false);
+    onUpdated();
+  }
+
+  async function handleW9Download() {
+    if (!w9Path) return;
+    const supabase = createClient();
+    const { data } = await supabase.storage.from('hoa-documents').createSignedUrl(w9Path, 60);
+    if (data?.signedUrl) {
+      window.open(data.signedUrl, '_blank');
+    } else {
+      toast.error('Failed to generate download link.');
+    }
   }
 
   if (!vendor) return null;
@@ -196,6 +260,68 @@ export function VendorDetailDialog({
             </div>
           </div>
 
+          {/* Tax ID */}
+          <div className="space-y-1.5">
+            <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+              Tax ID (EIN/SSN)
+            </Label>
+            <div className="flex items-center gap-2">
+              <Input
+                value={showTaxId ? taxId : (taxId ? maskTaxId(taxId) : '')}
+                onChange={(e) => { setShowTaxId(true); setTaxId(e.target.value); }}
+                onFocus={() => setShowTaxId(true)}
+                placeholder="XX-XXXXXXX"
+              />
+              {taxId && !showTaxId && (
+                <Button type="button" variant="ghost" size="sm" onClick={() => setShowTaxId(true)}>
+                  Reveal
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* W-9 Section */}
+          <div className="space-y-1.5">
+            <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+              W-9 Document
+            </Label>
+            <div className="flex items-center gap-3">
+              {w9OnFile ? (
+                <Badge variant="outline" className="text-meta text-green-600 dark:text-green-400 gap-1">
+                  <CheckCircle className="h-3 w-3" />
+                  W-9 on file
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-meta text-yellow-600 dark:text-yellow-400">
+                  No W-9
+                </Badge>
+              )}
+              {w9OnFile && (
+                <Button type="button" variant="ghost" size="sm" onClick={handleW9Download}>
+                  <FileText className="h-3.5 w-3.5 mr-1" />
+                  View
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={uploadingW9}
+                onClick={() => w9InputRef.current?.click()}
+              >
+                <Upload className="h-3.5 w-3.5 mr-1" />
+                {uploadingW9 ? 'Uploading...' : w9OnFile ? 'Replace' : 'Upload'}
+              </Button>
+              <input
+                ref={w9InputRef}
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                onChange={handleW9Upload}
+              />
+            </div>
+          </div>
+
           <div className="space-y-1.5">
             <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
               Notes
@@ -210,6 +336,17 @@ export function VendorDetailDialog({
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
+          {onRecordPayment && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => { onOpenChange(false); onRecordPayment(vendor); }}
+              className="mr-auto"
+            >
+              <DollarSign className="h-4 w-4 mr-1" />
+              Record Payment
+            </Button>
+          )}
           <DialogClose asChild>
             <Button variant="outline">Cancel</Button>
           </DialogClose>

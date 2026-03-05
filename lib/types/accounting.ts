@@ -13,7 +13,8 @@ export type JournalSource =
   | 'wallet_debit'
   | 'refund'
   | 'assessment_generated'
-  | 'bank_sync';
+  | 'bank_sync'
+  | 'vendor_payment';
 export type JournalStatus = 'draft' | 'posted' | 'reversed';
 
 // ─── Row Types ─────────────────────────────────────────────────────
@@ -43,6 +44,7 @@ export interface JournalEntry {
   reference_type: string | null;
   reference_id: string | null;
   unit_id: string | null;
+  vendor_id: string | null;
   reversed_by: string | null;
   reversal_of: string | null;
   memo: string | null;

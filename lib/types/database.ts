@@ -680,5 +680,8 @@ export interface Vendor {
   insurance_expiry: string | null;
   notes: string | null;
   status: VendorStatus;
+  tax_id: string | null;
+  w9_on_file: boolean;
+  w9_document_path: string | null;
   created_at: string;
 }

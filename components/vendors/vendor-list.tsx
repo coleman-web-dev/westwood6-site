@@ -1,7 +1,7 @@
 'use client';
 
 import { Badge } from '@/components/shared/ui/badge';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, CheckCircle } from 'lucide-react';
 import type { Vendor, VendorCategory } from '@/lib/types/database';
 
 const CATEGORY_LABELS: Record<VendorCategory, string> = {
@@ -91,6 +91,16 @@ export function VendorList({ vendors, loading, onSelect }: VendorListProps) {
                       Expiring soon
                     </span>
                   )}
+                  {v.w9_on_file ? (
+                    <span className="flex items-center gap-1 text-meta text-green-600 dark:text-green-400">
+                      <CheckCircle className="h-3 w-3" />
+                      W-9
+                    </span>
+                  ) : (
+                    <span className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                      No W-9
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
@@ -109,6 +119,9 @@ export function VendorList({ vendors, loading, onSelect }: VendorListProps) {
                       {v.email}
                     </p>
                   )}
+                  <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                    {v.tax_id ? 'TIN on file' : 'No TIN'}
+                  </p>
                 </div>
               </div>
             </div>

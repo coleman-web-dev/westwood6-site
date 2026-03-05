@@ -17,6 +17,7 @@ import { AssessmentPerformance } from '@/components/reports/financial/assessment
 import { CommunityEngagement } from '@/components/reports/community/community-engagement';
 import { AmenityUsage } from '@/components/reports/community/amenity-usage';
 import { VotingParticipation } from '@/components/reports/community/voting-participation';
+import { Vendor1099Report } from '@/components/reports/financial/vendor-1099-report';
 import type { ReportPeriod } from '@/components/reports/report-period-selector';
 import type {
   Invoice,
@@ -276,6 +277,7 @@ export default function ReportsPage() {
           <TabsList>
             <TabsTrigger value="financial">Financial</TabsTrigger>
             <TabsTrigger value="community">Community</TabsTrigger>
+            <TabsTrigger value="tax">Tax / 1099</TabsTrigger>
           </TabsList>
 
           <TabsContent value="financial" className="space-y-grid-gap mt-4">
@@ -294,6 +296,10 @@ export default function ReportsPage() {
             />
             <AmenityUsage reservations={reservations} amenities={amenities} />
             <VotingParticipation ballots={ballots} ballotEligibility={ballotEligibility} />
+          </TabsContent>
+
+          <TabsContent value="tax" className="space-y-grid-gap mt-4">
+            <Vendor1099Report communityId={community.id} />
           </TabsContent>
         </Tabs>
       )}
