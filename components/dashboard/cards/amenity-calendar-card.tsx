@@ -45,7 +45,7 @@ export function AmenityCalendarCard() {
     if (!el) return;
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        setShowTwoMonths(entry.contentRect.width >= 480);
+        setShowTwoMonths(entry.contentRect.width >= 400);
       }
     });
     observer.observe(el);
@@ -200,10 +200,10 @@ export function AmenityCalendarCard() {
             >
               <ChevronLeftIcon className="w-4 h-4" />
             </button>
-            <span className="text-label font-medium text-text-primary-light dark:text-text-primary-dark truncate flex items-center gap-1.5">
+            <span className="text-body font-semibold text-text-primary-light dark:text-text-primary-dark truncate flex items-center gap-2">
               {(() => {
                 const Icon = selectedAmenity ? getAmenityIcon(selectedAmenity.icon) : null;
-                return Icon ? <Icon className="w-3.5 h-3.5 shrink-0" /> : null;
+                return Icon ? <Icon className="w-4 h-4 shrink-0" /> : null;
               })()}
               {selectedAmenity?.name}
             </span>
@@ -229,7 +229,13 @@ export function AmenityCalendarCard() {
               <Calendar
                 numberOfMonths={showTwoMonths ? 2 : 1}
                 navLayout="around"
-                classNames={showTwoMonths ? { months: 'flex flex-row gap-4' } : undefined}
+                classNames={{
+                  months: showTwoMonths ? 'flex flex-row gap-4' : undefined,
+                  month: 'flex flex-col [&>button]:absolute [&>button:first-of-type]:left-1 [&>button:last-of-type]:right-1 [&>button]:top-1 relative',
+                  month_caption: 'flex justify-center py-1 relative items-center',
+                  button_previous: 'absolute left-1 top-1 z-10 inline-flex items-center justify-center h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 rounded-md border border-input',
+                  button_next: 'absolute right-1 top-1 z-10 inline-flex items-center justify-center h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 rounded-md border border-input',
+                }}
                 mode="single"
                 onSelect={(date) => {
                   if (date) handleDateSelect();
