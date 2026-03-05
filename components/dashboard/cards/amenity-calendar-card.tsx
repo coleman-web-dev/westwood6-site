@@ -239,32 +239,7 @@ export function AmenityCalendarCard() {
                   </div>
                 </div>
               )}
-              {/* Custom month nav: < March  April > */}
-              <div className="flex items-center mb-2">
-                <button
-                  onClick={handlePrevMonth}
-                  className="p-1.5 rounded-md text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors shrink-0"
-                >
-                  <ChevronLeftIcon className="w-4 h-4" />
-                </button>
-                <div className={`flex-1 flex ${showTwoMonths ? 'flex-row' : 'justify-center'}`}>
-                  <span className={`text-sm font-medium text-text-primary-light dark:text-text-primary-dark ${showTwoMonths ? 'flex-1 text-center' : ''}`}>
-                    {format(displayMonth, 'MMMM yyyy')}
-                  </span>
-                  {showTwoMonths && (
-                    <span className="flex-1 text-center text-sm font-medium text-text-primary-light dark:text-text-primary-dark">
-                      {format(addMonths(displayMonth, 1), 'MMMM yyyy')}
-                    </span>
-                  )}
-                </div>
-                <button
-                  onClick={handleNextMonth}
-                  className="p-1.5 rounded-md text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors shrink-0"
-                >
-                  <ChevronRightIcon className="w-4 h-4" />
-                </button>
-              </div>
-              {/* Calendar grid(s) */}
+              {/* Calendar with integrated nav */}
               <div className="flex justify-center">
                 <Calendar
                   numberOfMonths={showTwoMonths ? 2 : 1}
@@ -273,6 +248,7 @@ export function AmenityCalendarCard() {
                   classNames={{
                     months: `flex ${showTwoMonths ? 'flex-row gap-6' : ''}`,
                     month_caption: 'hidden',
+                    root: 'relative',
                   }}
                   mode="single"
                   onSelect={(date) => {
@@ -293,6 +269,39 @@ export function AmenityCalendarCard() {
                     hasEvent: 'bg-mint/20 dark:bg-mint/10',
                   }}
                   components={{
+                    Months: ({ children, ...props }) => (
+                      <div {...props}>
+                        <div className="flex items-center mb-2 px-1">
+                          <button
+                            onClick={handlePrevMonth}
+                            type="button"
+                            className="p-1 rounded-md text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors shrink-0"
+                          >
+                            <ChevronLeftIcon className="w-4 h-4" />
+                          </button>
+                          <div className={`flex-1 flex ${showTwoMonths ? 'flex-row' : 'justify-center'}`}>
+                            <span className={`text-sm font-medium text-text-primary-light dark:text-text-primary-dark ${showTwoMonths ? 'flex-1 text-center' : ''}`}>
+                              {format(displayMonth, 'MMMM yyyy')}
+                            </span>
+                            {showTwoMonths && (
+                              <span className="flex-1 text-center text-sm font-medium text-text-primary-light dark:text-text-primary-dark">
+                                {format(addMonths(displayMonth, 1), 'MMMM yyyy')}
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            onClick={handleNextMonth}
+                            type="button"
+                            className="p-1 rounded-md text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors shrink-0"
+                          >
+                            <ChevronRightIcon className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <div className={`flex ${showTwoMonths ? 'flex-row gap-6' : ''}`}>
+                          {children}
+                        </div>
+                      </div>
+                    ),
                     DayButton: ({ day, ...buttonProps }) => {
                       const dateKey = format(day.date, 'yyyy-MM-dd');
                       const dayEvents = eventByDate.get(dateKey);
