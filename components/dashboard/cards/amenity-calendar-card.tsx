@@ -37,7 +37,7 @@ export function AmenityCalendarCard() {
   const [calendarLoading, setCalendarLoading] = useState(false);
 
   const calendarContainerRef = useRef<HTMLDivElement>(null);
-  const [showTwoMonths, setShowTwoMonths] = useState(false);
+  const [showTwoMonths, setShowTwoMonths] = useState(true);
 
   // Observe container width to decide 1 vs 2 months
   useEffect(() => {
