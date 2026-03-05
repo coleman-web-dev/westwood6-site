@@ -622,7 +622,7 @@ BEGIN
     (v_viol_3, v_community_id, v_unit_106, v_m_president, 'architectural', 'Unapproved fence installation', 'A 6-foot privacy fence was installed without ARC approval. Fence exceeds height limits per CC&Rs.', 'under_review', 'major', NULL, NULL, now() - interval '7 days'),
     (v_viol_4, v_community_id, v_unit_115, v_m_secretary, 'noise', 'Repeated loud music after 10 PM', 'Multiple neighbors have complained about loud music from unit 115 after quiet hours.', 'notice_sent', 'minor', NULL, NULL, now() - interval '3 days'),
     (v_viol_5, v_community_id, v_unit_112, v_m_treasurer, 'maintenance', 'Lawn not maintained', 'Front lawn has not been mowed in over a month. Weeds are overgrown.', 'escalated', 'major', NULL, NULL, now() - interval '21 days'),
-    (v_viol_6, v_community_id, v_unit_109, v_m_president, 'pets', 'Unleashed dog in common area', 'Dog was observed unleashed in the common area on two occasions. Community rules require leashes.', 'dismissed', 'warning', 'Homeowner was spoken to. Dog was in a fenced yard, not common area as initially reported.', now() - interval '1 day', now() - interval '8 days'));
+    (v_viol_6, v_community_id, v_unit_109, v_m_president, 'pets', 'Unleashed dog in common area', 'Dog was observed unleashed in the common area on two occasions. Community rules require leashes.', 'dismissed', 'warning', 'Homeowner was spoken to. Dog was in a fenced yard, not common area as initially reported.', now() - interval '1 day', now() - interval '8 days');
 
   -- Violation notices
   INSERT INTO violation_notices (violation_id, notice_type, sent_at, sent_by, delivery_method, notes) VALUES
