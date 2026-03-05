@@ -45,7 +45,7 @@ export function AmenityCalendarCard() {
     if (!el) return;
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        setShowTwoMonths(entry.contentRect.width >= 550);
+        setShowTwoMonths(entry.contentRect.width >= 480);
       }
     });
     observer.observe(el);
@@ -218,7 +218,7 @@ export function AmenityCalendarCard() {
 
           {/* Calendar */}
           {selectedAmenity && (
-            <div ref={calendarContainerRef} className="relative flex-1 min-h-0">
+            <div ref={calendarContainerRef} className="relative flex-1 min-h-0 flex items-start justify-center">
               {calendarLoading && (
                 <div className="absolute inset-0 bg-surface-light/60 dark:bg-surface-dark/60 z-10 flex items-center justify-center rounded-inner-card">
                   <div className="animate-pulse text-body text-text-muted-light dark:text-text-muted-dark">
@@ -228,6 +228,7 @@ export function AmenityCalendarCard() {
               )}
               <Calendar
                 numberOfMonths={showTwoMonths ? 2 : 1}
+                classNames={showTwoMonths ? { months: 'flex flex-row gap-4' } : undefined}
                 mode="single"
                 onSelect={(date) => {
                   if (date) handleDateSelect();
