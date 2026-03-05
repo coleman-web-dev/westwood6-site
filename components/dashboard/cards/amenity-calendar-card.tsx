@@ -278,7 +278,7 @@ export function AmenityCalendarCard() {
                           >
                             <ChevronLeftIcon className="w-4 h-4" />
                           </button>
-                          <div className={`flex-1 flex ${showTwoMonths ? 'flex-row' : 'justify-center'}`}>
+                          <div className={`flex-1 flex ${showTwoMonths ? 'flex-row gap-6' : 'justify-center'}`}>
                             <span className={`text-sm font-medium text-text-primary-light dark:text-text-primary-dark ${showTwoMonths ? 'flex-1 text-center' : ''}`}>
                               {format(displayMonth, 'MMMM yyyy')}
                             </span>
