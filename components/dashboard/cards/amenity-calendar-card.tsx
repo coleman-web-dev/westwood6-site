@@ -45,7 +45,6 @@ export function AmenityCalendarCard() {
     if (!el) return;
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        console.log('[calendar] container width:', entry.contentRect.width);
         setShowTwoMonths(entry.contentRect.width >= 480);
       }
     });
@@ -229,6 +228,7 @@ export function AmenityCalendarCard() {
               )}
               <Calendar
                 numberOfMonths={showTwoMonths ? 2 : 1}
+                navLayout="around"
                 classNames={showTwoMonths ? { months: 'flex flex-row gap-4' } : undefined}
                 mode="single"
                 onSelect={(date) => {
