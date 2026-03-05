@@ -246,9 +246,8 @@ export function AmenityCalendarCard() {
                   month={displayMonth}
                   hideNavigation
                   classNames={{
-                    months: `flex ${showTwoMonths ? 'flex-row gap-6' : ''}`,
+                    months: 'flex flex-col',
                     month_caption: 'hidden',
-                    root: 'relative',
                   }}
                   mode="single"
                   onSelect={(date) => {
