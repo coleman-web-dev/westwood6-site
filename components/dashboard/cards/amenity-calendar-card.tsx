@@ -296,7 +296,7 @@ export function AmenityCalendarCard() {
                             <ChevronRightIcon className="w-4 h-4" />
                           </button>
                         </div>
-                        <div className={`flex ${showTwoMonths ? 'flex-row gap-6' : ''}`}>
+                        <div className={`flex ${showTwoMonths ? 'flex-row gap-6 px-[28px]' : ''}`}>
                           {children}
                         </div>
                       </div>
