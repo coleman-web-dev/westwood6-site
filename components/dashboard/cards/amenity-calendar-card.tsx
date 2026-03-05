@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -36,6 +36,22 @@ export function AmenityCalendarCard() {
   const [loading, setLoading] = useState(true);
   const [calendarLoading, setCalendarLoading] = useState(false);
 
+  const calendarContainerRef = useRef<HTMLDivElement>(null);
+  const [showTwoMonths, setShowTwoMonths] = useState(false);
+
+  // Observe container width to decide 1 vs 2 months
+  useEffect(() => {
+    const el = calendarContainerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setShowTwoMonths(entry.contentRect.width >= 550);
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   const selectedAmenity = amenities[selectedIndex] ?? null;
 
   // Fetch amenity list
@@ -57,12 +73,12 @@ export function AmenityCalendarCard() {
     fetchAmenities();
   }, [community.id]);
 
-  // Fetch blocked dates for visible month
+  // Fetch blocked dates for visible months
   const fetchBlockedDates = useCallback(async (amenityId: string, month: Date) => {
     setCalendarLoading(true);
     const supabase = createClient();
     const rangeStart = startOfMonth(month);
-    const rangeEnd = endOfMonth(addMonths(month, 1));
+    const rangeEnd = endOfMonth(addMonths(month, 2));
 
     const { data } = await supabase.rpc('get_amenity_blocked_dates', {
       p_amenity_id: amenityId,
@@ -202,7 +218,7 @@ export function AmenityCalendarCard() {
 
           {/* Calendar */}
           {selectedAmenity && (
-            <div className="relative flex-1 min-h-0">
+            <div ref={calendarContainerRef} className="relative flex-1 min-h-0">
               {calendarLoading && (
                 <div className="absolute inset-0 bg-surface-light/60 dark:bg-surface-dark/60 z-10 flex items-center justify-center rounded-inner-card">
                   <div className="animate-pulse text-body text-text-muted-light dark:text-text-muted-dark">
@@ -211,6 +227,7 @@ export function AmenityCalendarCard() {
                 </div>
               )}
               <Calendar
+                numberOfMonths={showTwoMonths ? 2 : 1}
                 mode="single"
                 onSelect={(date) => {
                   if (date) handleDateSelect();
