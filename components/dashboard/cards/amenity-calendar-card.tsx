@@ -40,18 +40,18 @@ export function AmenityCalendarCard() {
   const [showTwoMonths, setShowTwoMonths] = useState(false);
 
   // Observe container width to decide 1 vs 2 months
-  // Re-run when loading finishes so the ref is attached
   useEffect(() => {
     const el = calendarContainerRef.current;
     if (!el) return;
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        setShowTwoMonths(entry.contentRect.width >= 100);
+        // Two side-by-side month grids need ~560px
+        setShowTwoMonths(entry.contentRect.width >= 560);
       }
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [loading, selectedAmenity]);
+  }, [loading]);
 
   const selectedAmenity = amenities[selectedIndex] ?? null;
 
@@ -191,7 +191,7 @@ export function AmenityCalendarCard() {
           No amenities available.
         </p>
       ) : (
-        <div className="flex flex-col gap-3 h-full">
+        <div ref={calendarContainerRef} className="flex flex-col gap-3 h-full">
           {/* Amenity switcher */}
           <div className="flex items-center justify-between gap-2">
             <button
@@ -219,7 +219,7 @@ export function AmenityCalendarCard() {
 
           {/* Calendar */}
           {selectedAmenity && (
-            <div ref={calendarContainerRef} className="relative flex-1 min-h-0 flex items-start justify-center">
+            <div className="relative flex-1 min-h-0 flex items-start justify-center">
               {calendarLoading && (
                 <div className="absolute inset-0 bg-surface-light/60 dark:bg-surface-dark/60 z-10 flex items-center justify-center rounded-inner-card">
                   <div className="animate-pulse text-body text-text-muted-light dark:text-text-muted-dark">
