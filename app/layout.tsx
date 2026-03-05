@@ -61,6 +61,10 @@ export const metadata: Metadata = {
       'application/rss+xml': `${siteConfig.siteUrl}/feed.xml`,
     },
   },
+  other: {
+    'geo.region': 'US',
+    'geo.placename': 'United States',
+  },
   robots: {
     index: true,
     follow: true,

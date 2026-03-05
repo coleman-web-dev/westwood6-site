@@ -1,7 +1,7 @@
 {
-  "name": "Mevolut",
-  "short_name": "Mevolut",
-  "description": "Manage your money the easy way with Mevolut . Track expenses, send money, and grow your savings – safely and simply. Sign up free today!",
+  "name": "DuesIQ",
+  "short_name": "DuesIQ",
+  "description": "Smart HOA dues management. Track payments, manage accounts, and keep your community finances clear and simple.",
   "dir": "auto",
   "lang": "en-US",
   "display": "standalone",
