@@ -108,6 +108,7 @@ export const LandingPrimaryImageCtaSection = ({
   textPosition = 'left',
   imageSrc,
   imageAlt = '',
+  imageComponent,
   imagePosition = 'right',
   imagePerspective = 'none',
   imageShadow = 'hard',
@@ -131,6 +132,7 @@ export const LandingPrimaryImageCtaSection = ({
   textPosition?: 'center' | 'left';
   imageSrc?: string;
   imageAlt?: string;
+  imageComponent?: React.ReactNode;
   imagePosition?: 'left' | 'right' | 'center';
   imagePerspective?:
     | 'none'
@@ -178,7 +180,7 @@ export const LandingPrimaryImageCtaSection = ({
         </FadeMask>
       ) : null}
 
-      {imageSrc && withBackgroundGlow ? (
+      {(imageSrc || imageComponent) && withBackgroundGlow ? (
         <div className="hidden lg:flex justify-center w-full h-full absolute pointer-events-none">
           <GlowBg
             className={clsx(
@@ -219,30 +221,12 @@ export const LandingPrimaryImageCtaSection = ({
           {children}
         </LandingPrimaryCtaContent>
 
-        {imageSrc ? (
+        {imageSrc || imageComponent ? (
           <>
-            {imagePosition === 'center' ? (
-              <section className={clsx('w-full mt-6 md:mt-8')}>
-                <Image
-                  className={clsx(
-                    'w-full rounded-md overflow-hidden',
-                    imageShadow === 'soft' && 'shadow-md',
-                    imageShadow === 'hard' && 'hard-shadow',
-                  )}
-                  src={imageSrc}
-                  alt={imageAlt}
-                  width={1000}
-                  height={1000}
-                />
-              </section>
-            ) : null}
-
-            {imagePosition === 'left' || imagePosition === 'right' ? (
-              <Image
+            {imageComponent ? (
+              <div
                 className={clsx(
-                  'w-full rounded-md relative z-10',
-                  imageShadow === 'soft' && 'shadow-md',
-                  imageShadow === 'hard' && 'hard-shadow',
+                  'w-full relative z-10',
                   imagePerspective === 'left' && 'lg:perspective-left',
                   imagePerspective === 'right' && 'lg:perspective-right',
                   imagePerspective === 'bottom' && 'lg:perspective-bottom',
@@ -252,12 +236,50 @@ export const LandingPrimaryImageCtaSection = ({
                     'lg:ml-[7%] lg:perspective-paper',
                   imagePerspective === 'none' ? 'my-4' : 'my-8',
                 )}
-                alt={imageAlt}
-                src={imageSrc}
-                width={1000}
-                height={1000}
-              />
-            ) : null}
+              >
+                {imageComponent}
+              </div>
+            ) : (
+              <>
+                {imagePosition === 'center' ? (
+                  <section className={clsx('w-full mt-6 md:mt-8')}>
+                    <Image
+                      className={clsx(
+                        'w-full rounded-md overflow-hidden',
+                        imageShadow === 'soft' && 'shadow-md',
+                        imageShadow === 'hard' && 'hard-shadow',
+                      )}
+                      src={imageSrc!}
+                      alt={imageAlt}
+                      width={1000}
+                      height={1000}
+                    />
+                  </section>
+                ) : null}
+
+                {imagePosition === 'left' || imagePosition === 'right' ? (
+                  <Image
+                    className={clsx(
+                      'w-full rounded-md relative z-10',
+                      imageShadow === 'soft' && 'shadow-md',
+                      imageShadow === 'hard' && 'hard-shadow',
+                      imagePerspective === 'left' && 'lg:perspective-left',
+                      imagePerspective === 'right' && 'lg:perspective-right',
+                      imagePerspective === 'bottom' && 'lg:perspective-bottom',
+                      imagePerspective === 'bottom-lg' &&
+                        'lg:perspective-bottom-lg',
+                      imagePerspective === 'paper' &&
+                        'lg:ml-[7%] lg:perspective-paper',
+                      imagePerspective === 'none' ? 'my-4' : 'my-8',
+                    )}
+                    alt={imageAlt}
+                    src={imageSrc!}
+                    width={1000}
+                    height={1000}
+                  />
+                ) : null}
+              </>
+            )}
           </>
         ) : null}
       </div>

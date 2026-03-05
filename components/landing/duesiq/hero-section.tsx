@@ -1,11 +1,33 @@
 'use client';
 
+import Image from 'next/image';
 import {
   LandingPrimaryImageCtaSection,
   LandingLeadingPill,
   LandingFlickeringGridCtaBg,
 } from '@/components/landing';
 import { Button } from '@/components/shared/ui/button';
+
+function DashboardPreview() {
+  return (
+    <>
+      <Image
+        className="w-full rounded-md shadow-md dark:hidden"
+        src="/static/images/dashboard-light.png"
+        alt="DuesIQ dashboard preview"
+        width={1000}
+        height={1000}
+      />
+      <Image
+        className="w-full rounded-md shadow-md hidden dark:block"
+        src="/static/images/dashboard-dark.png"
+        alt="DuesIQ dashboard preview"
+        width={1000}
+        height={1000}
+      />
+    </>
+  );
+}
 
 export function HeroSection() {
   return (
@@ -36,10 +58,9 @@ export function HeroSection() {
           </Button>
         </div>
       }
-      imageSrc="/static/images/dashboard-preview.png"
+      imageComponent={<DashboardPreview />}
       imageAlt="DuesIQ dashboard preview"
       imagePerspective="right"
-      imageShadow="soft"
       imagePosition="right"
       textPosition="left"
       withBackground
