@@ -69,7 +69,7 @@ const JOURNAL_SUBTABS = [
 type JournalSubtab = (typeof JOURNAL_SUBTABS)[number]['id'];
 
 export default function AccountingPage() {
-  const { isBoard, community } = useCommunity();
+  const { isBoard, canRead, community } = useCommunity();
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [reportTab, setReportTab] = useState<ReportSubtab>('trial-balance');
   const [bankingTab, setBankingTab] = useState<BankingSubtab>('connections');
@@ -93,12 +93,12 @@ export default function AccountingPage() {
     checkSetup();
   }, [checkSetup]);
 
-  if (!isBoard) {
+  if (!canRead('accounting')) {
     return (
       <div className="space-y-6">
         <h1 className="text-page-title text-text-primary-light dark:text-text-primary-dark">Accounting</h1>
         <p className="text-body text-text-muted-light dark:text-text-muted-dark">
-          Accounting is only available to board members.
+          Accounting is only available to authorized members.
         </p>
       </div>
     );

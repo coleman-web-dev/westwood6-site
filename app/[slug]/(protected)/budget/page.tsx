@@ -19,7 +19,7 @@ import { ReserveFundCard } from '@/components/budget/reserve-fund-card';
 import type { Budget, BudgetLineItem } from '@/lib/types/database';
 
 export default function BudgetPage() {
-  const { isBoard, community, member } = useCommunity();
+  const { isBoard, canRead, canWrite, community, member } = useCommunity();
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [lineItems, setLineItems] = useState<BudgetLineItem[]>([]);
   const [selectedYear, setSelectedYear] = useState<string>('');
@@ -62,12 +62,12 @@ export default function BudgetPage() {
   useEffect(() => { fetchBudgets(); }, [fetchBudgets]);
   useEffect(() => { fetchLineItems(); }, [fetchLineItems]);
 
-  if (!isBoard) {
+  if (!canRead('budget')) {
     return (
       <div className="space-y-6">
         <h1 className="text-page-title text-text-primary-light dark:text-text-primary-dark">Budget</h1>
         <p className="text-body text-text-muted-light dark:text-text-muted-dark">
-          Budget information is only available to board members.
+          Budget information is only available to authorized members.
         </p>
       </div>
     );
@@ -99,7 +99,7 @@ export default function BudgetPage() {
               </SelectContent>
             </Select>
           )}
-          <Button onClick={() => setCreateOpen(true)}>New Budget</Button>
+          {canWrite('budget') && <Button onClick={() => setCreateOpen(true)}>New Budget</Button>}
         </div>
       </div>
 

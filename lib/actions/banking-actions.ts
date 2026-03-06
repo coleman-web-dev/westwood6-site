@@ -2,28 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
-
-async function getBoardMember(communityId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) throw new Error('Unauthorized');
-
-  const { data: member } = await supabase
-    .from('members')
-    .select('system_role')
-    .eq('user_id', user.id)
-    .eq('community_id', communityId)
-    .single();
-
-  if (!member || !['board', 'manager', 'super_admin'].includes(member.system_role)) {
-    throw new Error('Forbidden');
-  }
-
-  return user;
-}
+import { requirePermission } from '@/lib/actions/auth-guard';
 
 export async function categorizeTransaction(
   communityId: string,
@@ -32,7 +11,7 @@ export async function categorizeTransaction(
   createRule?: { pattern: string; matchField: string },
   vendorId?: string | null,
 ) {
-  await getBoardMember(communityId);
+  await requirePermission(communityId, 'banking', 'write');
   const admin = createAdminClient();
 
   // Update transaction
@@ -66,7 +45,7 @@ export async function matchTransaction(
   transactionId: string,
   journalEntryId: string,
 ) {
-  await getBoardMember(communityId);
+  await requirePermission(communityId, 'banking', 'write');
   const admin = createAdminClient();
 
   await admin
@@ -87,7 +66,7 @@ export async function excludeTransaction(
   transactionId: string,
   reason: string,
 ) {
-  await getBoardMember(communityId);
+  await requirePermission(communityId, 'banking', 'write');
   const admin = createAdminClient();
 
   await admin
@@ -103,7 +82,7 @@ export async function excludeTransaction(
 }
 
 export async function unmatchTransaction(communityId: string, transactionId: string) {
-  await getBoardMember(communityId);
+  await requirePermission(communityId, 'banking', 'write');
   const admin = createAdminClient();
 
   await admin
@@ -127,7 +106,7 @@ export async function mapBankAccountToGL(
   bankAccountId: string,
   glAccountId: string,
 ) {
-  await getBoardMember(communityId);
+  await requirePermission(communityId, 'banking', 'write');
   const admin = createAdminClient();
 
   await admin
@@ -146,7 +125,7 @@ export async function startReconciliation(
   periodEnd: string,
   statementEndingBalance: number,
 ) {
-  const user = await getBoardMember(communityId);
+  const { user } = await requirePermission(communityId, 'banking', 'write');
   const admin = createAdminClient();
 
   // Check for existing in-progress reconciliation
@@ -224,7 +203,7 @@ export async function startReconciliation(
 }
 
 export async function completeReconciliation(communityId: string, reconciliationId: string) {
-  const user = await getBoardMember(communityId);
+  const { user } = await requirePermission(communityId, 'banking', 'write');
   const admin = createAdminClient();
 
   // Verify difference is 0
@@ -264,7 +243,7 @@ export async function updateReconciliationBalance(
   communityId: string,
   reconciliationId: string,
 ) {
-  await getBoardMember(communityId);
+  await requirePermission(communityId, 'banking', 'write');
   const admin = createAdminClient();
 
   const { data: recon } = await admin
@@ -323,7 +302,7 @@ export async function createCategorizationRule(
   accountId: string,
   priority?: number,
 ) {
-  await getBoardMember(communityId);
+  await requirePermission(communityId, 'banking', 'write');
   const admin = createAdminClient();
 
   const { data, error } = await admin
@@ -343,7 +322,7 @@ export async function createCategorizationRule(
 }
 
 export async function deleteCategorizationRule(communityId: string, ruleId: string) {
-  await getBoardMember(communityId);
+  await requirePermission(communityId, 'banking', 'write');
   const admin = createAdminClient();
 
   await admin
@@ -360,7 +339,7 @@ export async function toggleCategorizationRule(
   ruleId: string,
   isActive: boolean,
 ) {
-  await getBoardMember(communityId);
+  await requirePermission(communityId, 'banking', 'write');
   const admin = createAdminClient();
 
   await admin
@@ -378,7 +357,7 @@ export async function createJournalEntryFromBankTxn(
   accountId: string,
   bankAccountGlId: string,
 ) {
-  const user = await getBoardMember(communityId);
+  const { user } = await requirePermission(communityId, 'banking', 'write');
   const admin = createAdminClient();
 
   // Get the transaction

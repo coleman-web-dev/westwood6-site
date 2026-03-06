@@ -49,7 +49,7 @@ interface AppSidebarProps {
 export function AppSidebar({ open, onClose }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { community, isHeadOfHousehold, isBoard, actualIsBoard } = useCommunity();
+  const { community, isHeadOfHousehold, isBoard, actualIsBoard, canRead } = useCommunity();
 
   const onboardingComplete = !!community.theme?.onboarding?.completed_at;
   const basePath = `/${community.slug}`;
@@ -127,7 +127,7 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
             label="Directory"
           />
         )}
-        {isBoard && (
+        {canRead('violations') && (
           <NavItem
             icon={ShieldAlert}
             href={`${basePath}/violations`}
@@ -135,7 +135,7 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
             label="Violations"
           />
         )}
-        {community.theme?.arc_enabled && (
+        {community.theme?.arc_enabled && canRead('arc_requests') && (
           <NavItem
             icon={Ruler}
             href={`${basePath}/arc-requests`}
@@ -143,7 +143,7 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
             label="ARC Requests"
           />
         )}
-        {isBoard && (
+        {canRead('budget') && (
           <NavItem
             icon={PiggyBank}
             href={`${basePath}/budget`}
@@ -151,7 +151,7 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
             label="Budget"
           />
         )}
-        {isBoard && (
+        {canRead('vendors') && (
           <NavItem
             icon={HardHat}
             href={`${basePath}/vendors`}
@@ -159,7 +159,7 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
             label="Vendors"
           />
         )}
-        {isBoard && (
+        {canRead('accounting') && (
           <NavItem
             icon={BookOpen}
             href={`${basePath}/accounting`}
@@ -167,7 +167,7 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
             label="Accounting"
           />
         )}
-        {isBoard && (
+        {canRead('reports') && (
           <NavItem
             icon={BarChart3}
             href={`${basePath}/reports`}

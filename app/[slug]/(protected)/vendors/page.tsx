@@ -26,7 +26,7 @@ const CATEGORY_FILTERS: { value: string; label: string }[] = [
 ];
 
 export default function VendorsPage() {
-  const { isBoard, community, member } = useCommunity();
+  const { isBoard, canRead, canWrite, community, member } = useCommunity();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -50,12 +50,12 @@ export default function VendorsPage() {
     fetchVendors();
   }, [fetchVendors]);
 
-  if (!isBoard) {
+  if (!canRead('vendors')) {
     return (
       <div className="space-y-6">
         <h1 className="text-page-title text-text-primary-light dark:text-text-primary-dark">Vendors</h1>
         <p className="text-body text-text-muted-light dark:text-text-muted-dark">
-          Vendor management is only available to board members.
+          Vendor management is only available to authorized members.
         </p>
       </div>
     );
@@ -74,7 +74,7 @@ export default function VendorsPage() {
             Vendors
           </h1>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>Add Vendor</Button>
+        {canWrite('vendors') && <Button onClick={() => setCreateOpen(true)}>Add Vendor</Button>}
       </div>
 
       <div className="flex flex-wrap gap-2">

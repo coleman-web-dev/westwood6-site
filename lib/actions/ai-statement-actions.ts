@@ -1,30 +1,8 @@
 'use server';
 
 import { createAdminClient } from '@/lib/supabase/admin';
-import { createClient } from '@/lib/supabase/server';
 import type { AIExtractedCheck, AIExtractedTransaction } from '@/lib/types/banking';
-
-async function getBoardMember(communityId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) throw new Error('Unauthorized');
-
-  const { data: member } = await supabase
-    .from('members')
-    .select('id, system_role')
-    .eq('user_id', user.id)
-    .eq('community_id', communityId)
-    .single();
-
-  if (!member || !['board', 'manager', 'super_admin'].includes(member.system_role)) {
-    throw new Error('Forbidden');
-  }
-
-  return { user, member };
-}
+import { requirePermission } from '@/lib/actions/auth-guard';
 
 /**
  * Apply AI-extracted transaction data to an existing uncategorized bank transaction.
@@ -35,7 +13,7 @@ export async function applyAICategorizationToTransaction(
   bankTxnId: string,
   aiTxn: AIExtractedTransaction,
 ) {
-  await getBoardMember(communityId);
+  await requirePermission(communityId, 'banking', 'write');
   const admin = createAdminClient();
 
   const updateData: Record<string, unknown> = {
@@ -78,7 +56,7 @@ export async function batchApplyAICategorizations(
   communityId: string,
   statementUploadId: string,
 ) {
-  await getBoardMember(communityId);
+  await requirePermission(communityId, 'banking', 'write');
   const admin = createAdminClient();
 
   // Get the AI results
@@ -152,7 +130,7 @@ export async function saveCheckImageToVendor(
   imageData: Buffer,
   mimeType: string,
 ) {
-  const { member } = await getBoardMember(communityId);
+  const { member } = await requirePermission(communityId, 'banking', 'write');
   const admin = createAdminClient();
 
   const ext = mimeType === 'image/png' ? 'png' : 'jpg';
@@ -190,7 +168,7 @@ export async function saveCheckImageToHousehold(
   imageData: Buffer,
   mimeType: string,
 ) {
-  await getBoardMember(communityId);
+  await requirePermission(communityId, 'banking', 'write');
   const admin = createAdminClient();
 
   const ext = mimeType === 'image/png' ? 'png' : 'jpg';
@@ -223,7 +201,7 @@ export async function processAIChecks(
   communityId: string,
   checks: AIExtractedCheck[],
 ) {
-  await getBoardMember(communityId);
+  await requirePermission(communityId, 'banking', 'write');
 
   const results = {
     vendor_docs_saved: 0,
@@ -284,7 +262,7 @@ export async function processAIChecks(
  * Get all statement uploads for a community.
  */
 export async function getStatementUploads(communityId: string) {
-  await getBoardMember(communityId);
+  await requirePermission(communityId, 'banking', 'write');
   const admin = createAdminClient();
 
   const { data, error } = await admin

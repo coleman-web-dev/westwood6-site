@@ -39,6 +39,8 @@ export default async function CommunityLayout({ children, params }: Props) {
       system_role: 'super_admin',
       is_approved: true,
       show_in_directory: true,
+      board_title: null,
+      role_template_id: null,
       parent_member_id: null,
       created_at: new Date().toISOString(),
     } as Member;

@@ -3,6 +3,13 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { Community, Member, Unit } from '@/lib/types/database';
 import { DEFAULT_CARD_VISIBILITY, type DashboardCardId } from '@/lib/types/dashboard';
+import type { PermissionKey, PermissionMap } from '@/lib/types/permissions';
+import { noPermissions } from '@/lib/types/permissions';
+import {
+  resolvePermissions,
+  checkPermission,
+  hasAnyPermission,
+} from '@/lib/utils/resolve-permissions';
 
 type ViewMode = 'admin' | 'personal';
 
@@ -21,6 +28,11 @@ interface CommunityContextValue {
   visibleCards: DashboardCardId[];
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
+  // Fine-grained permissions
+  permissions: PermissionMap;
+  hasPermission: (key: PermissionKey, level: 'read' | 'write') => boolean;
+  canRead: (key: PermissionKey) => boolean;
+  canWrite: (key: PermissionKey) => boolean;
 }
 
 const CommunityContext = createContext<CommunityContextValue | null>(null);
@@ -61,6 +73,12 @@ export function CommunityProvider({
 
     const actualIsBoard = systemRole === 'board' || systemRole === 'manager' || systemRole === 'super_admin';
 
+    // Resolve fine-grained permissions from role template
+    const resolvedPermissions = resolvePermissions(member, community);
+
+    // View mode affects whether permissions are active
+    const activePermissions = viewMode === 'admin' ? resolvedPermissions : noPermissions();
+
     const configCards = community.theme?.dashboard_cards?.[role];
     const visibleCards = (configCards ?? DEFAULT_CARD_VISIBILITY[role]) as DashboardCardId[];
 
@@ -70,15 +88,22 @@ export function CommunityProvider({
       unit,
       householdMembers,
       actualIsBoard,
-      isBoard: viewMode === 'admin' ? actualIsBoard : false,
+      // isBoard is true if the user has ANY admin permission (backward-compatible)
+      isBoard: viewMode === 'admin' ? hasAnyPermission(resolvedPermissions) : false,
       isManager: viewMode === 'admin' ? (systemRole === 'manager' || systemRole === 'super_admin') : false,
       isSuperAdmin: viewMode === 'admin' ? systemRole === 'super_admin' : false,
       isHeadOfHousehold: member?.member_role === 'owner' && member?.parent_member_id === null,
       visibleCards,
       viewMode,
       setViewMode,
+      // Permission helpers
+      permissions: activePermissions,
+      hasPermission: (key: PermissionKey, level: 'read' | 'write') =>
+        checkPermission(activePermissions, key, level),
+      canRead: (key: PermissionKey) => checkPermission(activePermissions, key, 'read'),
+      canWrite: (key: PermissionKey) => checkPermission(activePermissions, key, 'write'),
     };
-   
+
   }, [community, member, unit, householdMembers, viewMode]);
 
   return (

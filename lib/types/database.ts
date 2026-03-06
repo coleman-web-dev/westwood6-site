@@ -87,6 +87,7 @@ export interface CommunityTheme {
   vendors_config?: CommunityVendorsConfig;
   vendor_settings?: VendorSettings;
   check_settings?: import('./check').CheckSettings;
+  role_templates?: import('./permissions').RoleTemplate[];
   [key: string]: unknown;
 }
 
@@ -135,6 +136,7 @@ export interface Member {
   system_role: SystemRole;
   parent_member_id: string | null;
   board_title: string | null;
+  role_template_id: string | null;
   show_in_directory: boolean;
   is_approved: boolean;
   stripe_customer_id?: string | null;

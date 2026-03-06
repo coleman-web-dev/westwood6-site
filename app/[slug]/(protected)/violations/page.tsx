@@ -21,7 +21,7 @@ const STATUS_TABS: { value: string; label: string }[] = [
 ];
 
 export default function ViolationsPage() {
-  const { isBoard, community, unit } = useCommunity();
+  const { isBoard, canRead, canWrite, community, unit } = useCommunity();
   const [violations, setViolations] = useState<Violation[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,8 +46,10 @@ export default function ViolationsPage() {
     setLoading(false);
   }, [community.id, isBoard, unit]);
 
+  const canWriteViolations = canWrite('violations');
+
   const fetchUnits = useCallback(async () => {
-    if (!isBoard) return;
+    if (!canWriteViolations) return;
     const supabase = createClient();
     const { data } = await supabase
       .from('units')
@@ -56,7 +58,7 @@ export default function ViolationsPage() {
       .eq('status', 'active')
       .order('unit_number');
     setUnits((data as Unit[]) || []);
-  }, [isBoard, community.id]);
+  }, [canWriteViolations, community.id]);
 
   useEffect(() => {
     fetchViolations();
@@ -73,18 +75,18 @@ export default function ViolationsPage() {
         <div className="flex items-center gap-3">
           <ShieldAlert className="h-6 w-6 text-text-primary-light dark:text-text-primary-dark" />
           <h1 className="text-page-title text-text-primary-light dark:text-text-primary-dark">
-            {isBoard ? 'Violations' : 'My Violations'}
+            {canRead('violations') ? 'Violations' : 'My Violations'}
           </h1>
         </div>
-        {isBoard && (
+        {canWrite('violations') && (
           <Button onClick={() => setCreateOpen(true)}>
             Report Violation
           </Button>
         )}
       </div>
 
-      {/* Status filter tabs (board only) */}
-      {isBoard && (
+      {/* Status filter tabs */}
+      {canRead('violations') && (
         <div className="flex flex-wrap gap-2">
           {STATUS_TABS.map((tab) => (
             <button
@@ -109,7 +111,7 @@ export default function ViolationsPage() {
         onSelect={setSelectedViolation}
       />
 
-      {isBoard && (
+      {canWrite('violations') && (
         <CreateViolationDialog
           open={createOpen}
           onOpenChange={setCreateOpen}

@@ -1,32 +1,10 @@
 'use server';
 
 import { createAdminClient } from '@/lib/supabase/admin';
-import { createClient } from '@/lib/supabase/server';
 import { createJournalEntry, reverseJournalEntry } from '@/lib/utils/accounting-entries';
 import { queueEmail } from '@/lib/email/queue';
 import type { CheckSettings, CheckWithDetails } from '@/lib/types/check';
-
-async function getBoardMember(communityId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) throw new Error('Unauthorized');
-
-  const { data: member } = await supabase
-    .from('members')
-    .select('id, system_role, name, email')
-    .eq('user_id', user.id)
-    .eq('community_id', communityId)
-    .single();
-
-  if (!member || !['board', 'manager', 'super_admin'].includes(member.system_role)) {
-    throw new Error('Forbidden');
-  }
-
-  return { user, member };
-}
+import { requirePermission } from '@/lib/actions/auth-guard';
 
 /** Get check settings from community theme */
 export async function getCheckSettings(communityId: string): Promise<CheckSettings> {
@@ -50,7 +28,7 @@ export async function getCheckSettings(communityId: string): Promise<CheckSettin
 /** Update check settings in community theme */
 export async function updateCheckSettings(communityId: string, settings: CheckSettings) {
   try {
-    await getBoardMember(communityId);
+    await requirePermission(communityId, 'checks', 'read');
     const admin = createAdminClient();
 
     const { data: community } = await admin
@@ -83,7 +61,7 @@ export async function createCheckSequence(params: {
   prefix?: string;
 }) {
   try {
-    await getBoardMember(params.communityId);
+    await requirePermission(params.communityId, 'checks', 'write');
     const admin = createAdminClient();
 
     const { data, error } = await admin
@@ -115,7 +93,7 @@ export async function updateCheckSequence(params: {
   bankAccountLabel?: string;
 }) {
   try {
-    await getBoardMember(params.communityId);
+    await requirePermission(params.communityId, 'checks', 'write');
     const admin = createAdminClient();
 
     const updates: Record<string, unknown> = {};
@@ -161,7 +139,7 @@ export async function createCheck(params: {
   checkSequenceId: string;
 }) {
   try {
-    const { user } = await getBoardMember(params.communityId);
+    const { user } = await requirePermission(params.communityId, 'checks', 'write');
     const admin = createAdminClient();
 
     // Atomically get next check number
@@ -319,7 +297,7 @@ export async function createCheck(params: {
 /** Approve a check (as a designated signer) */
 export async function approveCheck(communityId: string, checkId: string) {
   try {
-    const { member } = await getBoardMember(communityId);
+    const { member } = await requirePermission(communityId, 'checks', 'write');
     const admin = createAdminClient();
 
     // Get the signer's signature
@@ -384,7 +362,7 @@ export async function approveCheck(communityId: string, checkId: string) {
 /** Reject a check */
 export async function rejectCheck(communityId: string, checkId: string, reason: string) {
   try {
-    const { member } = await getBoardMember(communityId);
+    const { member } = await requirePermission(communityId, 'checks', 'write');
     const admin = createAdminClient();
 
     // Update approval record
@@ -423,7 +401,7 @@ export async function rejectCheck(communityId: string, checkId: string, reason: 
 /** Print a check and create journal entry */
 export async function printCheck(communityId: string, checkId: string) {
   try {
-    const { user } = await getBoardMember(communityId);
+    const { user } = await requirePermission(communityId, 'checks', 'write');
     const admin = createAdminClient();
 
     // Get check with account details
@@ -479,7 +457,7 @@ export async function printCheck(communityId: string, checkId: string) {
 /** Void a check, reverse journal entry if exists */
 export async function voidCheck(communityId: string, checkId: string, reason: string) {
   try {
-    const { user } = await getBoardMember(communityId);
+    const { user } = await requirePermission(communityId, 'checks', 'write');
     const admin = createAdminClient();
 
     const { data: check } = await admin
@@ -522,7 +500,7 @@ export async function uploadSignature(
   filePath: string,
 ) {
   try {
-    await getBoardMember(communityId);
+    await requirePermission(communityId, 'checks', 'read');
     const admin = createAdminClient();
 
     // Upsert signature record
@@ -549,7 +527,7 @@ export async function uploadSignature(
 /** Delete a board member's signature */
 export async function deleteSignature(communityId: string, memberId: string) {
   try {
-    await getBoardMember(communityId);
+    await requirePermission(communityId, 'checks', 'read');
     const admin = createAdminClient();
 
     // Get the file path first
@@ -660,7 +638,7 @@ export async function linkCheckToTransaction(
   bankTransactionId: string,
 ) {
   try {
-    await getBoardMember(communityId);
+    await requirePermission(communityId, 'checks', 'read');
     const admin = createAdminClient();
 
     const { data: check } = await admin

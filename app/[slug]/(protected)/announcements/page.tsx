@@ -10,7 +10,7 @@ import { CreateAnnouncementDialog } from '@/components/announcements/create-anno
 import type { Announcement } from '@/lib/types/database';
 
 export default function AnnouncementsPage() {
-  const { community, isBoard } = useCommunity();
+  const { community, isBoard, canWrite } = useCommunity();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -57,7 +57,7 @@ export default function AnnouncementsPage() {
         <h1 className="text-page-title text-text-primary-light dark:text-text-primary-dark">
           Announcements
         </h1>
-        {isBoard && (
+        {canWrite('announcements') && (
           <Button onClick={handleCreate}>
             <Plus className="h-4 w-4 mr-2" />
             New Announcement

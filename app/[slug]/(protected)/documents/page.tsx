@@ -27,7 +27,7 @@ const CATEGORY_TABS: { value: string; label: string }[] = [
 ];
 
 export default function DocumentsPage() {
-  const { community, isBoard } = useCommunity();
+  const { community, isBoard, canRead, canWrite } = useCommunity();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -51,8 +51,10 @@ export default function DocumentsPage() {
     setLoading(false);
   }, [community.id]);
 
+  const canReadDocuments = canRead('documents');
+
   const fetchAgreements = useCallback(async () => {
-    if (!isBoard) {
+    if (!canReadDocuments) {
       setAgreementsLoading(false);
       return;
     }
@@ -66,7 +68,7 @@ export default function DocumentsPage() {
 
     setAgreements((data as AgreementRow[]) ?? []);
     setAgreementsLoading(false);
-  }, [community.id, isBoard]);
+  }, [community.id, canReadDocuments]);
 
   useEffect(() => {
     fetchDocuments();
@@ -87,7 +89,7 @@ export default function DocumentsPage() {
         <h1 className="text-page-title text-text-primary-light dark:text-text-primary-dark">
           Documents
         </h1>
-        {isBoard && (
+        {canWrite('documents') && (
           <Button onClick={() => setDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Upload Document
@@ -118,7 +120,7 @@ export default function DocumentsPage() {
               />
 
               {/* Signed agreements section (board only, on "all" and "forms" tabs) */}
-              {isBoard && (tab.value === 'all' || tab.value === 'forms') && (
+              {canReadDocuments && (tab.value === 'all' || tab.value === 'forms') && (
                 <SignedAgreementsDocSection
                   agreements={agreements}
                   loading={agreementsLoading}

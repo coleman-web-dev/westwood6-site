@@ -9,13 +9,14 @@ import { CommunitySettings } from '@/components/settings/community-settings';
 import { LandingPageSettings } from '@/components/settings/landing-page-settings';
 import { MfaSettings } from '@/components/settings/mfa-settings';
 import { AuditLogViewer } from '@/components/settings/audit-log-viewer';
+import { RolePermissionsManager } from '@/components/settings/role-permissions-manager';
 
 export default function SettingsPage() {
-  const { isBoard } = useCommunity();
+  const { canWrite, canRead } = useCommunity();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab');
 
-  const validTabs = ['profile', 'security', 'community', 'landing', 'audit'];
+  const validTabs = ['profile', 'security', 'community', 'landing', 'roles', 'audit'];
   const defaultTab =
     tabParam && validTabs.includes(tabParam) ? tabParam : 'profile';
 
@@ -29,9 +30,10 @@ export default function SettingsPage() {
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
-          {isBoard && <TabsTrigger value="community">Community</TabsTrigger>}
-          {isBoard && <TabsTrigger value="landing">Landing Page</TabsTrigger>}
-          {isBoard && <TabsTrigger value="audit">Audit Log</TabsTrigger>}
+          {canRead('settings') && <TabsTrigger value="community">Community</TabsTrigger>}
+          {canRead('settings') && <TabsTrigger value="landing">Landing Page</TabsTrigger>}
+          {canWrite('settings') && <TabsTrigger value="roles">Roles</TabsTrigger>}
+          {canRead('settings') && <TabsTrigger value="audit">Audit Log</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="profile">
@@ -45,19 +47,25 @@ export default function SettingsPage() {
           <MfaSettings />
         </TabsContent>
 
-        {isBoard && (
+        {canRead('settings') && (
           <TabsContent value="community">
             <CommunitySettings />
           </TabsContent>
         )}
 
-        {isBoard && (
+        {canRead('settings') && (
           <TabsContent value="landing">
             <LandingPageSettings />
           </TabsContent>
         )}
 
-        {isBoard && (
+        {canWrite('settings') && (
+          <TabsContent value="roles">
+            <RolePermissionsManager />
+          </TabsContent>
+        )}
+
+        {canRead('settings') && (
           <TabsContent value="audit">
             <AuditLogViewer />
           </TabsContent>
