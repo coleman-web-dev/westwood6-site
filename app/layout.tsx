@@ -110,6 +110,11 @@ export default function RootLayout({
         />
         <link
           rel="icon"
+          type="image/svg+xml"
+          href="/static/favicons/icon.svg"
+        />
+        <link
+          rel="icon"
           type="image/png"
           sizes="32x32"
           href="/static/favicons/favicon-32x32.png"

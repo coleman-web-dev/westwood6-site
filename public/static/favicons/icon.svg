@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="108" fill="#1D2024"/>
+  <text x="180" y="420" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-weight="800" font-size="440" fill="#F4AE90" opacity="0.3">D</text>
+  <text x="256" y="350" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-weight="800" font-size="220" fill="#FFFFFF" text-anchor="middle">IQ</text>
+</svg>
