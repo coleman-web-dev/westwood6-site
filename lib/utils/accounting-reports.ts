@@ -4,6 +4,8 @@ import type {
   BalanceSheetReport,
   IncomeStatementReport,
   FundSummary,
+  BudgetVarianceRow,
+  CashFlowRow,
 } from '@/lib/types/accounting';
 
 /**
@@ -211,4 +213,190 @@ export async function getFundSummary(communityId: string): Promise<FundSummary> 
     total_revenue_ytd: totalRevenue,
     total_expenses_ytd: totalExpenses,
   };
+}
+
+/** Get budget variance for a fiscal year */
+export async function getBudgetVariance(
+  communityId: string,
+  fiscalYear: number,
+): Promise<BudgetVarianceRow[]> {
+  const supabase = createAdminClient();
+
+  const { data: budget } = await supabase
+    .from('budgets')
+    .select('id')
+    .eq('community_id', communityId)
+    .eq('fiscal_year', fiscalYear)
+    .single();
+
+  if (!budget) return [];
+
+  const { data: items } = await supabase
+    .from('budget_line_items')
+    .select('*')
+    .eq('budget_id', budget.id)
+    .order('category');
+
+  if (!items) return [];
+
+  // Get actual amounts from GL for the fiscal year
+  const startDate = `${fiscalYear}-01-01`;
+  const endDate = `${fiscalYear}-12-31`;
+  const incomeStatement = await getIncomeStatement(communityId, startDate, endDate);
+
+  const actualByName = new Map<string, number>();
+  for (const row of [...incomeStatement.revenue.accounts, ...incomeStatement.expenses.accounts]) {
+    actualByName.set(row.name.toLowerCase(), row.balance);
+  }
+
+  return items.map((item) => {
+    const actual = actualByName.get(item.name.toLowerCase()) || item.actual_amount || 0;
+    const variance = item.is_income ? actual - item.budgeted_amount : item.budgeted_amount - actual;
+    const variance_pct = item.budgeted_amount > 0
+      ? ((actual / item.budgeted_amount) * 100)
+      : actual > 0 ? 999 : 0;
+
+    return {
+      category: item.category,
+      name: item.name,
+      budgeted: item.budgeted_amount,
+      actual,
+      variance,
+      variance_pct,
+      is_income: item.is_income,
+      over_threshold: !item.is_income && variance_pct > 80,
+    };
+  });
+}
+
+/** Get cash flow forecast for the next N months */
+export async function getCashFlowForecast(
+  communityId: string,
+  months: number = 6,
+): Promise<CashFlowRow[]> {
+  const supabase = createAdminClient();
+
+  // Get current cash position
+  const trialBalance = await getTrialBalance(communityId);
+  const currentCash = (trialBalance.find((r) => r.code === '1000')?.balance ?? 0)
+    + (trialBalance.find((r) => r.code === '1010')?.balance ?? 0);
+
+  // Get average monthly income and expenses from last 3 months
+  const now = new Date();
+  const threeMonthsAgo = new Date(now);
+  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+  const startDate = threeMonthsAgo.toISOString().split('T')[0];
+  const endDate = now.toISOString().split('T')[0];
+
+  const incomeStatement = await getIncomeStatement(communityId, startDate, endDate);
+  const avgMonthlyIncome = incomeStatement.revenue.total / 3;
+  const avgMonthlyExpenses = incomeStatement.expenses.total / 3;
+
+  // Get upcoming invoices for more accurate projections
+  const { data: pendingInvoices } = await supabase
+    .from('invoices')
+    .select('amount, due_date')
+    .eq('community_id', communityId)
+    .in('status', ['pending', 'overdue'])
+    .gte('due_date', now.toISOString().split('T')[0]);
+
+  // Build monthly forecast
+  const rows: CashFlowRow[] = [];
+  let runningBalance = currentCash;
+
+  for (let i = 0; i < months; i++) {
+    const forecastDate = new Date(now);
+    forecastDate.setMonth(forecastDate.getMonth() + i + 1);
+    const month = forecastDate.toISOString().slice(0, 7);
+    const label = forecastDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+
+    // Sum pending invoices due this month
+    const monthInvoiceIncome = (pendingInvoices || [])
+      .filter((inv) => inv.due_date?.startsWith(month))
+      .reduce((sum, inv) => sum + inv.amount, 0);
+
+    const projectedIncome = Math.max(monthInvoiceIncome, avgMonthlyIncome);
+    const projectedExpenses = avgMonthlyExpenses;
+    const netCashFlow = projectedIncome - projectedExpenses;
+    runningBalance += netCashFlow;
+
+    rows.push({
+      month,
+      label,
+      projected_income: Math.round(projectedIncome),
+      projected_expenses: Math.round(projectedExpenses),
+      net_cash_flow: Math.round(netCashFlow),
+      running_balance: Math.round(runningBalance),
+    });
+  }
+
+  return rows;
+}
+
+/** Get budget comparison across multiple fiscal years */
+export async function getBudgetComparison(
+  communityId: string,
+  years: number[],
+): Promise<{ year: number; items: { category: string; name: string; budgeted: number; actual: number; is_income: boolean }[] }[]> {
+  const supabase = createAdminClient();
+
+  const results: { year: number; items: { category: string; name: string; budgeted: number; actual: number; is_income: boolean }[] }[] = [];
+
+  for (const year of years) {
+    const { data: budget } = await supabase
+      .from('budgets')
+      .select('id')
+      .eq('community_id', communityId)
+      .eq('fiscal_year', year)
+      .single();
+
+    if (!budget) {
+      results.push({ year, items: [] });
+      continue;
+    }
+
+    const { data: items } = await supabase
+      .from('budget_line_items')
+      .select('category, name, budgeted_amount, actual_amount, is_income')
+      .eq('budget_id', budget.id)
+      .order('category');
+
+    results.push({
+      year,
+      items: (items || []).map((i) => ({
+        category: i.category,
+        name: i.name,
+        budgeted: i.budgeted_amount,
+        actual: i.actual_amount || 0,
+        is_income: i.is_income,
+      })),
+    });
+  }
+
+  return results;
+}
+
+/** Generate CSV export of chart of accounts */
+export function generateChartOfAccountsCSV(accounts: TrialBalanceRow[]): string {
+  const header = 'Account Code,Account Name,Type,Fund,Debit,Credit,Balance';
+  const rows = accounts.map((a) =>
+    `${a.code},"${a.name}",${a.account_type},${a.fund},${(a.debit_total / 100).toFixed(2)},${(a.credit_total / 100).toFixed(2)},${(a.balance / 100).toFixed(2)}`
+  );
+  return [header, ...rows].join('\n');
+}
+
+/** Generate CSV export of journal entries */
+export function generateJournalEntriesCSV(
+  entries: { entry_date: string; description: string; source: string; status: string; memo: string | null; lines: { code: string; name: string; debit: number; credit: number }[] }[],
+): string {
+  const header = 'Date,Description,Source,Status,Memo,Account Code,Account Name,Debit,Credit';
+  const rows: string[] = [];
+  for (const entry of entries) {
+    for (const line of entry.lines) {
+      rows.push(
+        `${entry.entry_date},"${entry.description}",${entry.source},${entry.status},"${entry.memo || ''}",${line.code},"${line.name}",${(line.debit / 100).toFixed(2)},${(line.credit / 100).toFixed(2)}`
+      );
+    }
+  }
+  return [header, ...rows].join('\n');
 }

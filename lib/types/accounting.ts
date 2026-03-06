@@ -14,7 +14,9 @@ export type JournalSource =
   | 'refund'
   | 'assessment_generated'
   | 'bank_sync'
-  | 'vendor_payment';
+  | 'vendor_payment'
+  | 'fund_transfer'
+  | 'recurring';
 export type JournalStatus = 'draft' | 'posted' | 'reversed';
 
 // ─── Row Types ─────────────────────────────────────────────────────
@@ -133,4 +135,102 @@ export interface FundSummary {
   total_ar: number;
   total_revenue_ytd: number;
   total_expenses_ytd: number;
+}
+
+// ─── Recurring Journal Entries ────────────────────────────────────
+
+export type RecurringFrequency = 'monthly' | 'quarterly' | 'annually';
+
+export interface RecurringJournalEntry {
+  id: string;
+  community_id: string;
+  description: string;
+  memo: string | null;
+  frequency: RecurringFrequency;
+  next_run_date: string;
+  end_date: string | null;
+  lines: { accountCode: string; debit: number; credit: number; description?: string }[];
+  is_active: boolean;
+  last_run_date: string | null;
+  times_run: number;
+  created_by: string | null;
+  created_at: string;
+}
+
+// ─── Delinquency ─────────────────────────────────────────────────
+
+export type DelinquencyActionType = 'reminder' | 'late_notice' | 'lien_warning' | 'lien_filed';
+
+export interface DelinquencyRule {
+  id: string;
+  community_id: string;
+  step_order: number;
+  days_overdue: number;
+  action_type: DelinquencyActionType;
+  email_subject: string;
+  email_body: string;
+  apply_late_fee: boolean;
+  late_fee_amount: number | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface DelinquencyAction {
+  id: string;
+  community_id: string;
+  invoice_id: string;
+  unit_id: string;
+  rule_id: string;
+  action_type: string;
+  sent_at: string;
+  email_sent: boolean;
+  late_fee_applied: boolean;
+  notes: string | null;
+}
+
+// ─── Budget ──────────────────────────────────────────────────────
+
+export interface Budget {
+  id: string;
+  community_id: string;
+  fiscal_year: number;
+  total_income: number;
+  total_expense: number;
+  reserve_contribution: number;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface BudgetLineItem {
+  id: string;
+  budget_id: string;
+  category: string;
+  name: string;
+  budgeted_amount: number;
+  actual_amount: number;
+  is_income: boolean;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface BudgetVarianceRow {
+  category: string;
+  name: string;
+  budgeted: number;
+  actual: number;
+  variance: number;
+  variance_pct: number;
+  is_income: boolean;
+  over_threshold: boolean;
+}
+
+// ─── Cash Flow Forecast ──────────────────────────────────────────
+
+export interface CashFlowRow {
+  month: string;
+  label: string;
+  projected_income: number;
+  projected_expenses: number;
+  net_cash_flow: number;
+  running_balance: number;
 }

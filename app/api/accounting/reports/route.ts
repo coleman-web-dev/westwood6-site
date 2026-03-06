@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { getTrialBalance, getBalanceSheet, getIncomeStatement } from '@/lib/utils/accounting-reports';
+import { getTrialBalance, getBalanceSheet, getIncomeStatement, getBudgetVariance, getCashFlowForecast } from '@/lib/utils/accounting-reports';
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient();
@@ -47,6 +47,16 @@ export async function GET(req: NextRequest) {
       }
       const data = await getIncomeStatement(communityId, startDate, endDate);
       return NextResponse.json(data);
+    }
+    case 'budget-variance': {
+      const year = parseInt(req.nextUrl.searchParams.get('year') || String(new Date().getFullYear()));
+      const rows = await getBudgetVariance(communityId, year);
+      return NextResponse.json({ rows });
+    }
+    case 'cash-flow': {
+      const months = parseInt(req.nextUrl.searchParams.get('months') || '6');
+      const rows = await getCashFlowForecast(communityId, months);
+      return NextResponse.json({ rows });
     }
     default:
       return NextResponse.json({ error: 'Unknown report type' }, { status: 400 });

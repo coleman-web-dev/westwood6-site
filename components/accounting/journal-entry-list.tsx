@@ -22,6 +22,8 @@ const SOURCE_LABELS: Record<JournalSource, string> = {
   assessment_generated: 'Assessment',
   bank_sync: 'Bank Sync',
   vendor_payment: 'Vendor Payment',
+  fund_transfer: 'Fund Transfer',
+  recurring: 'Recurring',
 };
 
 const STATUS_VARIANT: Record<JournalStatus, 'outline' | 'secondary' | 'destructive'> = {

@@ -16,6 +16,14 @@ import { BankTransactionList } from '@/components/accounting/bank-transaction-li
 import { CategorizationRulesManager } from '@/components/accounting/categorization-rules-manager';
 import { ReconciliationList } from '@/components/accounting/reconciliation-list';
 import { AIStatementProcessor } from '@/components/accounting/ai-statement-processor';
+import { InterFundTransferDialog } from '@/components/accounting/inter-fund-transfer-dialog';
+import { CashFlowForecast } from '@/components/accounting/cash-flow-forecast';
+import { BudgetVariance } from '@/components/accounting/budget-variance';
+import { BudgetComparison } from '@/components/accounting/budget-comparison';
+import { RecurringEntries } from '@/components/accounting/recurring-entries';
+import { FinancialAuditTrail } from '@/components/accounting/financial-audit-trail';
+import { ExportDialog } from '@/components/accounting/export-dialog';
+import { DelinquencySettings } from '@/components/accounting/delinquency-settings';
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard' },
@@ -24,6 +32,7 @@ const TABS = [
   { id: 'banking', label: 'Banking' },
   { id: 'reconciliation', label: 'Reconciliation' },
   { id: 'reports', label: 'Reports' },
+  { id: 'automation', label: 'Automation' },
 ] as const;
 
 type Tab = (typeof TABS)[number]['id'];
@@ -32,6 +41,10 @@ const REPORT_SUBTABS = [
   { id: 'trial-balance', label: 'Trial Balance' },
   { id: 'balance-sheet', label: 'Balance Sheet' },
   { id: 'income-statement', label: 'Income Statement' },
+  { id: 'cash-flow', label: 'Cash Flow' },
+  { id: 'budget-variance', label: 'Budget Variance' },
+  { id: 'budget-comparison', label: 'Multi-Year' },
+  { id: 'audit-trail', label: 'Audit Trail' },
 ] as const;
 
 type ReportSubtab = (typeof REPORT_SUBTABS)[number]['id'];
@@ -45,11 +58,19 @@ const BANKING_SUBTABS = [
 
 type BankingSubtab = (typeof BANKING_SUBTABS)[number]['id'];
 
+const JOURNAL_SUBTABS = [
+  { id: 'entries', label: 'Entries' },
+  { id: 'recurring', label: 'Recurring' },
+] as const;
+
+type JournalSubtab = (typeof JOURNAL_SUBTABS)[number]['id'];
+
 export default function AccountingPage() {
   const { isBoard, community } = useCommunity();
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [reportTab, setReportTab] = useState<ReportSubtab>('trial-balance');
   const [bankingTab, setBankingTab] = useState<BankingSubtab>('connections');
+  const [journalTab, setJournalTab] = useState<JournalSubtab>('entries');
   const [isSetUp, setIsSetUp] = useState<boolean | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -138,7 +159,16 @@ export default function AccountingPage() {
 
       {/* Tab content */}
       {activeTab === 'dashboard' && (
-        <FundSummaryCards key={`fund-${refreshKey}`} communityId={community.id} />
+        <div className="space-y-6">
+          <div className="flex items-center justify-end gap-2">
+            <InterFundTransferDialog
+              communityId={community.id}
+              onComplete={() => setRefreshKey((k) => k + 1)}
+            />
+            <ExportDialog communityId={community.id} />
+          </div>
+          <FundSummaryCards key={`fund-${refreshKey}`} communityId={community.id} />
+        </div>
       )}
 
       {activeTab === 'chart' && (
@@ -146,7 +176,31 @@ export default function AccountingPage() {
       )}
 
       {activeTab === 'journal' && (
-        <JournalEntryList key={`je-${refreshKey}`} communityId={community.id} />
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            {JOURNAL_SUBTABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setJournalTab(tab.id)}
+                className={`px-3 py-1.5 rounded-pill text-meta transition-colors ${
+                  journalTab === tab.id
+                    ? 'bg-secondary-400/15 text-secondary-400'
+                    : 'bg-surface-light-2 dark:bg-surface-dark-2 text-text-muted-light dark:text-text-muted-dark hover:text-text-secondary-light dark:hover:text-text-secondary-dark'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {journalTab === 'entries' && (
+            <JournalEntryList key={`je-${refreshKey}`} communityId={community.id} />
+          )}
+          {journalTab === 'recurring' && (
+            <RecurringEntries key={`re-${refreshKey}`} communityId={community.id} />
+          )}
+        </div>
       )}
 
       {activeTab === 'banking' && (
@@ -203,21 +257,24 @@ export default function AccountingPage() {
 
       {activeTab === 'reports' && (
         <div className="space-y-4">
-          <div className="flex gap-2">
-            {REPORT_SUBTABS.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setReportTab(tab.id)}
-                className={`px-3 py-1.5 rounded-pill text-meta transition-colors ${
-                  reportTab === tab.id
-                    ? 'bg-secondary-400/15 text-secondary-400'
-                    : 'bg-surface-light-2 dark:bg-surface-dark-2 text-text-muted-light dark:text-text-muted-dark hover:text-text-secondary-light dark:hover:text-text-secondary-dark'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+          <div className="flex items-center justify-between">
+            <div className="flex gap-2 flex-wrap">
+              {REPORT_SUBTABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setReportTab(tab.id)}
+                  className={`px-3 py-1.5 rounded-pill text-meta transition-colors ${
+                    reportTab === tab.id
+                      ? 'bg-secondary-400/15 text-secondary-400'
+                      : 'bg-surface-light-2 dark:bg-surface-dark-2 text-text-muted-light dark:text-text-muted-dark hover:text-text-secondary-light dark:hover:text-text-secondary-dark'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            <ExportDialog communityId={community.id} />
           </div>
 
           {reportTab === 'trial-balance' && (
@@ -229,6 +286,24 @@ export default function AccountingPage() {
           {reportTab === 'income-statement' && (
             <IncomeStatement key={`is-${refreshKey}`} communityId={community.id} />
           )}
+          {reportTab === 'cash-flow' && (
+            <CashFlowForecast key={`cf-${refreshKey}`} communityId={community.id} />
+          )}
+          {reportTab === 'budget-variance' && (
+            <BudgetVariance key={`bv-${refreshKey}`} communityId={community.id} />
+          )}
+          {reportTab === 'budget-comparison' && (
+            <BudgetComparison key={`bc2-${refreshKey}`} communityId={community.id} />
+          )}
+          {reportTab === 'audit-trail' && (
+            <FinancialAuditTrail key={`at-${refreshKey}`} communityId={community.id} />
+          )}
+        </div>
+      )}
+
+      {activeTab === 'automation' && (
+        <div className="space-y-6">
+          <DelinquencySettings key={`dl-${refreshKey}`} communityId={community.id} />
         </div>
       )}
     </div>

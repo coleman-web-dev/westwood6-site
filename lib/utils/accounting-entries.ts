@@ -309,6 +309,32 @@ export async function postVendorPayment(
   });
 }
 
+/** Inter-fund transfer: DR destination fund cash, CR source fund cash */
+export async function postInterFundTransfer(
+  communityId: string,
+  fromFund: 'operating' | 'reserve',
+  toFund: 'operating' | 'reserve',
+  amount: number,
+  description: string,
+  entryDate?: string,
+  memo?: string,
+  createdBy?: string,
+) {
+  const cashCodes: Record<string, string> = { operating: '1000', reserve: '1010' };
+  return createJournalEntry({
+    communityId,
+    entryDate,
+    description: `Fund transfer: ${description}`,
+    source: 'fund_transfer',
+    memo,
+    createdBy,
+    lines: [
+      { accountCode: cashCodes[toFund], debit: amount, credit: 0, description: `Transfer to ${toFund} fund` },
+      { accountCode: cashCodes[fromFund], debit: 0, credit: amount, description: `Transfer from ${fromFund} fund` },
+    ],
+  });
+}
+
 /**
  * Reverse an existing journal entry.
  * Creates a new entry with swapped debits/credits and links them.
