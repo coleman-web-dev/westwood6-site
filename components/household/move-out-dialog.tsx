@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import {
   Dialog,
   DialogContent,
@@ -13,6 +12,8 @@ import {
 } from '@/components/shared/ui/dialog';
 import { Button } from '@/components/shared/ui/button';
 import { toast } from 'sonner';
+import { useCommunity } from '@/lib/providers/community-provider';
+import { deprovisionMembers } from '@/lib/actions/deprovisioning-actions';
 import type { Unit, Member } from '@/lib/types/database';
 
 interface MoveOutDialogProps {
@@ -30,6 +31,7 @@ export function MoveOutDialog({
   onOpenChange,
   onSuccess,
 }: MoveOutDialogProps) {
+  const { member: currentMember } = useCommunity();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [emailHistory, setEmailHistory] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -57,16 +59,16 @@ export function MoveOutDialog({
     }
 
     setSubmitting(true);
-    const supabase = createClient();
 
-    const { error } = await supabase
-      .from('members')
-      .update({ unit_id: null })
-      .in('id', [...selectedIds]);
+    const result = await deprovisionMembers(
+      [...selectedIds],
+      currentMember?.user_id || '',
+      currentMember?.email || '',
+    );
 
     setSubmitting(false);
 
-    if (error) {
+    if (!result.success) {
       toast.error('Failed to remove members. Please try again.');
       return;
     }

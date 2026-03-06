@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getPlaidClient } from '@/lib/plaid';
+import { logAuditEvent } from '@/lib/audit';
 
 export async function POST(request: Request) {
   try {
@@ -95,6 +96,19 @@ export async function POST(request: Request) {
       console.error('Error saving bank accounts:', acctError);
       return NextResponse.json({ error: 'Failed to save bank accounts' }, { status: 500 });
     }
+
+    await logAuditEvent({
+      communityId,
+      actorId: user.id,
+      actorEmail: user.email || null,
+      action: 'plaid_connected',
+      targetType: 'plaid_connection',
+      targetId: connection.id,
+      metadata: {
+        institution_name: institutionName,
+        accounts_count: savedAccounts?.length || 0,
+      },
+    });
 
     return NextResponse.json({
       connection,

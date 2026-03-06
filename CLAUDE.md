@@ -434,3 +434,20 @@ Before completing any task:
 - Check for TypeScript errors (`npm run build` or IDE diagnostics)
 - Fix any linting or type errors before considering the task complete
 - This is critical and must never be skipped
+
+## Pending Deployment Steps
+
+### Plaid Security Attestation (due 09/06/2026)
+
+All 13 Plaid attestation requirements have been implemented. Before deploying:
+
+1. **Run the audit_log migration** against Supabase: `supabase/migrations/20260305000004_audit_log.sql`
+2. **Push to GitHub** to activate Dependabot and the security scanning workflow (`.github/workflows/security.yml`)
+3. **Enable MFA in Supabase Dashboard**: Go to Authentication > Multi-Factor Authentication and enable TOTP
+
+Key files for reference:
+- Policy docs: `SECURITY.md`, `policies/access-control.md`, `policies/data-retention.md`, `policies/eol-management.md`
+- MFA: `components/settings/mfa-settings.tsx`, login MFA challenge in `app/(auth)/login/page.tsx`
+- Audit logging: `lib/audit.ts`, `components/settings/audit-log-viewer.tsx`
+- De-provisioning: `lib/actions/deprovisioning-actions.ts`
+- Data retention cron: `app/api/cron/data-retention/route.ts` (monthly, configured in `vercel.json`)

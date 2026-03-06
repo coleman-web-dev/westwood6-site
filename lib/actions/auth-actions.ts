@@ -1,6 +1,7 @@
 'use server';
 
 import { createAdminClient } from '@/lib/supabase/admin';
+import { logAuditEvent } from '@/lib/audit';
 
 // Check if a member with this email exists (for first-timer detection on login page)
 export async function checkMemberExists(email: string): Promise<boolean> {
@@ -37,4 +38,54 @@ export async function sendPasswordSetupLink(
   }
 
   return { success: true };
+}
+
+// Log a login attempt for audit purposes
+export async function logLoginAttempt(
+  email: string,
+  success: boolean,
+  userId?: string | null,
+) {
+  const supabase = createAdminClient();
+
+  // Look up the member's community for the audit log
+  let communityId: string | null = null;
+  if (userId) {
+    const { data: member } = await supabase
+      .from('members')
+      .select('community_id')
+      .eq('user_id', userId)
+      .single();
+    communityId = member?.community_id || null;
+  } else {
+    const { data: member } = await supabase
+      .from('members')
+      .select('community_id')
+      .eq('email', email)
+      .single();
+    communityId = member?.community_id || null;
+  }
+
+  await logAuditEvent({
+    communityId,
+    actorId: userId || undefined,
+    actorEmail: email,
+    action: success ? 'login_success' : 'login_failed',
+    metadata: { success },
+  });
+}
+
+// Log MFA enrollment/removal for audit purposes
+export async function logMfaEvent(
+  userId: string,
+  email: string,
+  communityId: string,
+  type: 'enrolled' | 'removed',
+) {
+  await logAuditEvent({
+    communityId,
+    actorId: userId,
+    actorEmail: email,
+    action: type === 'enrolled' ? 'mfa_enrolled' : 'mfa_removed',
+  });
 }
