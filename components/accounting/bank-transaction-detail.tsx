@@ -28,11 +28,13 @@ import {
 import { MatchTransactionDialog } from '@/components/accounting/match-transaction-dialog';
 import type { BankTransaction } from '@/lib/types/banking';
 import type { Account } from '@/lib/types/accounting';
+import type { Vendor } from '@/lib/types/database';
 
 interface BankTransactionDetailProps {
   transaction: BankTransaction;
   communityId: string;
   accounts: Account[];
+  vendors: Vendor[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdate: () => void;
@@ -42,11 +44,13 @@ export function BankTransactionDetail({
   transaction,
   communityId,
   accounts,
+  vendors,
   open,
   onOpenChange,
   onUpdate,
 }: BankTransactionDetailProps) {
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+  const [selectedVendorId, setSelectedVendorId] = useState<string>('');
   const [createRule, setCreateRule] = useState(false);
   const [rulePattern, setRulePattern] = useState(
     transaction.merchant_name || transaction.name || '',
@@ -75,6 +79,7 @@ export function BankTransactionDetail({
         transaction.id,
         selectedAccountId,
         createRule ? { pattern: rulePattern.toLowerCase(), matchField: 'name' } : undefined,
+        selectedVendorId && selectedVendorId !== 'none' ? selectedVendorId : null,
       );
       toast.success('Transaction categorized.');
       onUpdate();
@@ -172,6 +177,16 @@ export function BankTransactionDetail({
                   {transaction.status}
                 </span>
               </div>
+              {transaction.vendor_id && (
+                <div className="flex justify-between">
+                  <span className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                    Vendor
+                  </span>
+                  <span className="text-body text-text-primary-light dark:text-text-primary-dark">
+                    {vendors.find((v) => v.id === transaction.vendor_id)?.name || 'Unknown'}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Actions for pending transactions */}
@@ -216,6 +231,26 @@ export function BankTransactionDetail({
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Vendor assignment (optional, for expense tracking / 1099) */}
+                {transaction.amount > 0 && vendors.length > 0 && (
+                  <div>
+                    <Label className="text-meta">Vendor (optional)</Label>
+                    <Select value={selectedVendorId} onValueChange={setSelectedVendorId}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Assign to vendor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No vendor</SelectItem>
+                        {vendors.map((v) => (
+                          <SelectItem key={v.id} value={v.id}>
+                            {v.name}{v.company ? ` (${v.company})` : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 <div className="flex items-start gap-2">
                   <Checkbox

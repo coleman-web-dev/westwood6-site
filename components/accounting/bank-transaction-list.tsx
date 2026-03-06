@@ -15,6 +15,7 @@ import { ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { BankTransactionDetail } from '@/components/accounting/bank-transaction-detail';
 import type { BankTransaction, BankTxnStatus } from '@/lib/types/banking';
 import type { Account } from '@/lib/types/accounting';
+import type { Vendor } from '@/lib/types/database';
 
 const STATUS_LABELS: Record<BankTxnStatus, string> = {
   pending: 'Pending',
@@ -40,6 +41,7 @@ interface BankTransactionListProps {
 export function BankTransactionList({ communityId, refreshKey }: BankTransactionListProps) {
   const [transactions, setTransactions] = useState<BankTransaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedTxn, setSelectedTxn] = useState<BankTransaction | null>(null);
@@ -60,7 +62,7 @@ export function BankTransactionList({ communityId, refreshKey }: BankTransaction
       query = query.eq('status', statusFilter);
     }
 
-    const [{ data: txns }, { data: accts }] = await Promise.all([
+    const [{ data: txns }, { data: accts }, { data: vndrs }] = await Promise.all([
       query,
       supabase
         .from('accounts')
@@ -68,10 +70,17 @@ export function BankTransactionList({ communityId, refreshKey }: BankTransaction
         .eq('community_id', communityId)
         .eq('is_active', true)
         .order('code'),
+      supabase
+        .from('vendors')
+        .select('*')
+        .eq('community_id', communityId)
+        .eq('status', 'active')
+        .order('name'),
     ]);
 
     setTransactions((txns as BankTransaction[]) || []);
     setAccounts((accts as Account[]) || []);
+    setVendors((vndrs as Vendor[]) || []);
     setLoading(false);
   }, [communityId, statusFilter, page, refreshKey]);
 
@@ -208,6 +217,7 @@ export function BankTransactionList({ communityId, refreshKey }: BankTransaction
           transaction={selectedTxn}
           communityId={communityId}
           accounts={accounts}
+          vendors={vendors}
           open={!!selectedTxn}
           onOpenChange={(open) => !open && setSelectedTxn(null)}
           onUpdate={() => {

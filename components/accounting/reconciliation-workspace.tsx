@@ -13,6 +13,7 @@ import {
 import { BankTransactionDetail } from '@/components/accounting/bank-transaction-detail';
 import type { BankReconciliation, BankTransaction } from '@/lib/types/banking';
 import type { Account } from '@/lib/types/accounting';
+import type { Vendor } from '@/lib/types/database';
 
 interface ReconciliationWorkspaceProps {
   communityId: string;
@@ -28,6 +29,7 @@ export function ReconciliationWorkspace({
   const [recon, setRecon] = useState<BankReconciliation | null>(null);
   const [transactions, setTransactions] = useState<BankTransaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState(false);
   const [selectedTxn, setSelectedTxn] = useState<BankTransaction | null>(null);
@@ -35,7 +37,7 @@ export function ReconciliationWorkspace({
   const fetchData = useCallback(async () => {
     const supabase = createClient();
 
-    const [{ data: reconData }, { data: txns }, { data: accts }] = await Promise.all([
+    const [{ data: reconData }, { data: txns }, { data: accts }, { data: vndrs }] = await Promise.all([
       supabase
         .from('bank_reconciliations')
         .select('*')
@@ -55,11 +57,18 @@ export function ReconciliationWorkspace({
         .eq('community_id', communityId)
         .eq('is_active', true)
         .order('code'),
+      supabase
+        .from('vendors')
+        .select('*')
+        .eq('community_id', communityId)
+        .eq('status', 'active')
+        .order('name'),
     ]);
 
     setRecon(reconData as BankReconciliation);
     setTransactions((txns as BankTransaction[]) || []);
     setAccounts((accts as Account[]) || []);
+    setVendors((vndrs as Vendor[]) || []);
     setLoading(false);
   }, [communityId, reconciliationId]);
 
@@ -312,6 +321,7 @@ export function ReconciliationWorkspace({
           transaction={selectedTxn}
           communityId={communityId}
           accounts={accounts}
+          vendors={vendors}
           open={!!selectedTxn}
           onOpenChange={(open) => !open && setSelectedTxn(null)}
           onUpdate={() => {

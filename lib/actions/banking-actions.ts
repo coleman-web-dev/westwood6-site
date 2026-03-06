@@ -30,6 +30,7 @@ export async function categorizeTransaction(
   transactionId: string,
   accountId: string,
   createRule?: { pattern: string; matchField: string },
+  vendorId?: string | null,
 ) {
   await getBoardMember(communityId);
   const admin = createAdminClient();
@@ -40,6 +41,7 @@ export async function categorizeTransaction(
     .update({
       status: 'categorized',
       categorized_account_id: accountId,
+      vendor_id: vendorId || null,
       match_method: 'manual',
     })
     .eq('id', transactionId)
@@ -52,6 +54,7 @@ export async function categorizeTransaction(
       pattern: createRule.pattern,
       match_field: createRule.matchField,
       account_id: accountId,
+      vendor_id: vendorId || null,
     });
   }
 
@@ -110,6 +113,7 @@ export async function unmatchTransaction(communityId: string, transactionId: str
       matched_journal_entry_id: null,
       match_method: null,
       categorized_account_id: null,
+      vendor_id: null,
       excluded_reason: null,
     })
     .eq('id', transactionId)
@@ -401,6 +405,7 @@ export async function createJournalEntryFromBankTxn(
       status: 'posted',
       posted_at: new Date().toISOString(),
       created_by: user.id,
+      vendor_id: txn.vendor_id || null,
     })
     .select()
     .single();

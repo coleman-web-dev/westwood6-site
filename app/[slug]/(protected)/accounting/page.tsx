@@ -15,6 +15,7 @@ import { BankConnectionManager } from '@/components/accounting/bank-connection-m
 import { BankTransactionList } from '@/components/accounting/bank-transaction-list';
 import { CategorizationRulesManager } from '@/components/accounting/categorization-rules-manager';
 import { ReconciliationList } from '@/components/accounting/reconciliation-list';
+import { AIStatementProcessor } from '@/components/accounting/ai-statement-processor';
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard' },
@@ -39,6 +40,7 @@ const BANKING_SUBTABS = [
   { id: 'connections', label: 'Connections' },
   { id: 'transactions', label: 'Transactions' },
   { id: 'rules', label: 'Categorization Rules' },
+  { id: 'ai-statements', label: 'AI Statements' },
 ] as const;
 
 type BankingSubtab = (typeof BANKING_SUBTABS)[number]['id'];
@@ -183,6 +185,12 @@ export default function AccountingPage() {
           {bankingTab === 'rules' && (
             <CategorizationRulesManager
               key={`cr-${refreshKey}`}
+              communityId={community.id}
+            />
+          )}
+          {bankingTab === 'ai-statements' && (
+            <AIStatementProcessor
+              key={`ai-${refreshKey}`}
               communityId={community.id}
             />
           )}
