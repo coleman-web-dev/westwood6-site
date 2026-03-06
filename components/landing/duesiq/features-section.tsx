@@ -1,10 +1,6 @@
 'use client';
 
 import {
-  LandingBentoGridSection,
-  LandingBentoGridIconItem,
-} from '@/components/landing';
-import {
   CreditCard,
   BookOpen,
   Landmark,
@@ -13,74 +9,118 @@ import {
   FileText,
   Wrench,
   Users,
+  type LucideIcon,
 } from 'lucide-react';
+import { StaggerContainer, StaggerItem } from './scroll-reveal';
+import { ScrollReveal } from './scroll-reveal';
+
+interface FeatureItem {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  span?: string;
+}
+
+const features: FeatureItem[] = [
+  {
+    icon: CreditCard,
+    title: 'Dues & Payments',
+    description:
+      'Auto-invoicing, Stripe payment processing, partial payments, wallet credits, and late fee automation.',
+    span: 'md:col-span-2 md:row-span-2',
+  },
+  {
+    icon: BookOpen,
+    title: 'Accounting',
+    description:
+      'Double-entry general ledger, chart of accounts, journal entries, and financial statements.',
+    span: 'md:col-span-2',
+  },
+  {
+    icon: Landmark,
+    title: 'Bank Reconciliation',
+    description:
+      'Connect your bank via Plaid, auto-match transactions, and reconcile in minutes instead of hours.',
+    span: 'md:col-span-2',
+  },
+  {
+    icon: CalendarCheck,
+    title: 'Amenity Reservations',
+    description:
+      'Online booking for pools, clubhouses, and courts with rental agreements and deposit tracking.',
+    span: 'md:col-span-2',
+  },
+  {
+    icon: Vote,
+    title: 'Voting & Ballots',
+    description:
+      'Board elections, budget approvals, and amendments with quorum tracking and proxy support.',
+    span: 'md:col-span-2',
+  },
+  {
+    icon: FileText,
+    title: 'Documents & Announcements',
+    description:
+      'Centralized document storage and community announcements with email notifications.',
+    span: 'md:col-span-2',
+  },
+  {
+    icon: Wrench,
+    title: 'Maintenance Requests',
+    description: 'Homeowners submit requests, board tracks and resolves them.',
+  },
+  {
+    icon: Users,
+    title: 'Homeowner Portal',
+    description:
+      'Each homeowner gets their own dashboard to view invoices, make payments, and stay informed.',
+  },
+];
 
 export function FeaturesSection() {
   return (
-    <section id="features">
-      <LandingBentoGridSection
-        title="Everything your board needs"
-        description="From collecting dues to running elections, DuesIQ handles the full spectrum of HOA operations."
-        withBackground
-        variant="primary"
-      >
-        <LandingBentoGridIconItem
-          icon={<CreditCard className="w-8 h-8" />}
-          topText="Dues & Payments"
-          bottomText="Auto-invoicing, Stripe payment processing, partial payments, wallet credits, and late fee automation."
-          colSpan={2}
-          variant="primary"
-        />
-        <LandingBentoGridIconItem
-          icon={<BookOpen className="w-8 h-8" />}
-          topText="Accounting"
-          bottomText="Double-entry general ledger, chart of accounts, journal entries, and financial statements."
-          colSpan={2}
-          variant="primary"
-        />
-        <LandingBentoGridIconItem
-          icon={<Landmark className="w-8 h-8" />}
-          topText="Bank Reconciliation"
-          bottomText="Connect your bank via Plaid, auto-match transactions, and reconcile in minutes instead of hours."
-          colSpan={2}
-          variant="primary"
-        />
-        <LandingBentoGridIconItem
-          icon={<CalendarCheck className="w-8 h-8" />}
-          topText="Amenity Reservations"
-          bottomText="Online booking for pools, clubhouses, and courts with rental agreements and deposit tracking."
-          colSpan={2}
-          variant="primary"
-        />
-        <LandingBentoGridIconItem
-          icon={<Vote className="w-8 h-8" />}
-          topText="Voting & Ballots"
-          bottomText="Board elections, budget approvals, and amendments with quorum tracking and proxy support."
-          colSpan={2}
-          variant="primary"
-        />
-        <LandingBentoGridIconItem
-          icon={<FileText className="w-8 h-8" />}
-          topText="Documents & Announcements"
-          bottomText="Centralized document storage and community announcements with email notifications."
-          colSpan={2}
-          variant="primary"
-        />
-        <LandingBentoGridIconItem
-          icon={<Wrench className="w-8 h-8" />}
-          topText="Maintenance Requests"
-          bottomText="Homeowners submit requests, board tracks and resolves them."
-          colSpan={2}
-          variant="primary"
-        />
-        <LandingBentoGridIconItem
-          icon={<Users className="w-8 h-8" />}
-          topText="Homeowner Portal"
-          bottomText="Each homeowner gets their own dashboard to view invoices, make payments, and stay informed."
-          colSpan={2}
-          variant="primary"
-        />
-      </LandingBentoGridSection>
+    <section id="features" className="relative py-20 lg:py-28 bg-primary-100/20 dark:bg-primary-900/10 section-flow">
+      {/* Organic background accent */}
+      <div className="absolute top-0 right-0 w-[350px] h-[350px] rounded-full bg-secondary-400/5 blur-3xl -z-0" />
+
+      <div className="max-w-7xl mx-auto px-6 lg:px-8 relative z-10">
+        <ScrollReveal className="text-center max-w-2xl mx-auto mb-14">
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-text-primary-light dark:text-text-primary-dark">
+            Everything your board needs
+          </h2>
+          <p className="mt-4 text-lg text-text-secondary-light dark:text-text-secondary-dark">
+            From collecting dues to running elections, DuesIQ handles the full spectrum of HOA operations.
+          </p>
+        </ScrollReveal>
+
+        {/* Anti-grid bento: asymmetric layout */}
+        <StaggerContainer
+          className="grid grid-cols-1 md:grid-cols-4 gap-4 lg:gap-5"
+          stagger={0.06}
+        >
+          {features.map((feature) => {
+            const Icon = feature.icon;
+            return (
+              <StaggerItem
+                key={feature.title}
+                className={feature.span || 'md:col-span-2'}
+              >
+                <div className="glass-card glass-card-hover rounded-2xl p-6 h-full flex flex-col group">
+                  <div className="w-10 h-10 rounded-lg bg-secondary-400/10 flex items-center justify-center mb-4 transition-colors group-hover:bg-secondary-400/20">
+                    <Icon className="w-5 h-5 text-secondary-400" />
+                  </div>
+                  <h3 className="text-base font-semibold text-text-primary-light dark:text-text-primary-dark mb-1.5">
+                    {feature.title}
+                  </h3>
+                  <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark leading-relaxed">
+                    {feature.description}
+                  </p>
+                </div>
+              </StaggerItem>
+            );
+          })}
+        </StaggerContainer>
+      </div>
     </section>
   );
 }

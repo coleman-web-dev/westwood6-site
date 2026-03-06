@@ -11,6 +11,7 @@ import { Textarea } from '@/components/shared/ui/textarea';
 import { LandingFlickeringGridCtaBg } from '@/components/landing';
 import { CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
+import { ScrollReveal } from './scroll-reveal';
 
 const demoSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -55,17 +56,20 @@ export function DemoRequestSection() {
   }
 
   return (
-    <section id="demo" className="relative overflow-hidden">
-      <div className="absolute inset-0">
+    <section id="demo" className="relative overflow-hidden bg-primary-100/10 dark:bg-primary-900/5">
+      <div className="absolute inset-0 -z-10">
         <LandingFlickeringGridCtaBg
           variant="primary"
-          maxOpacity={0.1}
+          maxOpacity={0.06}
           flickerChance={0.03}
         />
       </div>
 
+      {/* Organic gradient */}
+      <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[600px] h-[300px] rounded-full bg-secondary-400/8 blur-3xl -z-10" />
+
       <div className="relative z-10 max-w-2xl mx-auto px-6 py-24 sm:py-32">
-        <div className="text-center mb-10">
+        <ScrollReveal className="text-center mb-10">
           <h2 className="text-3xl font-bold tracking-tight text-text-primary-light dark:text-text-primary-dark sm:text-4xl">
             Ready to modernize your HOA?
           </h2>
@@ -80,7 +84,7 @@ export function DemoRequestSection() {
               if you are ready to get started.
             </span>
           </p>
-        </div>
+        </ScrollReveal>
 
         {submitted ? (
           <div className="text-center py-12 bg-surface-light dark:bg-surface-dark rounded-panel border border-stroke-light dark:border-stroke-dark">

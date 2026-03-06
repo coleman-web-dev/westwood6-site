@@ -1,52 +1,59 @@
 'use client';
 
-import { LandingTestimonial } from '@/components/landing';
+import { Quote } from 'lucide-react';
+import { ScrollReveal, StaggerContainer, StaggerItem } from './scroll-reveal';
 
 const testimonials = [
   {
     name: 'Sarah Mitchell',
-    handle: 'Board President, Lakewood Estates',
+    role: 'Board President, Lakewood Estates',
     text: 'We switched from Membershine and the difference is night and day. Dues collection went from a monthly headache to something that just happens. Our collection rate went from 78% to 96% in the first quarter.',
-    imageSrc: '',
-    verified: true,
   },
   {
     name: 'James Chen',
-    handle: 'Treasurer, Oak Ridge HOA',
+    role: 'Treasurer, Oak Ridge HOA',
     text: 'The accounting module alone is worth it. I used to spend entire weekends reconciling our books before board meetings. Now I pull up the dashboard and everything is already categorized and balanced.',
-    imageSrc: '',
-    verified: true,
   },
   {
     name: 'Maria Rodriguez',
-    handle: 'Community Manager, Sunset Villas',
+    role: 'Community Manager, Sunset Villas',
     text: 'Our homeowners love the portal. They can see their balance, pay online, reserve the clubhouse, and vote on community matters all in one place. Support requests dropped by half.',
-    imageSrc: '',
-    verified: true,
   },
 ];
 
 export function TestimonialsSection() {
   return (
-    <section className="w-full flex flex-col justify-center items-center gap-8 py-12 lg:py-16 bg-primary-100/20 dark:bg-primary-900/10">
-      <div className="w-full p-6 max-w-full container-wide relative flex flex-col items-center">
-        <h2 className="md:text-center text-2xl md:text-3xl lg:text-4xl font-semibold leading-tight md:leading-tight">
-          Trusted by HOA boards
-        </h2>
-        <p className="mt-6 md:text-xl">
-          See why communities are switching to DuesIQ.
-        </p>
-      </div>
+    <section className="relative py-20 lg:py-28 section-flow">
+      <div className="max-w-7xl mx-auto px-6 lg:px-8">
+        <ScrollReveal className="text-center max-w-2xl mx-auto mb-14">
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-text-primary-light dark:text-text-primary-dark">
+            Trusted by HOA boards
+          </h2>
+          <p className="mt-4 text-lg text-text-secondary-light dark:text-text-secondary-dark">
+            See why communities are switching to DuesIQ.
+          </p>
+        </ScrollReveal>
 
-      <div className="mx-auto max-w-7xl px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {testimonials.map((testimonial, index) => (
-            <LandingTestimonial
-              key={index}
-              {...testimonial}
-            />
+        <StaggerContainer className="grid grid-cols-1 md:grid-cols-3 gap-6" stagger={0.1}>
+          {testimonials.map((testimonial) => (
+            <StaggerItem key={testimonial.name}>
+              <div className="glass-card rounded-2xl p-8 h-full flex flex-col">
+                <Quote className="w-8 h-8 text-secondary-400/40 mb-4 flex-shrink-0" />
+                <blockquote className="text-text-primary-light dark:text-text-primary-dark leading-relaxed flex-1">
+                  {testimonial.text}
+                </blockquote>
+                <div className="mt-6 pt-5 border-t border-stroke-light dark:border-stroke-dark">
+                  <p className="font-semibold text-text-primary-light dark:text-text-primary-dark text-sm">
+                    {testimonial.name}
+                  </p>
+                  <p className="text-text-muted-light dark:text-text-muted-dark text-sm">
+                    {testimonial.role}
+                  </p>
+                </div>
+              </div>
+            </StaggerItem>
           ))}
-        </div>
+        </StaggerContainer>
       </div>
     </section>
   );
