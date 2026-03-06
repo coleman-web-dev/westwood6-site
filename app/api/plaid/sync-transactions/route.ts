@@ -174,8 +174,34 @@ export async function POST(request: Request) {
       removed,
       synced_at: new Date().toISOString(),
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error syncing transactions:', error);
+
+    // Handle Plaid DTM consent error
+    const plaidError = error as { response?: { data?: { error_code?: string } } };
+    if (plaidError?.response?.data?.error_code === 'ADDITIONAL_CONSENT_REQUIRED') {
+      // Mark connection as needing re-consent
+      const { communityId, connectionId } = await request.clone().json();
+      const admin = createAdminClient();
+      await admin
+        .from('plaid_connections')
+        .update({
+          requires_reconsent: true,
+          error_code: 'ADDITIONAL_CONSENT_REQUIRED',
+        })
+        .eq('id', connectionId)
+        .eq('community_id', communityId);
+
+      return NextResponse.json(
+        {
+          error: 'Additional consent required',
+          error_code: 'ADDITIONAL_CONSENT_REQUIRED',
+          message: 'This bank connection requires updated data consent. Please reconnect using the "Update Consent" button.',
+        },
+        { status: 403 },
+      );
+    }
+
     return NextResponse.json({ error: 'Failed to sync transactions' }, { status: 500 });
   }
 }

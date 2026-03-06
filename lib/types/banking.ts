@@ -17,6 +17,9 @@ export interface PlaidConnection {
   last_synced_at: string | null;
   error_code: string | null;
   is_active: boolean;
+  consented_products: string[];
+  consented_data_scopes: Record<string, string[]>[];
+  requires_reconsent: boolean;
   created_at: string;
   updated_at: string;
 }

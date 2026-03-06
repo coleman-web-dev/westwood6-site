@@ -22,7 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/shared/ui/alert-dialog';
-import { Building2, Loader2, RefreshCw, Unlink, Landmark } from 'lucide-react';
+import { Building2, Loader2, RefreshCw, Unlink, Landmark, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { mapBankAccountToGL } from '@/lib/actions/banking-actions';
 import type { PlaidBankAccount, PlaidConnection } from '@/lib/types/banking';
@@ -43,6 +43,8 @@ export function BankConnectionManager({ communityId, onSync }: BankConnectionMan
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState<string | null>(null);
   const [linkToken, setLinkToken] = useState<string | null>(null);
+  const [updateLinkToken, setUpdateLinkToken] = useState<string | null>(null);
+  const [updatingConnectionId, setUpdatingConnectionId] = useState<string | null>(null);
   const [disconnectId, setDisconnectId] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
 
@@ -118,11 +120,41 @@ export function BankConnectionManager({ communityId, onSync }: BankConnectionMan
     },
   });
 
+  // Update mode Link for DTM re-consent
+  const { open: openUpdate, ready: readyUpdate } = usePlaidLink({
+    token: updateLinkToken,
+    onSuccess: async () => {
+      // After update mode completes, clear the re-consent flag
+      if (updatingConnectionId) {
+        const supabase = createClient();
+        await supabase
+          .from('plaid_connections')
+          .update({ requires_reconsent: false, error_code: null })
+          .eq('id', updatingConnectionId);
+      }
+
+      toast.success('Bank consent updated successfully.');
+      setUpdateLinkToken(null);
+      setUpdatingConnectionId(null);
+      fetchData();
+    },
+    onExit: () => {
+      setUpdateLinkToken(null);
+      setUpdatingConnectionId(null);
+    },
+  });
+
   useEffect(() => {
     if (linkToken && ready) {
       open();
     }
   }, [linkToken, ready, open]);
+
+  useEffect(() => {
+    if (updateLinkToken && readyUpdate) {
+      openUpdate();
+    }
+  }, [updateLinkToken, readyUpdate, openUpdate]);
 
   async function handleSync(connectionId: string) {
     setSyncing(connectionId);
@@ -136,6 +168,14 @@ export function BankConnectionManager({ communityId, onSync }: BankConnectionMan
     setSyncing(null);
 
     if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+
+      if (errorData.error_code === 'ADDITIONAL_CONSENT_REQUIRED') {
+        toast.error('This bank connection requires updated data consent. Use "Update Consent" to continue.');
+        fetchData(); // Refresh to show reconsent badge
+        return;
+      }
+
       toast.error('Failed to sync transactions.');
       return;
     }
@@ -144,6 +184,25 @@ export function BankConnectionManager({ communityId, onSync }: BankConnectionMan
     toast.success(`Synced: ${data.added} new, ${data.modified} updated, ${data.removed} removed`);
     fetchData();
     onSync?.();
+  }
+
+  async function handleUpdateConsent(connectionId: string) {
+    setUpdatingConnectionId(connectionId);
+
+    const res = await fetch('/api/plaid/create-update-link-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ communityId, connectionId }),
+    });
+
+    if (!res.ok) {
+      toast.error('Failed to initialize consent update.');
+      setUpdatingConnectionId(null);
+      return;
+    }
+
+    const { link_token } = await res.json();
+    setUpdateLinkToken(link_token);
   }
 
   async function handleDisconnect() {
@@ -211,7 +270,13 @@ export function BankConnectionManager({ communityId, onSync }: BankConnectionMan
               <h3 className="text-section-title text-text-primary-light dark:text-text-primary-dark">
                 {conn.institution_name || 'Connected Bank'}
               </h3>
-              {conn.error_code && (
+              {conn.requires_reconsent && (
+                <Badge variant="destructive" className="text-meta">
+                  <ShieldAlert className="h-3 w-3 mr-1" />
+                  Consent Required
+                </Badge>
+              )}
+              {conn.error_code && !conn.requires_reconsent && (
                 <Badge variant="destructive" className="text-meta">
                   Error: {conn.error_code}
                 </Badge>
@@ -223,11 +288,26 @@ export function BankConnectionManager({ communityId, onSync }: BankConnectionMan
                   Last synced: {new Date(conn.last_synced_at).toLocaleDateString()}
                 </span>
               )}
+              {conn.requires_reconsent && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => handleUpdateConsent(conn.id)}
+                  disabled={updatingConnectionId === conn.id}
+                >
+                  {updatingConnectionId === conn.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                  ) : (
+                    <ShieldAlert className="h-3.5 w-3.5 mr-1" />
+                  )}
+                  Update Consent
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => handleSync(conn.id)}
-                disabled={syncing === conn.id}
+                disabled={syncing === conn.id || conn.requires_reconsent}
               >
                 {syncing === conn.id ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />

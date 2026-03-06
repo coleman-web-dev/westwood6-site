@@ -44,9 +44,22 @@ export async function POST(request: Request) {
 
     const { access_token, item_id } = exchangeResponse.data;
 
+    // Fetch Item details for DTM consent data
+    let consentedProducts: string[] = [];
+    let consentedDataScopes: Record<string, string[]>[] = [];
+
+    try {
+      const itemResponse = await plaid.itemGet({ access_token });
+      const item = itemResponse.data.item as unknown as Record<string, unknown>;
+      consentedProducts = (item.consented_products as string[]) || [];
+      consentedDataScopes = (item.consented_data_scopes as Record<string, string[]>[]) || [];
+    } catch {
+      // DTM fields may not be available yet for all environments
+    }
+
     const admin = createAdminClient();
 
-    // Save connection
+    // Save connection with consent data
     const { data: connection, error: connError } = await admin
       .from('plaid_connections')
       .insert({
@@ -55,6 +68,8 @@ export async function POST(request: Request) {
         plaid_access_token: access_token,
         institution_id: institutionId || null,
         institution_name: institutionName || null,
+        consented_products: consentedProducts,
+        consented_data_scopes: consentedDataScopes,
       })
       .select()
       .single();
