@@ -81,5 +81,61 @@ export async function autoMatchTransactions(admin: SupabaseClient, communityId: 
     }
   }
 
+  // ─── Phase 2: Match checks by check number ─────────────────────
+  // Re-fetch remaining pending transactions (some may have been matched above)
+  const { data: pendingTxns } = await admin
+    .from('bank_transactions')
+    .select('id, amount, date, name')
+    .eq('community_id', communityId)
+    .eq('status', 'pending');
+
+  if (pendingTxns && pendingTxns.length > 0) {
+    const checkPattern = /(?:check|ck|chk)\s*#?\s*(\d+)/i;
+
+    for (const txn of pendingTxns) {
+      const match = checkPattern.exec(txn.name);
+      if (!match) continue;
+
+      const checkNumber = parseInt(match[1], 10);
+      if (isNaN(checkNumber)) continue;
+
+      // Look for a matching check in our system
+      const { data: check } = await admin
+        .from('checks')
+        .select('id, amount, journal_entry_id, status')
+        .eq('community_id', communityId)
+        .eq('check_number', checkNumber)
+        .in('status', ['printed', 'approved'])
+        .single();
+
+      if (!check) continue;
+
+      // Verify amount matches (bank transactions store amounts in cents,
+      // positive = debit/money leaving for Plaid)
+      if (Math.abs(txn.amount) === check.amount) {
+        // Link the check to the bank transaction
+        await admin
+          .from('bank_transactions')
+          .update({
+            status: 'matched',
+            matched_journal_entry_id: check.journal_entry_id,
+            match_method: 'auto_reference',
+          })
+          .eq('id', txn.id);
+
+        // Update check status to cleared
+        await admin
+          .from('checks')
+          .update({
+            status: 'cleared',
+            bank_transaction_id: txn.id,
+          })
+          .eq('id', check.id);
+
+        matchCount++;
+      }
+    }
+  }
+
   return matchCount;
 }

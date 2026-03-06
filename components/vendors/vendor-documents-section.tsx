@@ -23,6 +23,7 @@ import {
   ScrollText,
   Award,
   File,
+  ImageIcon,
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
@@ -33,6 +34,7 @@ const DOC_TYPE_LABELS: Record<VendorDocumentType, string> = {
   insurance_cert: 'Insurance Certificate',
   license: 'License',
   w9: 'W-9',
+  check_image: 'Check Image',
   other: 'Other',
 };
 
@@ -41,6 +43,7 @@ const DOC_TYPE_ICONS: Record<VendorDocumentType, React.ReactNode> = {
   insurance_cert: <ShieldCheck className="h-4 w-4" />,
   license: <Award className="h-4 w-4" />,
   w9: <FileText className="h-4 w-4" />,
+  check_image: <ImageIcon className="h-4 w-4" />,
   other: <File className="h-4 w-4" />,
 };
 

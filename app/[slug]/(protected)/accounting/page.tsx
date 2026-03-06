@@ -24,11 +24,14 @@ import { RecurringEntries } from '@/components/accounting/recurring-entries';
 import { FinancialAuditTrail } from '@/components/accounting/financial-audit-trail';
 import { ExportDialog } from '@/components/accounting/export-dialog';
 import { DelinquencySettings } from '@/components/accounting/delinquency-settings';
+import { CheckRegister } from '@/components/accounting/checks/check-register';
+import { CheckSettingsPanel } from '@/components/accounting/checks/check-settings';
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'chart', label: 'Chart of Accounts' },
   { id: 'journal', label: 'Journal Entries' },
+  { id: 'checks', label: 'Checks' },
   { id: 'banking', label: 'Banking' },
   { id: 'reconciliation', label: 'Reconciliation' },
   { id: 'reports', label: 'Reports' },
@@ -71,6 +74,7 @@ export default function AccountingPage() {
   const [reportTab, setReportTab] = useState<ReportSubtab>('trial-balance');
   const [bankingTab, setBankingTab] = useState<BankingSubtab>('connections');
   const [journalTab, setJournalTab] = useState<JournalSubtab>('entries');
+  const [checksTab, setChecksTab] = useState<'register' | 'settings'>('register');
   const [isSetUp, setIsSetUp] = useState<boolean | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -199,6 +203,34 @@ export default function AccountingPage() {
           )}
           {journalTab === 'recurring' && (
             <RecurringEntries key={`re-${refreshKey}`} communityId={community.id} />
+          )}
+        </div>
+      )}
+
+      {activeTab === 'checks' && (
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            {(['register', 'settings'] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setChecksTab(tab)}
+                className={`px-3 py-1.5 rounded-pill text-meta transition-colors ${
+                  checksTab === tab
+                    ? 'bg-secondary-400/15 text-secondary-400'
+                    : 'bg-surface-light-2 dark:bg-surface-dark-2 text-text-muted-light dark:text-text-muted-dark hover:text-text-secondary-light dark:hover:text-text-secondary-dark'
+                }`}
+              >
+                {tab === 'register' ? 'Check Register' : 'Settings'}
+              </button>
+            ))}
+          </div>
+
+          {checksTab === 'register' && (
+            <CheckRegister key={`ck-${refreshKey}`} communityId={community.id} />
+          )}
+          {checksTab === 'settings' && (
+            <CheckSettingsPanel key={`cks-${refreshKey}`} communityId={community.id} />
           )}
         </div>
       )}

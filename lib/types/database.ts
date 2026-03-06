@@ -30,7 +30,7 @@ export type BudgetCategory = 'dues' | 'assessments' | 'amenity_fees' | 'interest
 // ─── Vendor Enums ─────────────────────────────────────
 export type VendorCategory = 'landscaping' | 'plumbing' | 'electrical' | 'hvac' | 'painting' | 'roofing' | 'cleaning' | 'security' | 'general' | 'other';
 export type VendorStatus = 'active' | 'inactive';
-export type VendorDocumentType = 'contract' | 'insurance_cert' | 'license' | 'w9' | 'other';
+export type VendorDocumentType = 'contract' | 'insurance_cert' | 'license' | 'w9' | 'check_image' | 'other';
 
 import type { LandingPageConfig, CommunityVendorsConfig } from './landing';
 
@@ -86,6 +86,7 @@ export interface CommunityTheme {
   landing_page?: LandingPageConfig;
   vendors_config?: CommunityVendorsConfig;
   vendor_settings?: VendorSettings;
+  check_settings?: import('./check').CheckSettings;
   [key: string]: unknown;
 }
 
@@ -689,6 +690,12 @@ export interface Vendor {
   tax_id: string | null;
   w9_on_file: boolean;
   w9_document_path: string | null;
+  default_expense_account_id: string | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
   created_at: string;
 }
 

@@ -27,6 +27,7 @@ import { Upload, FileText, CheckCircle, DollarSign } from 'lucide-react';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { VendorDocumentsSection } from '@/components/vendors/vendor-documents-section';
 import type { Vendor, VendorCategory, VendorStatus } from '@/lib/types/database';
+import type { Account } from '@/lib/types/accounting';
 
 const CATEGORY_LABELS: Record<VendorCategory, string> = {
   landscaping: 'Landscaping',
@@ -72,6 +73,13 @@ export function VendorDetailDialog({
   const [uploadingW9, setUploadingW9] = useState(false);
   const w9InputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<VendorStatus>('active');
+  const [defaultExpenseAccountId, setDefaultExpenseAccountId] = useState('');
+  const [addressLine1, setAddressLine1] = useState('');
+  const [addressLine2, setAddressLine2] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+  const [zip, setZip] = useState('');
+  const [expenseAccounts, setExpenseAccounts] = useState<Account[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -89,6 +97,23 @@ export function VendorDetailDialog({
       setW9OnFile(vendor.w9_on_file);
       setW9Path(vendor.w9_document_path ?? '');
       setStatus(vendor.status);
+      setDefaultExpenseAccountId(vendor.default_expense_account_id ?? '');
+      setAddressLine1(vendor.address_line1 ?? '');
+      setAddressLine2(vendor.address_line2 ?? '');
+      setCity(vendor.city ?? '');
+      setState(vendor.state ?? '');
+      setZip(vendor.zip ?? '');
+
+      // Fetch expense accounts
+      const supabase = createClient();
+      supabase
+        .from('accounts')
+        .select('*')
+        .eq('community_id', vendor.community_id)
+        .eq('account_type', 'expense')
+        .eq('is_active', true)
+        .order('code')
+        .then(({ data }) => setExpenseAccounts((data as Account[]) || []));
     }
   }, [vendor]);
 
@@ -111,6 +136,12 @@ export function VendorDetailDialog({
         tax_id: taxId.trim() || null,
         notes: notes.trim() || null,
         status,
+        default_expense_account_id: defaultExpenseAccountId || null,
+        address_line1: addressLine1.trim() || null,
+        address_line2: addressLine2.trim() || null,
+        city: city.trim() || null,
+        state: state.trim() || null,
+        zip: zip.trim() || null,
       })
       .eq('id', vendor.id);
 
@@ -322,6 +353,55 @@ export function VendorDetailDialog({
                 className="hidden"
                 onChange={handleW9Upload}
               />
+            </div>
+          </div>
+
+          {/* Default Expense Category */}
+          {expenseAccounts.length > 0 && (
+            <div className="space-y-1.5">
+              <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                Default Expense Category
+              </Label>
+              <Select value={defaultExpenseAccountId} onValueChange={setDefaultExpenseAccountId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="None" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">None</SelectItem>
+                  {expenseAccounts.map((acct) => (
+                    <SelectItem key={acct.id} value={acct.id}>
+                      {acct.code} - {acct.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                Auto-fills when writing checks to this vendor
+              </p>
+            </div>
+          )}
+
+          {/* Address */}
+          <div className="space-y-1.5">
+            <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+              Address
+            </Label>
+            <Input
+              value={addressLine1}
+              onChange={(e) => setAddressLine1(e.target.value)}
+              placeholder="Street address"
+              className="mb-1.5"
+            />
+            <Input
+              value={addressLine2}
+              onChange={(e) => setAddressLine2(e.target.value)}
+              placeholder="Apt, Suite, etc. (optional)"
+              className="mb-1.5"
+            />
+            <div className="grid grid-cols-3 gap-2">
+              <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" />
+              <Input value={state} onChange={(e) => setState(e.target.value)} placeholder="State" />
+              <Input value={zip} onChange={(e) => setZip(e.target.value)} placeholder="ZIP" />
             </div>
           </div>
 

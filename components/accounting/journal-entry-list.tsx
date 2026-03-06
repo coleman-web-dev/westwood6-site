@@ -22,6 +22,7 @@ const SOURCE_LABELS: Record<JournalSource, string> = {
   assessment_generated: 'Assessment',
   bank_sync: 'Bank Sync',
   vendor_payment: 'Vendor Payment',
+  check_payment: 'Check Payment',
   fund_transfer: 'Fund Transfer',
   recurring: 'Recurring',
 };

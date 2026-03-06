@@ -15,6 +15,7 @@ export type JournalSource =
   | 'assessment_generated'
   | 'bank_sync'
   | 'vendor_payment'
+  | 'check_payment'
   | 'fund_transfer'
   | 'recurring';
 export type JournalStatus = 'draft' | 'posted' | 'reversed';
