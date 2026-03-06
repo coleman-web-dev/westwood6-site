@@ -18,7 +18,6 @@ interface FeatureItem {
   icon: LucideIcon;
   title: string;
   description: string;
-  span?: string;
 }
 
 const features: FeatureItem[] = [
@@ -27,42 +26,36 @@ const features: FeatureItem[] = [
     title: 'Dues & Payments',
     description:
       'Auto-invoicing, Stripe payment processing, partial payments, wallet credits, and late fee automation.',
-    span: 'md:col-span-2 md:row-span-2',
   },
   {
     icon: BookOpen,
     title: 'Accounting',
     description:
       'Double-entry general ledger, chart of accounts, journal entries, and financial statements.',
-    span: 'md:col-span-2',
   },
   {
     icon: Landmark,
     title: 'Bank Reconciliation',
     description:
       'Connect your bank via Plaid, auto-match transactions, and reconcile in minutes instead of hours.',
-    span: 'md:col-span-2',
   },
   {
     icon: CalendarCheck,
     title: 'Amenity Reservations',
     description:
       'Online booking for pools, clubhouses, and courts with rental agreements and deposit tracking.',
-    span: 'md:col-span-2',
   },
   {
     icon: Vote,
     title: 'Voting & Ballots',
     description:
       'Board elections, budget approvals, and amendments with quorum tracking and proxy support.',
-    span: 'md:col-span-2',
   },
   {
     icon: FileText,
     title: 'Documents & Announcements',
     description:
       'Centralized document storage and community announcements with email notifications.',
-    span: 'md:col-span-2',
   },
   {
     icon: Wrench,
@@ -93,18 +86,14 @@ export function FeaturesSection() {
           </p>
         </ScrollReveal>
 
-        {/* Anti-grid bento: asymmetric layout */}
         <StaggerContainer
-          className="grid grid-cols-1 md:grid-cols-4 gap-4 lg:gap-5"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-5"
           stagger={0.06}
         >
           {features.map((feature) => {
             const Icon = feature.icon;
             return (
-              <StaggerItem
-                key={feature.title}
-                className={feature.span || 'md:col-span-2'}
-              >
+              <StaggerItem key={feature.title}>
                 <div className="glass-card glass-card-hover rounded-2xl p-6 h-full flex flex-col group">
                   <div className="w-10 h-10 rounded-lg bg-secondary-400/10 flex items-center justify-center mb-4 transition-colors group-hover:bg-secondary-400/20">
                     <Icon className="w-5 h-5 text-secondary-400" />

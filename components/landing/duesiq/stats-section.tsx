@@ -19,7 +19,7 @@ export function StatsSection() {
         >
           {stats.map((stat) => (
             <StaggerItem key={stat.value}>
-              <div className="text-center lg:text-left">
+              <div className="text-center">
                 <dt className="text-2xl sm:text-3xl font-bold tracking-tight text-text-primary-light dark:text-text-primary-dark">
                   {stat.value}
                 </dt>
