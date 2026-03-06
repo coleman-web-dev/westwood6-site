@@ -13,7 +13,7 @@ import clsx from 'clsx';
 
 /**
  * A component that renders the navigation bar for the landing page.
- * It includes a logo and a list of navigation items. On mobile, it collapses into a burger + side sheet.
+ * Full-width glassmorphism bar fixed to the top of the viewport.
  */
 export const LandingHeader = ({
   logoComponent,
@@ -33,52 +33,46 @@ export const LandingHeader = ({
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <nav
+    <header
       className={clsx(
-        'flex items-center justify-between gap-6 px-6 py-4 w-full max-w-full container-narrow lg:rounded-lg',
-        fixed ? 'sticky top-4 left-auto right-auto z-50 backdrop-blur-xl' : '',
-        fixed && !withBackground ? 'bg-white/50 dark:bg-black/20' : '',
-        withBackground ? 'lg:m-4 justify-self-center' : '',
-        withBackground && variant === 'primary'
-          ? 'bg-primary-100/20 dark:bg-primary-900/20 border border-primary-100/30 dark:border-primary-900/30'
-          : '',
-        withBackground && variant === 'secondary'
-          ? 'bg-secondary-100/20 dark:bg-secondary-900/10 border border-secondary-100/30 dark:border-secondary-900/30'
-          : '',
+        'w-full top-0 left-0 right-0 z-50',
+        fixed ? 'fixed' : '',
         className,
       )}
     >
-      <div className="flex items-center">
-        <Link href="/" className="text-2xl font-bold">
-          <div className="flex items-center gap-3 justify-between">
-            {logoComponent || (
-              <>
-                <OrbitIcon className="h-8 w-8 text-primary-900 dark:text-primary-100" />
+      {/* Glassmorphism backdrop */}
+      <div className="absolute inset-0 bg-white/60 dark:bg-black/50 backdrop-blur-2xl backdrop-saturate-150 border-b border-white/20 dark:border-white/[0.06]" />
 
+      <nav className="relative flex items-center justify-between gap-6 px-6 lg:px-10 py-4 max-w-7xl mx-auto">
+        <div className="flex items-center">
+          {logoComponent || (
+            <Link href="/" className="text-2xl font-bold">
+              <div className="flex items-center gap-3 justify-between">
+                <OrbitIcon className="h-8 w-8 text-primary-900 dark:text-primary-100" />
                 <div className="hidden text-2xl font-semibold font-display sm:flex gap-2 h-full">
                   Page <span className="font-bold">UI</span>
                 </div>
-              </>
-            )}
-          </div>
-        </Link>
-      </div>
+              </div>
+            </Link>
+          )}
+        </div>
 
-      <div className="hidden md:flex items-center gap-6">{children}</div>
+        <div className="hidden md:flex items-center gap-6">{children}</div>
 
-      <div className="md:hidden">
-        <Sheet open={isOpen} onOpenChange={setIsOpen}>
-          <SheetTrigger asChild>
-            <Button variant="outline" className="px-3">
-              <MenuIcon className="h-6 w-6 mr-2" />
-              Menu
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="right">
-            <nav className="flex flex-col gap-4 mt-8">{children}</nav>
-          </SheetContent>
-        </Sheet>
-      </div>
-    </nav>
+        <div className="md:hidden">
+          <Sheet open={isOpen} onOpenChange={setIsOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" className="px-3">
+                <MenuIcon className="h-6 w-6 mr-2" />
+                Menu
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right">
+              <nav className="flex flex-col gap-4 mt-8">{children}</nav>
+            </SheetContent>
+          </Sheet>
+        </div>
+      </nav>
+    </header>
   );
 };
