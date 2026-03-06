@@ -1,5 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <rect width="512" height="512" rx="108" fill="#1D2024"/>
-  <text x="180" y="420" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-weight="800" font-size="440" fill="#F4AE90" opacity="0.3">D</text>
-  <text x="256" y="350" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-weight="800" font-size="220" fill="#FFFFFF" text-anchor="middle">IQ</text>
+  <!-- House silhouette - wide, no windows/door -->
+  <g opacity="0.25">
+    <polygon points="256,30 490,220 22,220" fill="#F4AE90"/>
+    <rect x="50" y="220" width="412" height="270" fill="#F4AE90"/>
+  </g>
+  <!-- Bold IQ text -->
+  <text x="256" y="410" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-weight="900" font-size="340" fill="#FFFFFF" text-anchor="middle" letter-spacing="-10">IQ</text>
 </svg>
