@@ -10,13 +10,13 @@ import { JournalEntryList } from '@/components/accounting/journal-entry-list';
 import { TrialBalance } from '@/components/accounting/trial-balance';
 import { BalanceSheet } from '@/components/accounting/balance-sheet';
 import { IncomeStatement } from '@/components/accounting/income-statement';
-import { FundSummaryCards } from '@/components/accounting/fund-summary';
 import { BankConnectionManager } from '@/components/accounting/bank-connection-manager';
 import { BankTransactionList } from '@/components/accounting/bank-transaction-list';
 import { CategorizationRulesManager } from '@/components/accounting/categorization-rules-manager';
 import { ReconciliationList } from '@/components/accounting/reconciliation-list';
 import { AIStatementProcessor } from '@/components/accounting/ai-statement-processor';
-import { InterFundTransferDialog } from '@/components/accounting/inter-fund-transfer-dialog';
+import { AccountingDashboard } from '@/components/accounting/accounting-dashboard';
+import { LedgerBrowser } from '@/components/accounting/ledger-browser';
 import { CashFlowForecast } from '@/components/accounting/cash-flow-forecast';
 import { BudgetVariance } from '@/components/accounting/budget-variance';
 import { BudgetComparison } from '@/components/accounting/budget-comparison';
@@ -26,9 +26,12 @@ import { ExportDialog } from '@/components/accounting/export-dialog';
 import { DelinquencySettings } from '@/components/accounting/delinquency-settings';
 import { CheckRegister } from '@/components/accounting/checks/check-register';
 import { CheckSettingsPanel } from '@/components/accounting/checks/check-settings';
+import { TransactionInbox } from '@/components/accounting/transaction-inbox';
 
 const TABS = [
+  { id: 'inbox', label: 'Inbox' },
   { id: 'dashboard', label: 'Dashboard' },
+  { id: 'ledger', label: 'Ledger' },
   { id: 'chart', label: 'Chart of Accounts' },
   { id: 'journal', label: 'Journal Entries' },
   { id: 'checks', label: 'Checks' },
@@ -70,13 +73,14 @@ type JournalSubtab = (typeof JOURNAL_SUBTABS)[number]['id'];
 
 export default function AccountingPage() {
   const { isBoard, canRead, community } = useCommunity();
-  const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+  const [activeTab, setActiveTab] = useState<Tab>('inbox');
   const [reportTab, setReportTab] = useState<ReportSubtab>('trial-balance');
   const [bankingTab, setBankingTab] = useState<BankingSubtab>('connections');
   const [journalTab, setJournalTab] = useState<JournalSubtab>('entries');
   const [checksTab, setChecksTab] = useState<'register' | 'settings'>('register');
   const [isSetUp, setIsSetUp] = useState<boolean | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [pendingCount, setPendingCount] = useState(0);
 
   const checkSetup = useCallback(async () => {
     const supabase = createClient();
@@ -156,23 +160,38 @@ export default function AccountingPage() {
                 : 'bg-surface-light-2 dark:bg-surface-dark-2 text-text-secondary-light dark:text-text-secondary-dark hover:bg-primary-100 dark:hover:bg-primary-800'
             }`}
           >
-            {tab.label}
+            <span className="inline-flex items-center gap-1">
+              {tab.label}
+              {tab.id === 'inbox' && pendingCount > 0 && (
+                <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-secondary-400 text-[10px] font-semibold text-primary-900 px-1">
+                  {pendingCount}
+                </span>
+              )}
+            </span>
           </button>
         ))}
       </div>
 
       {/* Tab content */}
+      {activeTab === 'inbox' && (
+        <TransactionInbox
+          key={`inbox-${refreshKey}`}
+          communityId={community.id}
+          onPendingCountChange={setPendingCount}
+        />
+      )}
+
       {activeTab === 'dashboard' && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-end gap-2">
-            <InterFundTransferDialog
-              communityId={community.id}
-              onComplete={() => setRefreshKey((k) => k + 1)}
-            />
-            <ExportDialog communityId={community.id} />
-          </div>
-          <FundSummaryCards key={`fund-${refreshKey}`} communityId={community.id} />
-        </div>
+        <AccountingDashboard
+          key={`dash-${refreshKey}`}
+          communityId={community.id}
+          refreshKey={refreshKey}
+          onRefresh={() => setRefreshKey((k) => k + 1)}
+        />
+      )}
+
+      {activeTab === 'ledger' && (
+        <LedgerBrowser key={`ledger-${refreshKey}`} communityId={community.id} />
       )}
 
       {activeTab === 'chart' && (

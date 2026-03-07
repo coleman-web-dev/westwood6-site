@@ -225,6 +225,37 @@ export interface BudgetVarianceRow {
   over_threshold: boolean;
 }
 
+// ─── Dashboard Chart Types ──────────────────────────────────────
+
+export interface MonthlyFlowPoint {
+  month: string;
+  label: string;
+  income: number;
+  expenses: number;
+}
+
+export interface CategoryBreakdown {
+  account_id: string;
+  code: string;
+  name: string;
+  amount: number;
+}
+
+export interface AccountWithTxnCount extends Account {
+  txn_count: number;
+}
+
+export interface AccountTransaction {
+  line_id: string;
+  entry_id: string;
+  entry_date: string;
+  description: string;
+  source: JournalSource;
+  debit: number;
+  credit: number;
+  running_balance: number;
+}
+
 // ─── Cash Flow Forecast ──────────────────────────────────────────
 
 export interface CashFlowRow {

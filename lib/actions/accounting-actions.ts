@@ -534,3 +534,125 @@ export async function getFinancialAuditTrail(communityId: string, startDate: str
 
   return entries || [];
 }
+
+// ─── Ledger Browser ─────────────────────────────────────────────
+
+export async function getAccountsWithTxnCounts(communityId: string) {
+  const admin = createAdminClient();
+
+  const { data: accounts } = await admin
+    .from('accounts')
+    .select('*')
+    .eq('community_id', communityId)
+    .eq('is_active', true)
+    .order('display_order');
+
+  if (!accounts || accounts.length === 0) return [];
+
+  // Get posted entry IDs for this community
+  const { data: entries } = await admin
+    .from('journal_entries')
+    .select('id')
+    .eq('community_id', communityId)
+    .eq('status', 'posted');
+
+  if (!entries || entries.length === 0) {
+    return accounts.map((a) => ({ ...a, txn_count: 0 }));
+  }
+
+  const entryIds = entries.map((e) => e.id);
+
+  // Get line counts per account
+  const { data: lines } = await admin
+    .from('journal_lines')
+    .select('account_id')
+    .in('journal_entry_id', entryIds);
+
+  const countMap = new Map<string, number>();
+  for (const line of lines || []) {
+    countMap.set(line.account_id, (countMap.get(line.account_id) || 0) + 1);
+  }
+
+  return accounts.map((a) => ({
+    ...a,
+    txn_count: countMap.get(a.id) || 0,
+  }));
+}
+
+export async function getAccountTransactions(
+  communityId: string,
+  accountId: string,
+  page = 1,
+  pageSize = 25,
+) {
+  const admin = createAdminClient();
+
+  // Get the account for normal balance direction
+  const { data: account } = await admin
+    .from('accounts')
+    .select('normal_balance')
+    .eq('id', accountId)
+    .single();
+
+  if (!account) return { transactions: [], total: 0 };
+
+  // Get posted entry IDs for this community, ordered by date
+  const { data: entries } = await admin
+    .from('journal_entries')
+    .select('id, entry_date, description, source')
+    .eq('community_id', communityId)
+    .eq('status', 'posted')
+    .order('entry_date', { ascending: true });
+
+  if (!entries || entries.length === 0) return { transactions: [], total: 0 };
+
+  const entryIds = entries.map((e) => e.id);
+  const entryMap = new Map(entries.map((e) => [e.id, e]));
+
+  // Get all lines for this account in these entries
+  const { data: allLines } = await admin
+    .from('journal_lines')
+    .select('id, journal_entry_id, debit, credit')
+    .eq('account_id', accountId)
+    .in('journal_entry_id', entryIds);
+
+  if (!allLines || allLines.length === 0) return { transactions: [], total: 0 };
+
+  // Sort by entry date then by line ID for stable ordering
+  const sortedLines = allLines.sort((a, b) => {
+    const entryA = entryMap.get(a.journal_entry_id);
+    const entryB = entryMap.get(b.journal_entry_id);
+    const dateCompare = (entryA?.entry_date || '').localeCompare(entryB?.entry_date || '');
+    if (dateCompare !== 0) return dateCompare;
+    return a.id.localeCompare(b.id);
+  });
+
+  // Compute running balances for ALL lines (most recent last)
+  let runningBalance = 0;
+  const withBalance = sortedLines.map((line) => {
+    const entry = entryMap.get(line.journal_entry_id)!;
+    if (account.normal_balance === 'debit') {
+      runningBalance += line.debit - line.credit;
+    } else {
+      runningBalance += line.credit - line.debit;
+    }
+    return {
+      line_id: line.id,
+      entry_id: line.journal_entry_id,
+      entry_date: entry.entry_date,
+      description: entry.description,
+      source: entry.source,
+      debit: line.debit,
+      credit: line.credit,
+      running_balance: runningBalance,
+    };
+  });
+
+  // Reverse for display (most recent first) then paginate
+  const reversed = withBalance.reverse();
+  const total = reversed.length;
+  const start = (page - 1) * pageSize;
+  const transactions = reversed.slice(start, start + pageSize);
+
+  return { transactions, total };
+}
