@@ -255,14 +255,12 @@ export function BankConnectionManager({ communityId, onSync }: BankConnectionMan
   }
 
   async function handleMapToGL(bankAccountId: string, glAccountId: string) {
-    try {
-      await mapBankAccountToGL(communityId, bankAccountId, glAccountId);
+    const result = await mapBankAccountToGL(communityId, bankAccountId, glAccountId);
+    if (result.success) {
       toast.success('Account mapped to GL.');
       fetchData();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to map account.';
-      console.error('Map to GL error:', err);
-      toast.error(message);
+    } else {
+      toast.error(result.error || 'Failed to map account.');
     }
   }
 
