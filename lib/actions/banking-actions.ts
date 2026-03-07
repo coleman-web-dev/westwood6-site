@@ -109,11 +109,16 @@ export async function mapBankAccountToGL(
   await requirePermission(communityId, 'banking', 'write');
   const admin = createAdminClient();
 
-  await admin
+  const { error } = await admin
     .from('plaid_bank_accounts')
     .update({ gl_account_id: glAccountId })
     .eq('id', bankAccountId)
     .eq('community_id', communityId);
+
+  if (error) {
+    console.error('mapBankAccountToGL error:', error);
+    throw new Error(error.message);
+  }
 
   return { success: true };
 }
