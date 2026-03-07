@@ -110,8 +110,8 @@ export async function mapBankAccountToGL(
     await requirePermission(communityId, 'banking', 'write');
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Permission denied';
-    console.error('mapBankAccountToGL permission error:', msg);
-    return { success: false, error: msg };
+    console.error('mapBankAccountToGL permission error:', msg, { communityId, bankAccountId, glAccountId });
+    return { success: false, error: `${msg} [debug: cid=${communityId.slice(0, 8)}]` };
   }
 
   const admin = createAdminClient();

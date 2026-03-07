@@ -29,18 +29,23 @@ export async function requireBoardMember(communityId: string): Promise<AuthResul
   } = await supabase.auth.getUser();
   if (!user) throw new Error('Unauthorized');
 
-  const { data: member } = await supabase
+  const { data: member, error: memberError } = await supabase
     .from('members')
     .select('id, system_role, role_template_id, first_name, last_name, email')
     .eq('user_id', user.id)
     .eq('community_id', communityId)
     .single();
 
-  if (
-    !member ||
-    !['board', 'manager', 'super_admin'].includes(member.system_role)
-  ) {
-    throw new Error('Forbidden');
+  if (memberError) {
+    throw new Error(`Forbidden: query failed - ${memberError.message}`);
+  }
+
+  if (!member) {
+    throw new Error(`Forbidden: no member found for user ${user.id.slice(0, 8)} in community ${communityId.slice(0, 8)}`);
+  }
+
+  if (!['board', 'manager', 'super_admin'].includes(member.system_role)) {
+    throw new Error(`Forbidden: role ${member.system_role} is not board-level`);
   }
 
   return { user, member };
