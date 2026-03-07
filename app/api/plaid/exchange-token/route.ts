@@ -129,8 +129,9 @@ export async function POST(request: Request) {
       connection,
       accounts: savedAccounts,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error exchanging token:', error);
-    return NextResponse.json({ error: 'Failed to exchange token' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Failed to exchange token';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

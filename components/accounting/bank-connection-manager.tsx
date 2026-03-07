@@ -117,7 +117,8 @@ export function BankConnectionManager({ communityId, onSync }: BankConnectionMan
       });
 
       if (!res.ok) {
-        toast.error('Failed to connect bank account.');
+        const body = await res.json().catch(() => ({}));
+        toast.error(body.error || 'Failed to connect bank account.');
         return;
       }
 
