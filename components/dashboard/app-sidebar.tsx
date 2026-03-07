@@ -70,13 +70,13 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
       className={`
         group/sidebar
         fixed top-0 left-0 z-50 h-screen
-        w-sidebar lg:hover:w-52
         flex flex-col
         py-4 gap-3.5
         bg-surface-light dark:bg-surface-dark
         border-r border-stroke-light dark:border-stroke-dark
-        transition-[width] duration-200 ease-out overflow-hidden
-        ${open ? 'translate-x-0 w-52' : '-translate-x-full lg:translate-x-0'}
+        transition-[width,transform] duration-200 ease-out overflow-x-hidden
+        lg:w-sidebar lg:hover:w-52 lg:translate-x-0
+        ${open ? 'translate-x-0 w-52' : '-translate-x-full w-0'}
       `}
     >
       {/* Mobile close */}
@@ -101,7 +101,7 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
       </Link>
 
       {/* Nav items */}
-      <nav className="flex-1 flex flex-col gap-1 px-3 overflow-y-auto">
+      <nav className="flex-1 min-h-0 flex flex-col gap-1 px-3 overflow-y-auto">
         {NAV_ITEMS.map((item) => (
           <NavItem
             key={item.href}
@@ -239,7 +239,7 @@ function NavItem({
     <Link
       href={href}
       className={`
-        flex items-center gap-3 h-10 px-2.5 rounded-inner-card transition-colors
+        flex items-center gap-3 h-10 shrink-0 px-2.5 rounded-inner-card transition-colors
         ${
           active
             ? 'bg-secondary-400/15 text-secondary-400'
