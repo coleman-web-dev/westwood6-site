@@ -101,7 +101,7 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
       </Link>
 
       {/* Nav items */}
-      <nav className="flex-1 flex flex-col gap-1 px-3">
+      <nav className="flex-1 flex flex-col gap-1 px-3 overflow-y-auto">
         {NAV_ITEMS.map((item) => (
           <NavItem
             key={item.href}
