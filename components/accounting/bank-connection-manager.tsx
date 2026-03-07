@@ -76,21 +76,30 @@ export function BankConnectionManager({ communityId, onSync }: BankConnectionMan
     fetchData();
   }, [fetchData]);
 
+  const [connecting, setConnecting] = useState(false);
+
   async function getLinkToken() {
-    const res = await fetch('/api/plaid/create-link-token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ communityId }),
-    });
+    setConnecting(true);
+    try {
+      const res = await fetch('/api/plaid/create-link-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ communityId }),
+      });
 
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      toast.error(body.error || `Failed to initialize bank connection (${res.status}).`);
-      return;
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        toast.error(body.error || `Failed to initialize bank connection (${res.status}).`);
+        setConnecting(false);
+        return;
+      }
+
+      const { link_token } = await res.json();
+      setLinkToken(link_token);
+    } catch {
+      toast.error('Network error connecting to bank service.');
+      setConnecting(false);
     }
-
-    const { link_token } = await res.json();
-    setLinkToken(link_token);
   }
 
   const { open, ready } = usePlaidLink({
@@ -118,6 +127,7 @@ export function BankConnectionManager({ communityId, onSync }: BankConnectionMan
     },
     onExit: () => {
       setLinkToken(null);
+      setConnecting(false);
     },
   });
 
@@ -148,8 +158,23 @@ export function BankConnectionManager({ communityId, onSync }: BankConnectionMan
   useEffect(() => {
     if (linkToken && ready) {
       open();
+      setConnecting(false);
     }
   }, [linkToken, ready, open]);
+
+  // If token was fetched but Plaid Link doesn't become ready within 5s, show error
+  useEffect(() => {
+    if (linkToken && !ready) {
+      const timeout = setTimeout(() => {
+        if (!ready) {
+          toast.error('Plaid Link failed to load. Check browser console or try disabling ad blockers.');
+          setConnecting(false);
+          setLinkToken(null);
+        }
+      }, 5000);
+      return () => clearTimeout(timeout);
+    }
+  }, [linkToken, ready]);
 
   useEffect(() => {
     if (updateLinkToken && readyUpdate) {
@@ -254,9 +279,9 @@ export function BankConnectionManager({ communityId, onSync }: BankConnectionMan
             ? 'No bank accounts connected'
             : `${connections.length} connected institution${connections.length !== 1 ? 's' : ''}`}
         </p>
-        <Button size="sm" onClick={getLinkToken}>
-          <Building2 className="h-4 w-4 mr-1" />
-          Connect Bank
+        <Button size="sm" onClick={getLinkToken} disabled={connecting}>
+          {connecting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Building2 className="h-4 w-4 mr-1" />}
+          {connecting ? 'Connecting...' : 'Connect Bank'}
         </Button>
       </div>
 
