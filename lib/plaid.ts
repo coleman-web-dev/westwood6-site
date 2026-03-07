@@ -4,9 +4,9 @@ let plaidClient: PlaidApi | null = null;
 
 export function getPlaidClient(): PlaidApi {
   if (!plaidClient) {
-    const clientId = process.env.PLAID_CLIENT_ID;
-    const secret = process.env.PLAID_SECRET;
-    const env = process.env.PLAID_ENV || 'sandbox';
+    const clientId = (process.env.PLAID_CLIENT_ID || '').trim();
+    const secret = (process.env.PLAID_SECRET || '').trim();
+    const env = (process.env.PLAID_ENV || 'sandbox').trim();
 
     if (!clientId || !secret) {
       throw new Error('PLAID_CLIENT_ID and PLAID_SECRET must be set');
