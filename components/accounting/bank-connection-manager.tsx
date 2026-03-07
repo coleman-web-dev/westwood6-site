@@ -337,6 +337,7 @@ export function BankConnectionManager({ communityId, onSync }: BankConnectionMan
                 variant="outline"
                 onClick={() => handleSync(conn.id)}
                 disabled={syncing === conn.id || conn.requires_reconsent}
+                title="Sync transactions"
               >
                 {syncing === conn.id ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -348,6 +349,7 @@ export function BankConnectionManager({ communityId, onSync }: BankConnectionMan
                 size="sm"
                 variant="ghost"
                 onClick={() => setDisconnectId(conn.id)}
+                title="Disconnect bank"
               >
                 <Unlink className="h-3.5 w-3.5" />
               </Button>
