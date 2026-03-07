@@ -84,7 +84,8 @@ export function BankConnectionManager({ communityId, onSync }: BankConnectionMan
     });
 
     if (!res.ok) {
-      toast.error('Failed to initialize bank connection.');
+      const body = await res.json().catch(() => ({}));
+      toast.error(body.error || `Failed to initialize bank connection (${res.status}).`);
       return;
     }
 

@@ -28,7 +28,7 @@ export async function POST(request: Request) {
       .single();
 
     if (!member || !['board', 'manager', 'super_admin'].includes(member.system_role)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return NextResponse.json({ error: `Forbidden: role=${member?.system_role || 'no member found'}` }, { status: 403 });
     }
 
     const plaid = getPlaidClient();
@@ -41,8 +41,9 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ link_token: response.data.link_token });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error creating link token:', error);
-    return NextResponse.json({ error: 'Failed to create link token' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Failed to create link token';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
