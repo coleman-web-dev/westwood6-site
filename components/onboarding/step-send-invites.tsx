@@ -26,11 +26,10 @@ export function StepSendInvites({
   const [members, setMembers] = useState<InvitableMember[]>([]);
   const [signedUpCount, setSignedUpCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [done, setDone] = useState(false);
+  const [progressText, setProgressText] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [creatingAccounts, setCreatingAccounts] = useState(false);
-  const [accountsCreated, setAccountsCreated] = useState(false);
 
   useEffect(() => {
     async function fetchMembers() {
@@ -78,11 +77,32 @@ export function StepSendInvites({
     fetchMembers();
   }, [community.id]);
 
-  async function handleSendInvites() {
+  async function handleCreateAndInvite() {
     if (members.length === 0) return;
 
-    setSending(true);
+    setProcessing(true);
+
     try {
+      // Step 1: Create login accounts
+      setProgressText('Creating login accounts...');
+      const res = await fetch('/api/stripe/pre-create-accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ communityId: community.id }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to create accounts');
+        return;
+      }
+
+      toast.success(
+        `Created ${data.created} accounts. ${data.alreadyExists} already existed.`,
+      );
+
+      // Step 2: Send welcome emails
+      setProgressText('Sending welcome emails...');
       const memberList = members.map((m) => ({
         email: m.email,
         name: `${m.first_name} ${m.last_name}`,
@@ -99,37 +119,16 @@ export function StepSendInvites({
         toast.success(
           `Welcome emails queued for ${result.count} member${result.count !== 1 ? 's' : ''}.`,
         );
-        setSent(true);
+        setDone(true);
       } else {
         toast.error(result.error || 'Failed to send welcome emails.');
       }
     } catch (err) {
-      console.error('Error sending invites:', err);
+      console.error('Error creating accounts and sending invites:', err);
       toast.error('An unexpected error occurred.');
     } finally {
-      setSending(false);
-    }
-  }
-
-  async function handleCreateAccounts() {
-    setCreatingAccounts(true);
-    try {
-      const res = await fetch('/api/stripe/pre-create-accounts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ communityId: community.id }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success("Created " + data.created + " accounts. " + data.alreadyExists + " already existed.");
-        setAccountsCreated(true);
-      } else {
-        toast.error(data.error || 'Failed to create accounts');
-      }
-    } catch {
-      toast.error('An unexpected error occurred');
-    } finally {
-      setCreatingAccounts(false);
+      setProcessing(false);
+      setProgressText('');
     }
   }
 
@@ -189,32 +188,29 @@ export function StepSendInvites({
 
           {members.length > 0 && (
             <>
-              {/* Action buttons */}
-              <div className="mb-4 space-y-2">
+              {/* Action button */}
+              <div className="mb-4">
                 <Button
                   type="button"
-                  onClick={handleCreateAccounts}
-                  disabled={creatingAccounts || accountsCreated}
-                  variant="outline"
+                  onClick={handleCreateAndInvite}
+                  disabled={processing || done}
                 >
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  {accountsCreated
-                    ? 'Accounts Created'
-                    : creatingAccounts
-                      ? 'Creating...'
-                      : `Create Login Accounts (${members.length})`}
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handleSendInvites}
-                  disabled={sending || sent}
-                >
-                  <Mail className="mr-2 h-4 w-4" />
-                  {sent
-                    ? 'Emails Queued'
-                    : sending
-                      ? 'Sending...'
-                      : `Send Welcome Emails (${members.length})`}
+                  {done ? (
+                    <>
+                      <Check className="mr-2 h-4 w-4" />
+                      Accounts Created & Emails Sent
+                    </>
+                  ) : processing ? (
+                    <>
+                      <Mail className="mr-2 h-4 w-4 animate-pulse" />
+                      {progressText}
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      Create Accounts & Send Invites ({members.length})
+                    </>
+                  )}
                 </Button>
               </div>
 

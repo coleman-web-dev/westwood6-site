@@ -176,9 +176,10 @@ export function StepAssessmentConfig({
         Assessment Configuration
       </h2>
       <p className="text-body text-text-secondary-light dark:text-text-secondary-dark mb-6">
-        Set up your community&apos;s annual assessment. This will automatically
-        generate invoices for all active units based on the selected payment
-        frequency.
+        Set up your community&apos;s annual assessment. Invoices will be
+        automatically generated for all active units. Each unit&apos;s invoices
+        will use its own payment frequency if one is already set (e.g. from
+        import), otherwise the default frequency below will be used.
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -258,7 +259,7 @@ export function StepAssessmentConfig({
             htmlFor="frequency"
             className="text-label text-text-secondary-light dark:text-text-secondary-dark"
           >
-            Payment Frequency *
+            Default Payment Frequency *
           </Label>
           <Select
             value={form.frequency}
@@ -276,6 +277,9 @@ export function StepAssessmentConfig({
               <SelectItem value="annual">Annual</SelectItem>
             </SelectContent>
           </Select>
+          <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+            This is the default frequency for new units. Units that already have a payment frequency set (e.g. from import) will use their own. Homeowners can also change their payment frequency from their dashboard if you allow that option in community settings.
+          </p>
         </div>
 
         {previewPeriods.length > 0 && form.annual_amount && (
