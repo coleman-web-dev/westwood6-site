@@ -12,6 +12,8 @@ import {
   assignReconciliationTransactions,
 } from '@/lib/actions/banking-actions';
 import { BankTransactionDetail } from '@/components/accounting/bank-transaction-detail';
+import { MerchantLogo } from '@/components/accounting/merchant-logo';
+import { AccountCombobox } from '@/components/accounting/account-combobox';
 import type { BankReconciliation, BankTransaction } from '@/lib/types/banking';
 import type { Account } from '@/lib/types/accounting';
 import type { Vendor } from '@/lib/types/database';
@@ -79,34 +81,6 @@ export function ReconciliationWorkspace({
         .order('name'),
     ]);
 
-    if (txnResult.error) {
-      console.error('Reconciliation txn query error:', txnResult.error);
-      console.error('Query params:', {
-        communityId,
-        plaid_bank_account_id: reconData.plaid_bank_account_id,
-        period_start: reconData.period_start,
-        period_end: reconData.period_end,
-      });
-    }
-
-    // If filtered query returns nothing, check if there are ANY transactions for this bank account
-    if (!txnResult.data?.length && !txnResult.error) {
-      const { data: allForAccount, count } = await supabase
-        .from('bank_transactions')
-        .select('id, date, status', { count: 'exact', head: false })
-        .eq('community_id', communityId)
-        .eq('plaid_bank_account_id', reconData.plaid_bank_account_id)
-        .order('date', { ascending: true })
-        .limit(3);
-
-      console.warn('Reconciliation: 0 transactions in date range.', {
-        period: `${reconData.period_start} to ${reconData.period_end}`,
-        bankAccountId: reconData.plaid_bank_account_id,
-        totalForAccount: count,
-        sampleDates: allForAccount?.map((t) => `${t.date} (${t.status})`),
-      });
-    }
-
     setTransactions((txnResult.data as BankTransaction[]) || []);
     setAccounts((accts as Account[]) || []);
     setVendors((vndrs as Vendor[]) || []);
@@ -158,10 +132,13 @@ export function ReconciliationWorkspace({
     return (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
   }
 
-  function getAccountName(accountId: string | null) {
-    if (!accountId) return null;
-    const acct = accounts.find((a) => a.id === accountId);
-    return acct ? `${acct.code} - ${acct.name}` : null;
+  function formatAmount(amount: number) {
+    // Plaid: positive = money leaving (debit), negative = money entering (credit)
+    const isDebit = amount > 0;
+    return {
+      text: `${isDebit ? '-' : '+'}${(Math.abs(amount) / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}`,
+      className: isDebit ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400',
+    };
   }
 
   if (loading) {
@@ -316,42 +293,46 @@ export function ReconciliationWorkspace({
             </h3>
           </div>
           <div className="divide-y divide-stroke-light dark:divide-stroke-dark">
-            {pending.map((txn) => (
-              <button
-                key={txn.id}
-                type="button"
-                onClick={() => setSelectedTxn(txn)}
-                className="w-full text-left px-card-padding py-3 hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors flex items-center gap-3"
-              >
-                <span className="text-meta tabular-nums text-text-muted-light dark:text-text-muted-dark w-20 shrink-0">
-                  {new Date(txn.date).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                  })}
-                </span>
-                <span className="text-body text-text-primary-light dark:text-text-primary-dark flex-1 truncate">
-                  {txn.merchant_name || txn.name}
-                </span>
-                {txn.ai_confidence != null && txn.ai_confidence >= 0.5 && (
-                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-medium shrink-0">
-                    <Sparkles className="h-2.5 w-2.5" /> Suggestion
-                  </span>
-                )}
-                <span
-                  className={`text-body tabular-nums shrink-0 ${
-                    txn.amount > 0
-                      ? 'text-red-500 dark:text-red-400'
-                      : 'text-green-600 dark:text-green-400'
-                  }`}
+            {pending.map((txn) => {
+              const amt = formatAmount(txn.amount);
+              return (
+                <div
+                  key={txn.id}
+                  className="px-card-padding py-2.5 hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors flex items-center gap-3"
                 >
-                  {txn.amount > 0 ? '-' : '+'}
-                  {(Math.abs(txn.amount) / 100).toLocaleString('en-US', {
-                    style: 'currency',
-                    currency: 'USD',
-                  })}
-                </span>
-              </button>
-            ))}
+                  <MerchantLogo name={txn.merchant_name || txn.name} logoUrl={txn.logo_url} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-body font-semibold text-text-primary-light dark:text-text-primary-dark truncate">
+                      {txn.merchant_name || txn.name}
+                    </p>
+                    <p className="text-meta text-text-muted-light dark:text-text-muted-dark truncate">
+                      {new Date(txn.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      {txn.merchant_name && txn.name !== txn.merchant_name && (
+                        <span className="ml-1.5">{txn.name}</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <AccountCombobox
+                      communityId={communityId}
+                      transactionId={txn.id}
+                      currentAccountId={txn.categorized_account_id}
+                      accounts={accounts}
+                      onUpdate={fetchData}
+                    />
+                    {txn.ai_confidence != null && txn.ai_confidence >= 0.5 && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-500 text-[10px] font-medium">
+                        <Sparkles className="h-2.5 w-2.5" />
+                        {(txn.ai_confidence * 100).toFixed(0)}%
+                      </span>
+                    )}
+                    <span className={`text-body tabular-nums font-medium w-24 text-right ${amt.className}`}>
+                      {amt.text}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -365,50 +346,51 @@ export function ReconciliationWorkspace({
             </h3>
           </div>
           <div className="divide-y divide-stroke-light dark:divide-stroke-dark">
-            {[...matched, ...categorized].map((txn) => (
-              <div
-                key={txn.id}
-                className="px-card-padding py-2 flex items-center gap-3 text-text-secondary-light dark:text-text-secondary-dark"
-              >
-                <span className="text-meta tabular-nums w-20 shrink-0">
-                  {new Date(txn.date).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                  })}
-                </span>
-                <span className="text-body flex-1 truncate">
-                  {txn.merchant_name || txn.name}
-                </span>
-                {txn.match_method === 'ai' && (
-                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-500 text-[10px] font-medium shrink-0">
-                    <Sparkles className="h-2.5 w-2.5" /> AI {txn.ai_confidence != null ? `${(txn.ai_confidence * 100).toFixed(0)}%` : ''}
-                  </span>
-                )}
-                {txn.match_method === 'rule' && (
-                  <Badge variant="outline" className="text-[10px] shrink-0">
-                    Rule
-                  </Badge>
-                )}
-                {txn.categorized_account_id && (
-                  <span className="text-meta text-text-muted-light dark:text-text-muted-dark shrink-0 max-w-[160px] truncate">
-                    {getAccountName(txn.categorized_account_id)}
-                  </span>
-                )}
-                <span
-                  className={`text-body tabular-nums shrink-0 ${
-                    txn.amount > 0
-                      ? 'text-red-500 dark:text-red-400'
-                      : 'text-green-600 dark:text-green-400'
-                  }`}
+            {[...matched, ...categorized].map((txn) => {
+              const amt = formatAmount(txn.amount);
+              return (
+                <div
+                  key={txn.id}
+                  className="px-card-padding py-2.5 hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors flex items-center gap-3"
                 >
-                  {txn.amount > 0 ? '-' : '+'}
-                  {(Math.abs(txn.amount) / 100).toLocaleString('en-US', {
-                    style: 'currency',
-                    currency: 'USD',
-                  })}
-                </span>
-              </div>
-            ))}
+                  <MerchantLogo name={txn.merchant_name || txn.name} logoUrl={txn.logo_url} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-body font-semibold text-text-primary-light dark:text-text-primary-dark truncate">
+                      {txn.merchant_name || txn.name}
+                    </p>
+                    <p className="text-meta text-text-muted-light dark:text-text-muted-dark truncate">
+                      {new Date(txn.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      {txn.merchant_name && txn.name !== txn.merchant_name && (
+                        <span className="ml-1.5">{txn.name}</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <AccountCombobox
+                      communityId={communityId}
+                      transactionId={txn.id}
+                      currentAccountId={txn.categorized_account_id}
+                      accounts={accounts}
+                      onUpdate={fetchData}
+                    />
+                    {txn.match_method === 'ai' && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-500 text-[10px] font-medium">
+                        <Sparkles className="h-2.5 w-2.5" />
+                        {txn.ai_confidence != null ? `${(txn.ai_confidence * 100).toFixed(0)}%` : 'AI'}
+                      </span>
+                    )}
+                    {txn.match_method === 'rule' && (
+                      <Badge variant="outline" className="text-[10px]">
+                        Rule
+                      </Badge>
+                    )}
+                    <span className={`text-body tabular-nums font-medium w-24 text-right ${amt.className}`}>
+                      {amt.text}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -422,33 +404,31 @@ export function ReconciliationWorkspace({
             </h3>
           </div>
           <div className="divide-y divide-stroke-light dark:divide-stroke-dark">
-            {excluded.map((txn) => (
-              <div
-                key={txn.id}
-                className="px-card-padding py-2 flex items-center gap-3 text-text-muted-light dark:text-text-muted-dark opacity-60"
-              >
-                <span className="text-meta tabular-nums w-20 shrink-0">
-                  {new Date(txn.date).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                  })}
-                </span>
-                <span className="text-body flex-1 truncate">
-                  {txn.merchant_name || txn.name}
-                </span>
-                {txn.excluded_reason && (
-                  <span className="text-meta shrink-0 max-w-[160px] truncate">
-                    {txn.excluded_reason}
+            {excluded.map((txn) => {
+              const amt = formatAmount(txn.amount);
+              return (
+                <div
+                  key={txn.id}
+                  className="px-card-padding py-2.5 flex items-center gap-3 opacity-50"
+                >
+                  <MerchantLogo name={txn.merchant_name || txn.name} logoUrl={txn.logo_url} size={24} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-body text-text-secondary-light dark:text-text-secondary-dark truncate">
+                      {txn.merchant_name || txn.name}
+                    </p>
+                    <p className="text-meta text-text-muted-light dark:text-text-muted-dark truncate">
+                      {new Date(txn.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      {txn.excluded_reason && (
+                        <span className="ml-1.5 italic">{txn.excluded_reason}</span>
+                      )}
+                    </p>
+                  </div>
+                  <span className={`text-body tabular-nums font-medium w-24 text-right ${amt.className} opacity-70`}>
+                    {amt.text}
                   </span>
-                )}
-                <span className="text-body tabular-nums shrink-0">
-                  {(Math.abs(txn.amount) / 100).toLocaleString('en-US', {
-                    style: 'currency',
-                    currency: 'USD',
-                  })}
-                </span>
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

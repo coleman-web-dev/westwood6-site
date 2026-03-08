@@ -83,17 +83,30 @@ export async function POST(request: Request) {
       if (newTxns.length > 0) {
         const inserts = newTxns
           .filter((t) => accountMap.has(t.account_id))
-          .map((t) => ({
-            community_id: communityId,
-            plaid_bank_account_id: accountMap.get(t.account_id)!,
-            plaid_transaction_id: t.transaction_id,
-            date: t.date,
-            name: t.name,
-            merchant_name: t.merchant_name || null,
-            // Plaid amounts: positive = money leaving account (debit), negative = money entering (credit)
-            // Store in cents
-            amount: Math.round(t.amount * 100),
-          }));
+          .map((t) => {
+            // Extract logo from counterparties or top-level
+            const txnAny = t as unknown as Record<string, unknown>;
+            const counterparties = txnAny.counterparties as { logo_url?: string | null }[] | undefined;
+            const logoUrl =
+              (txnAny.logo_url as string) ||
+              counterparties?.[0]?.logo_url ||
+              null;
+            const pfc = txnAny.personal_finance_category as { primary?: string } | undefined;
+
+            return {
+              community_id: communityId,
+              plaid_bank_account_id: accountMap.get(t.account_id)!,
+              plaid_transaction_id: t.transaction_id,
+              date: t.date,
+              name: t.name,
+              merchant_name: t.merchant_name || null,
+              // Plaid amounts: positive = money leaving account (debit), negative = money entering (credit)
+              // Store in cents
+              amount: Math.round(t.amount * 100),
+              logo_url: logoUrl,
+              plaid_category: pfc?.primary || null,
+            };
+          });
 
         if (inserts.length > 0) {
           await admin.from('bank_transactions').upsert(inserts, {
@@ -106,6 +119,14 @@ export async function POST(request: Request) {
       // Update modified transactions
       for (const t of modTxns) {
         if (!accountMap.has(t.account_id)) continue;
+        const txnAny = t as unknown as Record<string, unknown>;
+        const counterparties = txnAny.counterparties as { logo_url?: string | null }[] | undefined;
+        const logoUrl =
+          (txnAny.logo_url as string) ||
+          counterparties?.[0]?.logo_url ||
+          null;
+        const pfc = txnAny.personal_finance_category as { primary?: string } | undefined;
+
         await admin
           .from('bank_transactions')
           .update({
@@ -113,6 +134,8 @@ export async function POST(request: Request) {
             name: t.name,
             merchant_name: t.merchant_name || null,
             amount: Math.round(t.amount * 100),
+            logo_url: logoUrl,
+            plaid_category: pfc?.primary || null,
           })
           .eq('plaid_transaction_id', t.transaction_id);
         modified++;

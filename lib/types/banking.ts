@@ -61,6 +61,8 @@ export interface BankTransaction {
   notes: string | null;
   ai_confidence: number | null;
   ai_reasoning: string | null;
+  logo_url: string | null;
+  plaid_category: string | null;
   created_at: string;
   updated_at: string;
 }
