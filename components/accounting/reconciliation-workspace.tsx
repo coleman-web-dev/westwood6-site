@@ -55,7 +55,7 @@ export function ReconciliationWorkspace({
     setRecon(reconData as BankReconciliation);
 
     // Now fetch transactions for this bank account within the period
-    const [{ data: txns }, { data: accts }, { data: vndrs }] = await Promise.all([
+    const [txnResult, { data: accts }, { data: vndrs }] = await Promise.all([
       supabase
         .from('bank_transactions')
         .select('*')
@@ -79,7 +79,35 @@ export function ReconciliationWorkspace({
         .order('name'),
     ]);
 
-    setTransactions((txns as BankTransaction[]) || []);
+    if (txnResult.error) {
+      console.error('Reconciliation txn query error:', txnResult.error);
+      console.error('Query params:', {
+        communityId,
+        plaid_bank_account_id: reconData.plaid_bank_account_id,
+        period_start: reconData.period_start,
+        period_end: reconData.period_end,
+      });
+    }
+
+    // If filtered query returns nothing, check if there are ANY transactions for this bank account
+    if (!txnResult.data?.length && !txnResult.error) {
+      const { data: allForAccount, count } = await supabase
+        .from('bank_transactions')
+        .select('id, date, status', { count: 'exact', head: false })
+        .eq('community_id', communityId)
+        .eq('plaid_bank_account_id', reconData.plaid_bank_account_id)
+        .order('date', { ascending: true })
+        .limit(3);
+
+      console.warn('Reconciliation: 0 transactions in date range.', {
+        period: `${reconData.period_start} to ${reconData.period_end}`,
+        bankAccountId: reconData.plaid_bank_account_id,
+        totalForAccount: count,
+        sampleDates: allForAccount?.map((t) => `${t.date} (${t.status})`),
+      });
+    }
+
+    setTransactions((txnResult.data as BankTransaction[]) || []);
     setAccounts((accts as Account[]) || []);
     setVendors((vndrs as Vendor[]) || []);
     setLoading(false);
@@ -264,6 +292,20 @@ export function ReconciliationWorkspace({
           </div>
         ))}
       </div>
+
+      {/* No transactions message */}
+      {transactions.length === 0 && (
+        <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding text-center py-8">
+          <p className="text-body text-text-muted-light dark:text-text-muted-dark">
+            No transactions found for this bank account between{' '}
+            {new Date(recon.period_start).toLocaleDateString()} and{' '}
+            {new Date(recon.period_end).toLocaleDateString()}.
+          </p>
+          <p className="text-meta text-text-muted-light dark:text-text-muted-dark mt-2">
+            Make sure you have synced transactions and the date range covers your bank statement period.
+          </p>
+        </div>
+      )}
 
       {/* Pending transactions (action needed) */}
       {pending.length > 0 && (
