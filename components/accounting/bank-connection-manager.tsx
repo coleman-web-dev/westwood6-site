@@ -233,13 +233,15 @@ export function BankConnectionManager({ communityId, onSync }: BankConnectionMan
       body: JSON.stringify({ communityId, connectionId }),
     });
 
+    const body = await res.json().catch(() => ({}));
+
     if (!res.ok) {
-      toast.error('Failed to initialize consent update.');
+      toast.error(body.error || 'Failed to initialize consent update.');
       setUpdatingConnectionId(null);
       return;
     }
 
-    const { link_token } = await res.json();
+    const { link_token } = body;
     setUpdateLinkToken(link_token);
   }
 

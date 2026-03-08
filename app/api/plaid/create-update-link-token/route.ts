@@ -62,13 +62,15 @@ export async function POST(request: Request) {
       access_token: connection.plaid_access_token,
       country_codes: [CountryCode.Us],
       language: 'en',
-      // Request consent for transactions and statements in the update flow
-      additional_consented_products: [Products.Transactions, Products.Statements],
+      additional_consented_products: [Products.Statements],
     });
 
     return NextResponse.json({ link_token: response.data.link_token });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error creating update link token:', error);
-    return NextResponse.json({ error: 'Failed to create update link token' }, { status: 500 });
+    const plaidError = error as { response?: { data?: { error_message?: string; error_code?: string } } };
+    const message = plaidError?.response?.data?.error_message
+      || (error instanceof Error ? error.message : 'Failed to create update link token');
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
