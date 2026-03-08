@@ -2,20 +2,7 @@
 
 import { Badge } from '@/components/shared/ui/badge';
 import { AlertTriangle, CheckCircle } from 'lucide-react';
-import type { Vendor, VendorCategory } from '@/lib/types/database';
-
-const CATEGORY_LABELS: Record<VendorCategory, string> = {
-  landscaping: 'Landscaping',
-  plumbing: 'Plumbing',
-  electrical: 'Electrical',
-  hvac: 'HVAC',
-  painting: 'Painting',
-  roofing: 'Roofing',
-  cleaning: 'Cleaning',
-  security: 'Security',
-  general: 'General',
-  other: 'Other',
-};
+import type { Vendor } from '@/lib/types/database';
 
 interface VendorListProps {
   vendors: Vendor[];
@@ -74,7 +61,7 @@ export function VendorList({ vendors, loading, onSelect }: VendorListProps) {
                     {v.name}
                   </h3>
                   <Badge variant="outline" className="text-meta">
-                    {CATEGORY_LABELS[v.category]}
+                    {v.vendor_categories?.name ?? 'General'}
                   </Badge>
                   {v.status === 'inactive' && (
                     <Badge variant="secondary" className="text-meta">Inactive</Badge>

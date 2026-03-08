@@ -22,12 +22,13 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
-import type { VendorCategory } from '@/lib/types/database';
+import type { VendorCategoryRow } from '@/lib/types/database';
 
 interface CreateVendorDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   communityId: string;
+  categories: VendorCategoryRow[];
   onCreated: () => void;
 }
 
@@ -35,13 +36,15 @@ export function CreateVendorDialog({
   open,
   onOpenChange,
   communityId,
+  categories,
   onCreated,
 }: CreateVendorDialogProps) {
+  const generalCategoryId = categories.find((c) => c.slug === 'general')?.id ?? '';
   const [name, setName] = useState('');
   const [company, setCompany] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [category, setCategory] = useState<VendorCategory>('general');
+  const [categoryId, setCategoryId] = useState(generalCategoryId);
   const [licenseNumber, setLicenseNumber] = useState('');
   const [insuranceExpiry, setInsuranceExpiry] = useState('');
   const [taxId, setTaxId] = useState('');
@@ -63,7 +66,7 @@ export function CreateVendorDialog({
       company: company.trim() || null,
       phone: phone.trim() || null,
       email: email.trim() || null,
-      category,
+      category_id: categoryId,
       license_number: licenseNumber.trim() || null,
       insurance_expiry: insuranceExpiry || null,
       tax_id: taxId.trim() || null,
@@ -82,7 +85,7 @@ export function CreateVendorDialog({
     setCompany('');
     setPhone('');
     setEmail('');
-    setCategory('general');
+    setCategoryId(generalCategoryId);
     setLicenseNumber('');
     setInsuranceExpiry('');
     setTaxId('');
@@ -134,21 +137,14 @@ export function CreateVendorDialog({
               <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
                 Category
               </Label>
-              <Select value={category} onValueChange={(v) => setCategory(v as VendorCategory)}>
+              <Select value={categoryId} onValueChange={setCategoryId}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="landscaping">Landscaping</SelectItem>
-                  <SelectItem value="plumbing">Plumbing</SelectItem>
-                  <SelectItem value="electrical">Electrical</SelectItem>
-                  <SelectItem value="hvac">HVAC</SelectItem>
-                  <SelectItem value="painting">Painting</SelectItem>
-                  <SelectItem value="roofing">Roofing</SelectItem>
-                  <SelectItem value="cleaning">Cleaning</SelectItem>
-                  <SelectItem value="security">Security</SelectItem>
-                  <SelectItem value="general">General</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

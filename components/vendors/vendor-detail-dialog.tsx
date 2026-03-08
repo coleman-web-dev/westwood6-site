@@ -26,24 +26,12 @@ import { toast } from 'sonner';
 import { Upload, FileText, CheckCircle, DollarSign } from 'lucide-react';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { VendorDocumentsSection } from '@/components/vendors/vendor-documents-section';
-import type { Vendor, VendorCategory, VendorStatus } from '@/lib/types/database';
+import type { Vendor, VendorCategoryRow, VendorStatus } from '@/lib/types/database';
 import type { Account } from '@/lib/types/accounting';
-
-const CATEGORY_LABELS: Record<VendorCategory, string> = {
-  landscaping: 'Landscaping',
-  plumbing: 'Plumbing',
-  electrical: 'Electrical',
-  hvac: 'HVAC',
-  painting: 'Painting',
-  roofing: 'Roofing',
-  cleaning: 'Cleaning',
-  security: 'Security',
-  general: 'General',
-  other: 'Other',
-};
 
 interface VendorDetailDialogProps {
   vendor: Vendor | null;
+  categories: VendorCategoryRow[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdated: () => void;
@@ -52,6 +40,7 @@ interface VendorDetailDialogProps {
 
 export function VendorDetailDialog({
   vendor,
+  categories,
   open,
   onOpenChange,
   onUpdated,
@@ -62,7 +51,7 @@ export function VendorDetailDialog({
   const [company, setCompany] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [category, setCategory] = useState<VendorCategory>('general');
+  const [categoryId, setCategoryId] = useState('');
   const [licenseNumber, setLicenseNumber] = useState('');
   const [insuranceExpiry, setInsuranceExpiry] = useState('');
   const [notes, setNotes] = useState('');
@@ -88,7 +77,7 @@ export function VendorDetailDialog({
       setCompany(vendor.company ?? '');
       setPhone(vendor.phone ?? '');
       setEmail(vendor.email ?? '');
-      setCategory(vendor.category);
+      setCategoryId(vendor.category_id);
       setLicenseNumber(vendor.license_number ?? '');
       setInsuranceExpiry(vendor.insurance_expiry ?? '');
       setNotes(vendor.notes ?? '');
@@ -130,7 +119,7 @@ export function VendorDetailDialog({
         company: company.trim() || null,
         phone: phone.trim() || null,
         email: email.trim() || null,
-        category,
+        category_id: categoryId,
         license_number: licenseNumber.trim() || null,
         insurance_expiry: insuranceExpiry || null,
         tax_id: taxId.trim() || null,
@@ -252,13 +241,13 @@ export function VendorDetailDialog({
               <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
                 Category
               </Label>
-              <Select value={category} onValueChange={(v) => setCategory(v as VendorCategory)}>
+              <Select value={categoryId} onValueChange={setCategoryId}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

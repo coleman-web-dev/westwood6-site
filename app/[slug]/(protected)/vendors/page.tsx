@@ -9,27 +9,17 @@ import { VendorList } from '@/components/vendors/vendor-list';
 import { CreateVendorDialog } from '@/components/vendors/create-vendor-dialog';
 import { VendorDetailDialog } from '@/components/vendors/vendor-detail-dialog';
 import { RecordVendorPaymentDialog } from '@/components/vendors/record-vendor-payment-dialog';
-import type { Vendor, VendorCategory } from '@/lib/types/database';
-
-const CATEGORY_FILTERS: { value: string; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'landscaping', label: 'Landscaping' },
-  { value: 'plumbing', label: 'Plumbing' },
-  { value: 'electrical', label: 'Electrical' },
-  { value: 'hvac', label: 'HVAC' },
-  { value: 'painting', label: 'Painting' },
-  { value: 'roofing', label: 'Roofing' },
-  { value: 'cleaning', label: 'Cleaning' },
-  { value: 'security', label: 'Security' },
-  { value: 'general', label: 'General' },
-  { value: 'other', label: 'Other' },
-];
+import { VendorCategoryManager } from '@/components/vendors/vendor-category-manager';
+import { useVendorCategories } from '@/lib/hooks/use-vendor-categories';
+import type { Vendor } from '@/lib/types/database';
 
 export default function VendorsPage() {
   const { isBoard, canRead, canWrite, community, member } = useCommunity();
+  const { categories, refetch: refetchCategories } = useVendorCategories(community.id);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [paymentVendor, setPaymentVendor] = useState<Vendor | null>(null);
@@ -38,7 +28,7 @@ export default function VendorsPage() {
     const supabase = createClient();
     const { data } = await supabase
       .from('vendors')
-      .select('*')
+      .select('*, vendor_categories(*)')
       .eq('community_id', community.id)
       .order('name');
 
@@ -63,7 +53,7 @@ export default function VendorsPage() {
 
   const filtered = categoryFilter === 'all'
     ? vendors
-    : vendors.filter((v) => v.category === categoryFilter);
+    : vendors.filter((v) => v.category_id === categoryFilter);
 
   return (
     <div className="space-y-6">
@@ -77,21 +67,42 @@ export default function VendorsPage() {
         {canWrite('vendors') && <Button onClick={() => setCreateOpen(true)}>Add Vendor</Button>}
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {CATEGORY_FILTERS.map((filter) => (
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setCategoryFilter('all')}
+          className={`px-3 py-1.5 rounded-pill text-label transition-colors ${
+            categoryFilter === 'all'
+              ? 'bg-primary-700 text-white dark:bg-primary-300 dark:text-primary-900'
+              : 'bg-surface-light-2 dark:bg-surface-dark-2 text-text-secondary-light dark:text-text-secondary-dark hover:bg-primary-100 dark:hover:bg-primary-800'
+          }`}
+        >
+          All
+        </button>
+        {categories.map((cat) => (
           <button
-            key={filter.value}
+            key={cat.id}
             type="button"
-            onClick={() => setCategoryFilter(filter.value)}
+            onClick={() => setCategoryFilter(cat.id)}
             className={`px-3 py-1.5 rounded-pill text-label transition-colors ${
-              categoryFilter === filter.value
+              categoryFilter === cat.id
                 ? 'bg-primary-700 text-white dark:bg-primary-300 dark:text-primary-900'
                 : 'bg-surface-light-2 dark:bg-surface-dark-2 text-text-secondary-light dark:text-text-secondary-dark hover:bg-primary-100 dark:hover:bg-primary-800'
             }`}
           >
-            {filter.label}
+            {cat.name}
           </button>
         ))}
+        {canWrite('vendors') && (
+          <button
+            type="button"
+            onClick={() => setCategoryManagerOpen(true)}
+            className="px-2 py-1.5 rounded-pill text-label text-text-muted-light dark:text-text-muted-dark hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors"
+            title="Manage categories"
+          >
+            ⚙
+          </button>
+        )}
       </div>
 
       <VendorList
@@ -104,15 +115,25 @@ export default function VendorsPage() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         communityId={community.id}
+        categories={categories}
         onCreated={fetchVendors}
       />
 
       <VendorDetailDialog
         vendor={selectedVendor}
+        categories={categories}
         open={selectedVendor !== null}
         onOpenChange={(open) => { if (!open) setSelectedVendor(null); }}
         onUpdated={fetchVendors}
         onRecordPayment={(v) => setPaymentVendor(v)}
+      />
+
+      <VendorCategoryManager
+        open={categoryManagerOpen}
+        onOpenChange={setCategoryManagerOpen}
+        communityId={community.id}
+        categories={categories}
+        onUpdated={refetchCategories}
       />
 
       <RecordVendorPaymentDialog

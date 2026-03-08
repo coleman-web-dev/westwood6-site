@@ -83,7 +83,7 @@ export async function processStatementWithAI({
     const [{ data: vendors }, { data: members }] = await Promise.all([
       admin
         .from('vendors')
-        .select('id, name, company, category')
+        .select('id, name, company, vendor_categories(name)')
         .eq('community_id', communityId)
         .eq('status', 'active'),
       admin
@@ -93,7 +93,10 @@ export async function processStatementWithAI({
     ]);
 
     const vendorContext = (vendors || [])
-      .map((v) => `${v.name}${v.company ? ` (${v.company})` : ''} [${v.category}] - ID: ${v.id}`)
+      .map((v) => {
+        const catName = (v.vendor_categories as unknown as { name: string } | null)?.name ?? 'General';
+        return `${v.name}${v.company ? ` (${v.company})` : ''} [${catName}] - ID: ${v.id}`;
+      })
       .join('\n');
 
     const memberContext = (members || [])

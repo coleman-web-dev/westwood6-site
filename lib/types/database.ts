@@ -27,8 +27,16 @@ export type ArcStatus = 'draft' | 'submitted' | 'under_review' | 'approved' | 'a
 // ─── Budget Enums ─────────────────────────────────────
 export type BudgetCategory = 'dues' | 'assessments' | 'amenity_fees' | 'interest' | 'maintenance' | 'landscaping' | 'insurance' | 'utilities' | 'management' | 'legal' | 'reserves' | 'other';
 
-// ─── Vendor Enums ─────────────────────────────────────
-export type VendorCategory = 'landscaping' | 'plumbing' | 'electrical' | 'hvac' | 'painting' | 'roofing' | 'cleaning' | 'security' | 'general' | 'other';
+// ─── Vendor Types ─────────────────────────────────────
+export interface VendorCategoryRow {
+  id: string;
+  community_id: string;
+  name: string;
+  slug: string;
+  display_order: number;
+  is_system: boolean;
+  created_at: string;
+}
 export type VendorStatus = 'active' | 'inactive';
 export type VendorDocumentType = 'contract' | 'insurance_cert' | 'license' | 'w9' | 'check_image' | 'other';
 
@@ -684,7 +692,8 @@ export interface Vendor {
   company: string | null;
   phone: string | null;
   email: string | null;
-  category: VendorCategory;
+  category_id: string;
+  vendor_categories?: VendorCategoryRow;
   license_number: string | null;
   insurance_expiry: string | null;
   notes: string | null;
