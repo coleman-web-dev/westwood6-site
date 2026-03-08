@@ -493,3 +493,32 @@ export async function createJournalEntryFromBankTxn(
 
   return { entryId: entry.id };
 }
+
+export async function assignReconciliationTransactions(
+  communityId: string,
+  reconciliationId: string,
+  bankAccountId: string,
+  periodStart: string,
+  periodEnd: string,
+) {
+  await requirePermission(communityId, 'banking', 'write');
+  const admin = createAdminClient();
+
+  // Assign reconciliation_id to all transactions for this bank account
+  // within the date range that aren't already reconciled
+  const { error } = await admin
+    .from('bank_transactions')
+    .update({ reconciliation_id: reconciliationId })
+    .eq('community_id', communityId)
+    .eq('plaid_bank_account_id', bankAccountId)
+    .gte('date', periodStart)
+    .lte('date', periodEnd)
+    .neq('status', 'reconciled')
+    .is('reconciliation_id', null);
+
+  if (error) {
+    console.error('assignReconciliationTransactions error:', error);
+  }
+
+  return { success: !error };
+}

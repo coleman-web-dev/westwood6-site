@@ -1,14 +1,15 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/shared/ui/button';
 import { Badge } from '@/components/shared/ui/badge';
-import { ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Loader2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   completeReconciliation,
   updateReconciliationBalance,
+  assignReconciliationTransactions,
 } from '@/lib/actions/banking-actions';
 import { BankTransactionDetail } from '@/components/accounting/bank-transaction-detail';
 import type { BankReconciliation, BankTransaction } from '@/lib/types/banking';
@@ -33,23 +34,36 @@ export function ReconciliationWorkspace({
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState(false);
   const [selectedTxn, setSelectedTxn] = useState<BankTransaction | null>(null);
+  const assignedRef = useRef(false);
 
   const fetchData = useCallback(async () => {
     const supabase = createClient();
 
-    const [{ data: reconData }, { data: txns }, { data: accts }, { data: vndrs }] = await Promise.all([
-      supabase
-        .from('bank_reconciliations')
-        .select('*')
-        .eq('id', reconciliationId)
-        .single(),
+    // Fetch recon first to get bank account ID and date range
+    const { data: reconData } = await supabase
+      .from('bank_reconciliations')
+      .select('*')
+      .eq('id', reconciliationId)
+      .single();
+
+    if (!reconData) {
+      setRecon(null);
+      setLoading(false);
+      return;
+    }
+
+    setRecon(reconData as BankReconciliation);
+
+    // Now fetch transactions for this bank account within the period
+    const [{ data: txns }, { data: accts }, { data: vndrs }] = await Promise.all([
       supabase
         .from('bank_transactions')
         .select('*')
         .eq('community_id', communityId)
-        .or(
-          `reconciliation_id.eq.${reconciliationId},and(status.eq.pending,reconciliation_id.is.null)`,
-        )
+        .eq('plaid_bank_account_id', reconData.plaid_bank_account_id)
+        .gte('date', reconData.period_start)
+        .lte('date', reconData.period_end)
+        .neq('status', 'reconciled')
         .order('date', { ascending: false }),
       supabase
         .from('accounts')
@@ -65,11 +79,22 @@ export function ReconciliationWorkspace({
         .order('name'),
     ]);
 
-    setRecon(reconData as BankReconciliation);
     setTransactions((txns as BankTransaction[]) || []);
     setAccounts((accts as Account[]) || []);
     setVendors((vndrs as Vendor[]) || []);
     setLoading(false);
+
+    // Assign reconciliation_id to transactions (once per session)
+    if (!assignedRef.current && reconData.status === 'in_progress') {
+      assignedRef.current = true;
+      await assignReconciliationTransactions(
+        communityId,
+        reconciliationId,
+        reconData.plaid_bank_account_id,
+        reconData.period_start,
+        reconData.period_end,
+      );
+    }
   }, [communityId, reconciliationId]);
 
   useEffect(() => {
@@ -103,6 +128,12 @@ export function ReconciliationWorkspace({
   function formatCents(cents: number | null) {
     if (cents === null) return '-';
     return (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+  }
+
+  function getAccountName(accountId: string | null) {
+    if (!accountId) return null;
+    const acct = accounts.find((a) => a.id === accountId);
+    return acct ? `${acct.code} - ${acct.name}` : null;
   }
 
   if (loading) {
@@ -259,6 +290,11 @@ export function ReconciliationWorkspace({
                 <span className="text-body text-text-primary-light dark:text-text-primary-dark flex-1 truncate">
                   {txn.merchant_name || txn.name}
                 </span>
+                {txn.ai_confidence != null && txn.ai_confidence >= 0.5 && (
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-medium shrink-0">
+                    <Sparkles className="h-2.5 w-2.5" /> Suggestion
+                  </span>
+                )}
                 <span
                   className={`text-body tabular-nums shrink-0 ${
                     txn.amount > 0
@@ -278,7 +314,7 @@ export function ReconciliationWorkspace({
         </div>
       )}
 
-      {/* Processed transactions summary */}
+      {/* Cleared transactions */}
       {(matched.length > 0 || categorized.length > 0) && (
         <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark overflow-hidden">
           <div className="px-card-padding py-2 bg-surface-light-2 dark:bg-surface-dark-2 border-b border-stroke-light dark:border-stroke-dark">
@@ -301,9 +337,68 @@ export function ReconciliationWorkspace({
                 <span className="text-body flex-1 truncate">
                   {txn.merchant_name || txn.name}
                 </span>
-                <Badge variant="secondary" className="text-meta shrink-0">
-                  {txn.status}
-                </Badge>
+                {txn.match_method === 'ai' && (
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-500 text-[10px] font-medium shrink-0">
+                    <Sparkles className="h-2.5 w-2.5" /> AI {txn.ai_confidence != null ? `${(txn.ai_confidence * 100).toFixed(0)}%` : ''}
+                  </span>
+                )}
+                {txn.match_method === 'rule' && (
+                  <Badge variant="outline" className="text-[10px] shrink-0">
+                    Rule
+                  </Badge>
+                )}
+                {txn.categorized_account_id && (
+                  <span className="text-meta text-text-muted-light dark:text-text-muted-dark shrink-0 max-w-[160px] truncate">
+                    {getAccountName(txn.categorized_account_id)}
+                  </span>
+                )}
+                <span
+                  className={`text-body tabular-nums shrink-0 ${
+                    txn.amount > 0
+                      ? 'text-red-500 dark:text-red-400'
+                      : 'text-green-600 dark:text-green-400'
+                  }`}
+                >
+                  {txn.amount > 0 ? '-' : '+'}
+                  {(Math.abs(txn.amount) / 100).toLocaleString('en-US', {
+                    style: 'currency',
+                    currency: 'USD',
+                  })}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Excluded transactions */}
+      {excluded.length > 0 && (
+        <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark overflow-hidden">
+          <div className="px-card-padding py-2 bg-surface-light-2 dark:bg-surface-dark-2 border-b border-stroke-light dark:border-stroke-dark">
+            <h3 className="text-section-title text-text-muted-light dark:text-text-muted-dark">
+              Excluded ({excluded.length})
+            </h3>
+          </div>
+          <div className="divide-y divide-stroke-light dark:divide-stroke-dark">
+            {excluded.map((txn) => (
+              <div
+                key={txn.id}
+                className="px-card-padding py-2 flex items-center gap-3 text-text-muted-light dark:text-text-muted-dark opacity-60"
+              >
+                <span className="text-meta tabular-nums w-20 shrink-0">
+                  {new Date(txn.date).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                </span>
+                <span className="text-body flex-1 truncate">
+                  {txn.merchant_name || txn.name}
+                </span>
+                {txn.excluded_reason && (
+                  <span className="text-meta shrink-0 max-w-[160px] truncate">
+                    {txn.excluded_reason}
+                  </span>
+                )}
                 <span className="text-body tabular-nums shrink-0">
                   {(Math.abs(txn.amount) / 100).toLocaleString('en-US', {
                     style: 'currency',
