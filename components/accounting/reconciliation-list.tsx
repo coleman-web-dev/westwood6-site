@@ -228,7 +228,14 @@ export function ReconciliationList({ communityId }: ReconciliationListProps) {
           <div className="space-y-4">
             <div>
               <Label className="text-meta">Bank Account</Label>
-              <Select value={selectedBankAccountId} onValueChange={setSelectedBankAccountId}>
+              <Select value={selectedBankAccountId} onValueChange={(id) => {
+                setSelectedBankAccountId(id);
+                // Auto-fill statement balance from Plaid-synced current balance
+                const acct = bankAccounts.find((a) => a.id === id);
+                if (acct?.current_balance != null) {
+                  setStatementBalance((acct.current_balance / 100).toFixed(2));
+                }
+              }}>
                 <SelectTrigger className="mt-1">
                   <SelectValue placeholder="Select bank account" />
                 </SelectTrigger>
@@ -271,6 +278,11 @@ export function ReconciliationList({ communityId }: ReconciliationListProps) {
                 onChange={(e) => setStatementBalance(e.target.value)}
                 placeholder="12,345.67"
               />
+              {selectedBankAccountId && bankAccounts.find((a) => a.id === selectedBankAccountId)?.current_balance != null && (
+                <p className="text-meta text-text-muted-light dark:text-text-muted-dark mt-1">
+                  Pre-filled from last Plaid sync. Adjust if your statement differs.
+                </p>
+              )}
             </div>
             <div className="flex gap-2 justify-end">
               <Button variant="ghost" onClick={() => setCreateOpen(false)}>
