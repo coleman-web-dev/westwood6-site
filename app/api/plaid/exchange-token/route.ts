@@ -60,6 +60,8 @@ export async function POST(request: Request) {
     const admin = createAdminClient();
 
     // Save connection with consent data
+    const hasStatementsConsent = consentedProducts.includes('statements');
+
     const { data: connection, error: connError } = await admin
       .from('plaid_connections')
       .insert({
@@ -70,6 +72,7 @@ export async function POST(request: Request) {
         institution_name: institutionName || null,
         consented_products: consentedProducts,
         consented_data_scopes: consentedDataScopes,
+        has_statements_consent: hasStatementsConsent,
       })
       .select()
       .single();

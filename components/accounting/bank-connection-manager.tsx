@@ -22,7 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/shared/ui/alert-dialog';
-import { Building2, Loader2, RefreshCw, Unlink, Landmark, ShieldAlert } from 'lucide-react';
+import { Building2, Loader2, RefreshCw, Unlink, Landmark, ShieldAlert, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { mapBankAccountToGL } from '@/lib/actions/banking-actions';
 import type { PlaidBankAccount, PlaidConnection } from '@/lib/types/banking';
@@ -47,6 +47,7 @@ export function BankConnectionManager({ communityId, onSync }: BankConnectionMan
   const [updatingConnectionId, setUpdatingConnectionId] = useState<string | null>(null);
   const [disconnectId, setDisconnectId] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [fetchingStatements, setFetchingStatements] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     const supabase = createClient();
@@ -142,12 +143,16 @@ export function BankConnectionManager({ communityId, onSync }: BankConnectionMan
   const { open: openUpdate, ready: readyUpdate } = usePlaidLink({
     token: updateLinkToken,
     onSuccess: async () => {
-      // After update mode completes, clear the re-consent flag
+      // After update mode completes, clear the re-consent flag and enable statements consent
       if (updatingConnectionId) {
         const supabase = createClient();
         await supabase
           .from('plaid_connections')
-          .update({ requires_reconsent: false, error_code: null })
+          .update({
+            requires_reconsent: false,
+            error_code: null,
+            has_statements_consent: true,
+          })
           .eq('id', updatingConnectionId);
       }
 
@@ -260,6 +265,37 @@ export function BankConnectionManager({ communityId, onSync }: BankConnectionMan
     fetchData();
   }
 
+  async function handleFetchStatements(connectionId: string) {
+    setFetchingStatements(connectionId);
+
+    try {
+      const res = await fetch('/api/plaid/fetch-statements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ communityId, connectionId }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || 'Failed to fetch statements.');
+        return;
+      }
+
+      const data = await res.json();
+      if (data.processed > 0) {
+        toast.success(`Fetched and processed ${data.processed} statement${data.processed !== 1 ? 's' : ''}.`);
+      } else if (data.already_exists > 0) {
+        toast.info('All available statements have already been processed.');
+      } else {
+        toast.info('No new statements available from the bank.');
+      }
+      fetchData();
+    } catch {
+      toast.error('Failed to fetch statements.');
+    }
+    setFetchingStatements(null);
+  }
+
   async function handleMapToGL(bankAccountId: string, glAccountId: string) {
     const result = await mapBankAccountToGL(communityId, bankAccountId, glAccountId);
     if (result.success) {
@@ -343,6 +379,40 @@ export function BankConnectionManager({ communityId, onSync }: BankConnectionMan
                     <ShieldAlert className="h-3.5 w-3.5 mr-1" />
                   )}
                   Update Consent
+                </Button>
+              )}
+              {!conn.has_statements_consent && !conn.requires_reconsent && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => handleUpdateConsent(conn.id)}
+                  disabled={updatingConnectionId === conn.id}
+                  title="Enable automatic statement downloads"
+                >
+                  {updatingConnectionId === conn.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                  ) : (
+                    <FileText className="h-3.5 w-3.5 mr-1" />
+                  )}
+                  Enable Statements
+                </Button>
+              )}
+              {conn.has_statements_consent && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleFetchStatements(conn.id)}
+                  disabled={fetchingStatements === conn.id || conn.requires_reconsent}
+                  title={conn.statements_last_fetched_at
+                    ? `Last fetched: ${new Date(conn.statements_last_fetched_at).toLocaleDateString()}`
+                    : 'Fetch bank statements'}
+                >
+                  {fetchingStatements === conn.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                  ) : (
+                    <FileText className="h-3.5 w-3.5 mr-1" />
+                  )}
+                  {fetchingStatements === conn.id ? 'Fetching...' : 'Statements'}
                 </Button>
               )}
               <Button

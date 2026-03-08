@@ -1,24 +1,24 @@
 'use server';
 
 import { createAdminClient } from '@/lib/supabase/admin';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { AIExtractedCheck, AIExtractedTransaction } from '@/lib/types/banking';
 import { requirePermission } from '@/lib/actions/auth-guard';
 
+// ─── Internal helpers (no auth check, accepts admin client) ──────
+
 /**
- * Apply AI-extracted transaction data to an existing uncategorized bank transaction.
- * Links vendor, sets GL account, and optionally creates a journal entry.
+ * Internal: apply a single AI categorization to a bank transaction.
  */
-export async function applyAICategorizationToTransaction(
+export async function applyAICategorizationInternal(
+  admin: SupabaseClient,
   communityId: string,
   bankTxnId: string,
   aiTxn: AIExtractedTransaction,
 ) {
-  await requirePermission(communityId, 'banking', 'write');
-  const admin = createAdminClient();
-
   const updateData: Record<string, unknown> = {
     status: 'categorized',
-    match_method: 'rule', // 'rule' indicates AI-assisted
+    match_method: 'rule',
   };
 
   if (aiTxn.matched_vendor_id) {
@@ -26,7 +26,6 @@ export async function applyAICategorizationToTransaction(
   }
 
   if (aiTxn.suggested_account_code) {
-    // Resolve account code to ID
     const { data: account } = await admin
       .from('accounts')
       .select('id')
@@ -49,17 +48,14 @@ export async function applyAICategorizationToTransaction(
 }
 
 /**
- * Batch apply AI categorizations to all matching uncategorized bank transactions.
- * Matches by amount and date.
+ * Internal: batch apply AI categorizations without auth check.
+ * Used by both the server action (with auth) and the automated Plaid flow (admin-only).
  */
-export async function batchApplyAICategorizations(
+export async function batchApplyAICategorizationsInternal(
+  admin: SupabaseClient,
   communityId: string,
   statementUploadId: string,
 ) {
-  await requirePermission(communityId, 'banking', 'write');
-  const admin = createAdminClient();
-
-  // Get the AI results
   const { data: upload } = await admin
     .from('statement_uploads')
     .select('ai_results')
@@ -74,7 +70,6 @@ export async function batchApplyAICategorizations(
   const results = upload.ai_results as unknown as { transactions: AIExtractedTransaction[] };
   const aiTransactions = results.transactions || [];
 
-  // Get pending bank transactions
   const { data: pendingTxns } = await admin
     .from('bank_transactions')
     .select('id, date, amount, name, merchant_name')
@@ -94,14 +89,12 @@ export async function batchApplyAICategorizations(
       continue;
     }
 
-    // Find matching bank transaction by amount and date
     const match = pendingTxns.find(
       (bt) => bt.amount === aiTxn.amount && bt.date === aiTxn.date,
     );
 
     if (match) {
-      await applyAICategorizationToTransaction(communityId, match.id, aiTxn);
-      // Remove from pending list so we don't match it again
+      await applyAICategorizationInternal(admin, communityId, match.id, aiTxn);
       const idx = pendingTxns.indexOf(match);
       pendingTxns.splice(idx, 1);
       applied++;
@@ -110,13 +103,39 @@ export async function batchApplyAICategorizations(
     }
   }
 
-  // Update the statement upload with the count
   await admin
     .from('statement_uploads')
     .update({ auto_categorized: applied })
     .eq('id', statementUploadId);
 
   return { applied, skipped };
+}
+
+// ─── Server actions (with auth check) ────────────────────────────
+
+/**
+ * Apply AI-extracted transaction data to an existing uncategorized bank transaction.
+ */
+export async function applyAICategorizationToTransaction(
+  communityId: string,
+  bankTxnId: string,
+  aiTxn: AIExtractedTransaction,
+) {
+  await requirePermission(communityId, 'banking', 'write');
+  const admin = createAdminClient();
+  return applyAICategorizationInternal(admin, communityId, bankTxnId, aiTxn);
+}
+
+/**
+ * Batch apply AI categorizations to all matching uncategorized bank transactions.
+ */
+export async function batchApplyAICategorizations(
+  communityId: string,
+  statementUploadId: string,
+) {
+  await requirePermission(communityId, 'banking', 'write');
+  const admin = createAdminClient();
+  return batchApplyAICategorizationsInternal(admin, communityId, statementUploadId);
 }
 
 /**

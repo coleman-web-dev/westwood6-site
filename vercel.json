@@ -35,6 +35,10 @@
     {
       "path": "/api/cron/delinquency",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/fetch-statements",
+      "schedule": "0 8 5 * *"
     }
   ]
 }

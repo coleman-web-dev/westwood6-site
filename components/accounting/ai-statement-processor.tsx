@@ -28,6 +28,7 @@ import {
   Building2,
   Users,
   ArrowRight,
+  Landmark,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { batchApplyAICategorizations } from '@/lib/actions/ai-statement-actions';
@@ -234,11 +235,20 @@ export function AIStatementProcessor({ communityId }: AIStatementProcessorProps)
                   key={upload.id}
                   className="px-card-padding py-3 flex items-center gap-3"
                 >
-                  <FileText className="h-4 w-4 text-text-muted-light dark:text-text-muted-dark shrink-0" />
+                  {upload.source === 'plaid' ? (
+                    <Landmark className="h-4 w-4 text-blue-500 shrink-0" />
+                  ) : (
+                    <FileText className="h-4 w-4 text-text-muted-light dark:text-text-muted-dark shrink-0" />
+                  )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-body text-text-primary-light dark:text-text-primary-dark truncate">
-                      {MONTHS[upload.period_month - 1]} {upload.period_year}
-                    </p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-body text-text-primary-light dark:text-text-primary-dark truncate">
+                        {MONTHS[upload.period_month - 1]} {upload.period_year}
+                      </p>
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                        {upload.source === 'plaid' ? 'Plaid' : 'Manual'}
+                      </Badge>
+                    </div>
                     <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
                       {upload.file_name}
                     </p>

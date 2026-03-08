@@ -59,7 +59,7 @@ const BANKING_SUBTABS = [
   { id: 'connections', label: 'Connections' },
   { id: 'transactions', label: 'Transactions' },
   { id: 'rules', label: 'Categorization Rules' },
-  { id: 'ai-statements', label: 'AI Statements' },
+  { id: 'ai-statements', label: 'Statements' },
 ] as const;
 
 type BankingSubtab = (typeof BANKING_SUBTABS)[number]['id'];

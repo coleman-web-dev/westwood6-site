@@ -20,6 +20,8 @@ export interface PlaidConnection {
   consented_products: string[];
   consented_data_scopes: Record<string, string[]>[];
   requires_reconsent: boolean;
+  has_statements_consent: boolean;
+  statements_last_fetched_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -134,6 +136,9 @@ export interface StatementUpload {
   error_message: string | null;
   uploaded_by: string | null;
   processed_at: string | null;
+  source: 'manual' | 'plaid';
+  plaid_statement_id: string | null;
+  plaid_connection_id: string | null;
   created_at: string;
 }
 
@@ -176,4 +181,13 @@ export interface AIExtractedCheck {
   matched_member_id: string | null;
   matched_unit_id: string | null;
   document_saved: boolean; // whether image was saved as vendor/household doc
+}
+
+// ─── Plaid Statement Fetch ───────────────────────────────────────
+
+export interface StatementFetchResult {
+  processed: number;
+  skipped: number;
+  already_exists: number;
+  errors: string[];
 }

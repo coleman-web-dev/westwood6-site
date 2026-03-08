@@ -62,8 +62,8 @@ export async function POST(request: Request) {
       access_token: connection.plaid_access_token,
       country_codes: [CountryCode.Us],
       language: 'en',
-      // Request consent for transactions in the update flow
-      additional_consented_products: [Products.Transactions],
+      // Request consent for transactions and statements in the update flow
+      additional_consented_products: [Products.Transactions, Products.Statements],
     });
 
     return NextResponse.json({ link_token: response.data.link_token });

@@ -5,6 +5,7 @@ import { getPlaidClient } from '@/lib/plaid';
 import { applyCategorization } from '@/lib/utils/bank-categorization';
 import { categorizeAndApplyAI } from '@/lib/ai/categorize-transactions';
 import { autoMatchTransactions } from '@/lib/utils/bank-matching';
+import { fetchAndProcessStatements } from '@/lib/utils/plaid-statements';
 
 export async function POST(request: Request) {
   try {
@@ -200,6 +201,13 @@ export async function POST(request: Request) {
 
     // Auto-match transactions to journal entries
     await autoMatchTransactions(admin, communityId);
+
+    // Auto-fetch bank statements if Statements product is consented (fire-and-forget)
+    if (connection.has_statements_consent) {
+      fetchAndProcessStatements(communityId, connectionId).catch((err) => {
+        console.error('Statement fetch failed (non-fatal):', err);
+      });
+    }
 
     return NextResponse.json({
       added,
