@@ -4,12 +4,13 @@ import { useState, useCallback, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Button } from '@/components/shared/ui/button';
-import { HardHat } from 'lucide-react';
+import { HardHat, Upload } from 'lucide-react';
 import { VendorList } from '@/components/vendors/vendor-list';
 import { CreateVendorDialog } from '@/components/vendors/create-vendor-dialog';
 import { VendorDetailDialog } from '@/components/vendors/vendor-detail-dialog';
 import { RecordVendorPaymentDialog } from '@/components/vendors/record-vendor-payment-dialog';
 import { VendorCategoryManager } from '@/components/vendors/vendor-category-manager';
+import { ImportVendorsDialog } from '@/components/vendors/import-vendors-dialog';
 import { useVendorCategories } from '@/lib/hooks/use-vendor-categories';
 import type { Vendor } from '@/lib/types/database';
 
@@ -21,6 +22,7 @@ export default function VendorsPage() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [paymentVendor, setPaymentVendor] = useState<Vendor | null>(null);
 
@@ -64,7 +66,15 @@ export default function VendorsPage() {
             Vendors
           </h1>
         </div>
-        {canWrite('vendors') && <Button onClick={() => setCreateOpen(true)}>Add Vendor</Button>}
+        {canWrite('vendors') && (
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setImportOpen(true)}>
+              <Upload className="h-4 w-4 mr-1.5" />
+              Import
+            </Button>
+            <Button onClick={() => setCreateOpen(true)}>Add Vendor</Button>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -134,6 +144,14 @@ export default function VendorsPage() {
         communityId={community.id}
         categories={categories}
         onUpdated={refetchCategories}
+      />
+
+      <ImportVendorsDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        communityId={community.id}
+        categories={categories}
+        onImported={fetchVendors}
       />
 
       <RecordVendorPaymentDialog

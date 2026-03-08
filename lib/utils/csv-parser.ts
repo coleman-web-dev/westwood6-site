@@ -13,6 +13,23 @@ export interface ParsedMember {
   role: 'owner' | 'member' | 'tenant';
 }
 
+export interface ParsedVendor {
+  name: string;
+  company: string;
+  phone: string;
+  email: string;
+  category: string;
+  license_number: string;
+  insurance_expiry: string;
+  tax_id: string;
+  notes: string;
+  address_line1: string;
+  address_line2: string;
+  city: string;
+  state: string;
+  zip: string;
+}
+
 export interface ParseResult<T> {
   data: T[];
   errors: string[];
@@ -137,6 +154,171 @@ export function parseMembersCSV(
       email,
       unit_number: unitNumber,
       role,
+    });
+  }
+
+  return { data, errors };
+}
+
+/**
+ * Known aliases for vendor column headers.
+ * Maps various common header names to our canonical field names.
+ */
+const VENDOR_COLUMN_ALIASES: Record<string, keyof ParsedVendor> = {
+  name: 'name',
+  vendor_name: 'name',
+  vendor: 'name',
+  'vendor name': 'name',
+  'contact name': 'name',
+  contact: 'name',
+  company: 'company',
+  company_name: 'company',
+  'company name': 'company',
+  business: 'company',
+  'business name': 'company',
+  phone: 'phone',
+  phone_number: 'phone',
+  'phone number': 'phone',
+  tel: 'phone',
+  telephone: 'phone',
+  email: 'email',
+  email_address: 'email',
+  'email address': 'email',
+  category: 'category',
+  type: 'category',
+  vendor_type: 'category',
+  'vendor type': 'category',
+  service: 'category',
+  'service type': 'category',
+  license: 'license_number',
+  license_number: 'license_number',
+  'license number': 'license_number',
+  'license #': 'license_number',
+  'license no': 'license_number',
+  insurance_expiry: 'insurance_expiry',
+  'insurance expiry': 'insurance_expiry',
+  'insurance exp': 'insurance_expiry',
+  'insurance expiration': 'insurance_expiry',
+  tax_id: 'tax_id',
+  'tax id': 'tax_id',
+  ein: 'tax_id',
+  ssn: 'tax_id',
+  'ein/ssn': 'tax_id',
+  notes: 'notes',
+  note: 'notes',
+  comments: 'notes',
+  description: 'notes',
+  address: 'address_line1',
+  address_line1: 'address_line1',
+  'address line 1': 'address_line1',
+  'street address': 'address_line1',
+  street: 'address_line1',
+  address_line2: 'address_line2',
+  'address line 2': 'address_line2',
+  suite: 'address_line2',
+  apt: 'address_line2',
+  city: 'city',
+  state: 'state',
+  province: 'state',
+  zip: 'zip',
+  zipcode: 'zip',
+  'zip code': 'zip',
+  postal: 'zip',
+  'postal code': 'zip',
+};
+
+/**
+ * Auto-detect column mapping from CSV headers.
+ * Returns a map of CSV column name -> ParsedVendor field name.
+ */
+export function autoMapVendorColumns(
+  headers: string[],
+): Record<string, keyof ParsedVendor | ''> {
+  const mapping: Record<string, keyof ParsedVendor | ''> = {};
+
+  for (const header of headers) {
+    const normalized = header.trim().toLowerCase().replace(/[_\s]+/g, ' ').replace(/[#]/g, '');
+    // Try exact match first, then normalized
+    const match =
+      VENDOR_COLUMN_ALIASES[header.trim().toLowerCase()] ??
+      VENDOR_COLUMN_ALIASES[normalized] ??
+      '';
+    mapping[header] = match;
+  }
+
+  return mapping;
+}
+
+/**
+ * Parse a CSV string of vendors using the provided column mapping.
+ * Returns parsed data and any validation errors.
+ */
+export function parseVendorsCSV(
+  csvString: string,
+  columnMapping: Record<string, keyof ParsedVendor | ''>,
+): ParseResult<ParsedVendor> {
+  const result = Papa.parse<Record<string, string>>(csvString, {
+    header: true,
+    skipEmptyLines: true,
+  });
+
+  const data: ParsedVendor[] = [];
+  const errors: string[] = [];
+
+  if (result.errors.length > 0) {
+    for (const err of result.errors) {
+      errors.push(
+        `Row ${err.row !== undefined ? err.row + 1 : '?'}: ${err.message}`,
+      );
+    }
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  // Invert the mapping: field -> csv column name
+  const fieldToColumn: Partial<Record<keyof ParsedVendor, string>> = {};
+  for (const [csvCol, field] of Object.entries(columnMapping)) {
+    if (field) fieldToColumn[field] = csvCol;
+  }
+
+  function getField(row: Record<string, string>, field: keyof ParsedVendor): string {
+    const col = fieldToColumn[field];
+    if (!col) return '';
+    return (row[col] ?? '').trim();
+  }
+
+  for (let i = 0; i < result.data.length; i++) {
+    const row = result.data[i];
+    const rowNum = i + 1;
+
+    const name = getField(row, 'name');
+
+    if (!name) {
+      errors.push(`Row ${rowNum}: Missing required field "name".`);
+      continue;
+    }
+
+    const email = getField(row, 'email');
+    if (email && !emailRegex.test(email)) {
+      errors.push(`Row ${rowNum}: Invalid email format "${email}".`);
+      continue;
+    }
+
+    data.push({
+      name,
+      company: getField(row, 'company'),
+      phone: getField(row, 'phone'),
+      email,
+      category: getField(row, 'category'),
+      license_number: getField(row, 'license_number'),
+      insurance_expiry: getField(row, 'insurance_expiry'),
+      tax_id: getField(row, 'tax_id'),
+      notes: getField(row, 'notes'),
+      address_line1: getField(row, 'address_line1'),
+      address_line2: getField(row, 'address_line2'),
+      city: getField(row, 'city'),
+      state: getField(row, 'state'),
+      zip: getField(row, 'zip'),
     });
   }
 
