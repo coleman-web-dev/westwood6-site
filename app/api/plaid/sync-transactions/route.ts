@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getPlaidClient } from '@/lib/plaid';
 import { applyCategorization } from '@/lib/utils/bank-categorization';
+import { categorizeAndApplyAI } from '@/lib/ai/categorize-transactions';
 import { autoMatchTransactions } from '@/lib/utils/bank-matching';
 
 export async function POST(request: Request) {
@@ -162,8 +163,17 @@ export async function POST(request: Request) {
         .eq('id', bankAccountId);
     }
 
-    // Auto-categorize new pending transactions
+    // Auto-categorize new pending transactions (rule-based, fast + free)
     await applyCategorization(admin, communityId);
+
+    // AI categorization for remaining pending transactions
+    let aiResult = { auto_categorized: 0, suggested: 0, uncertain: 0 };
+    try {
+      aiResult = await categorizeAndApplyAI(admin, communityId);
+    } catch (aiError) {
+      // AI failures should not break the sync pipeline
+      console.error('AI categorization failed (non-fatal):', aiError);
+    }
 
     // Auto-match transactions to journal entries
     await autoMatchTransactions(admin, communityId);
@@ -172,6 +182,8 @@ export async function POST(request: Request) {
       added,
       modified,
       removed,
+      ai_categorized: aiResult.auto_categorized,
+      ai_suggested: aiResult.suggested,
       synced_at: new Date().toISOString(),
     });
   } catch (error: unknown) {

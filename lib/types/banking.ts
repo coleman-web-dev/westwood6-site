@@ -2,7 +2,7 @@
 
 export type BankTxnStatus = 'pending' | 'matched' | 'categorized' | 'excluded' | 'reconciled';
 export type ReconStatus = 'in_progress' | 'completed';
-export type MatchMethod = 'auto_amount_date' | 'auto_reference' | 'manual' | 'rule';
+export type MatchMethod = 'auto_amount_date' | 'auto_reference' | 'manual' | 'rule' | 'ai';
 
 // ─── Row Types ────────────────────────────────────────────────────
 
@@ -59,6 +59,8 @@ export interface BankTransaction {
   reconciliation_id: string | null;
   excluded_reason: string | null;
   notes: string | null;
+  ai_confidence: number | null;
+  ai_reasoning: string | null;
   created_at: string;
   updated_at: string;
 }

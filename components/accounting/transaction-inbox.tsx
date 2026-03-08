@@ -31,6 +31,7 @@ import {
   CheckCircle2,
   XCircle,
   Link2,
+  Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -296,6 +297,16 @@ export function TransactionInbox({ communityId, onPendingCountChange }: Transact
                   <span className="text-body text-text-primary-light dark:text-text-primary-dark truncate">
                     {txn.merchant_name || txn.name}
                   </span>
+                  {txn.match_method === 'ai' && (
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-500 text-[10px] font-medium flex-shrink-0">
+                      <Sparkles className="h-2.5 w-2.5" /> AI
+                    </span>
+                  )}
+                  {txn.status === 'pending' && txn.ai_confidence != null && txn.ai_confidence >= 0.5 && (
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-medium flex-shrink-0">
+                      <Sparkles className="h-2.5 w-2.5" /> Suggestion
+                    </span>
+                  )}
                 </div>
                 <span className="text-meta text-text-muted-light dark:text-text-muted-dark">
                   {new Date(txn.date).toLocaleDateString('en-US', {
@@ -532,13 +543,38 @@ function DetailPanel({
             {formatAmount(transaction.amount)}
           </span>
         </div>
-        <Badge
-          variant={transaction.status === 'pending' ? 'outline' : transaction.status === 'excluded' ? 'destructive' : 'secondary'}
-          className="text-meta"
-        >
-          {transaction.status}
-        </Badge>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge
+            variant={transaction.status === 'pending' ? 'outline' : transaction.status === 'excluded' ? 'destructive' : 'secondary'}
+            className="text-meta"
+          >
+            {transaction.status}
+          </Badge>
+          {transaction.match_method === 'ai' && (
+            <Badge className="text-meta bg-violet-500/10 text-violet-500 hover:bg-violet-500/20 border-0">
+              <Sparkles className="h-3 w-3 mr-0.5" /> AI Categorized
+              {transaction.ai_confidence != null && (
+                <span className="ml-1 opacity-75">
+                  ({(transaction.ai_confidence * 100).toFixed(0)}%)
+                </span>
+              )}
+            </Badge>
+          )}
+        </div>
       </div>
+
+      {/* AI Reasoning */}
+      {transaction.ai_reasoning && (
+        <div className="rounded-inner-card bg-violet-500/5 border border-violet-500/10 px-3 py-2">
+          <div className="flex items-center gap-1.5 mb-0.5">
+            <Sparkles className="h-3 w-3 text-violet-500" />
+            <span className="text-meta font-medium text-violet-600 dark:text-violet-400">AI Reasoning</span>
+          </div>
+          <p className="text-meta text-text-secondary-light dark:text-text-secondary-dark">
+            {transaction.ai_reasoning}
+          </p>
+        </div>
+      )}
 
       {/* Notes */}
       {transaction.notes && (
@@ -588,6 +624,39 @@ function DetailPanel({
           {/* Categorize form */}
           {mode === 'categorize' && (
             <div className="space-y-3">
+              {/* AI suggestion quick-accept */}
+              {transaction.status === 'pending' &&
+                transaction.ai_confidence != null &&
+                transaction.ai_confidence >= 0.5 &&
+                transaction.categorized_account_id && (
+                <div className="rounded-inner-card border border-amber-500/20 bg-amber-500/5 p-3 space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                    <span className="text-meta font-medium text-amber-600 dark:text-amber-400">
+                      AI Suggestion ({(transaction.ai_confidence * 100).toFixed(0)}% confidence)
+                    </span>
+                  </div>
+                  <p className="text-meta text-text-secondary-light dark:text-text-secondary-dark">
+                    {accounts.find((a) => a.id === transaction.categorized_account_id)
+                      ? `${accounts.find((a) => a.id === transaction.categorized_account_id)!.code} - ${accounts.find((a) => a.id === transaction.categorized_account_id)!.name}`
+                      : 'Unknown account'}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                    onClick={() => {
+                      setSelectedAccountId(transaction.categorized_account_id!);
+                      handleCategorize();
+                    }}
+                    disabled={saving}
+                  >
+                    {saving && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />}
+                    <Sparkles className="h-3 w-3 mr-1" /> Accept AI Suggestion
+                  </Button>
+                </div>
+              )}
+
               <div>
                 <Label className="text-meta">Category (GL Account)</Label>
                 <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>

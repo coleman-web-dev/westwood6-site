@@ -3,6 +3,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { requirePermission } from '@/lib/actions/auth-guard';
+import { normalizeTransactionName } from '@/lib/ai/categorize-transactions';
 
 export async function categorizeTransaction(
   communityId: string,
@@ -13,6 +14,14 @@ export async function categorizeTransaction(
 ) {
   await requirePermission(communityId, 'banking', 'write');
   const admin = createAdminClient();
+
+  // Fetch the transaction before updating (needed for AI feedback loop)
+  const { data: txn } = await admin
+    .from('bank_transactions')
+    .select('name, merchant_name, match_method, categorized_account_id, ai_confidence')
+    .eq('id', transactionId)
+    .eq('community_id', communityId)
+    .single();
 
   // Update transaction
   await admin
@@ -35,6 +44,48 @@ export async function categorizeTransaction(
       account_id: accountId,
       vendor_id: vendorId || null,
     });
+  }
+
+  // AI feedback loop: reinforce correct mapping, record corrections
+  if (txn) {
+    const normalized = normalizeTransactionName(txn.merchant_name || txn.name);
+    if (normalized.length >= 3) {
+      // Get the chosen account's code and type
+      const { data: chosenAccount } = await admin
+        .from('accounts')
+        .select('code, account_type')
+        .eq('id', accountId)
+        .single();
+
+      if (chosenAccount) {
+        // Reinforce the correct mapping in memory
+        await admin.rpc('upsert_ai_memory', {
+          p_normalized_name: normalized,
+          p_account_code: chosenAccount.code,
+          p_account_type: chosenAccount.account_type,
+        });
+
+        // If AI had suggested a different account, record the correction
+        if (
+          txn.match_method === 'ai' &&
+          txn.categorized_account_id &&
+          txn.categorized_account_id !== accountId
+        ) {
+          const { data: wrongAccount } = await admin
+            .from('accounts')
+            .select('code')
+            .eq('id', txn.categorized_account_id)
+            .single();
+
+          if (wrongAccount) {
+            await admin.rpc('record_ai_correction', {
+              p_normalized_name: normalized,
+              p_wrong_account_code: wrongAccount.code,
+            });
+          }
+        }
+      }
+    }
   }
 
   return { success: true };
@@ -382,7 +433,7 @@ export async function createJournalEntryFromBankTxn(
 
   if (!txn) throw new Error('Transaction not found');
 
-  const amountDollars = Math.abs(txn.amount) / 100;
+  const amountCents = Math.abs(txn.amount);
   const isDebit = txn.amount > 0; // Positive = money leaving account (expense)
 
   // Create journal entry
@@ -410,22 +461,22 @@ export async function createJournalEntryFromBankTxn(
   //   Debit cash account, Credit revenue/liability account
   const lines = isDebit
     ? [
-        { journal_entry_id: entry.id, account_id: accountId, debit: amountDollars, credit: 0 },
+        { journal_entry_id: entry.id, account_id: accountId, debit: amountCents, credit: 0 },
         {
           journal_entry_id: entry.id,
           account_id: bankAccountGlId,
           debit: 0,
-          credit: amountDollars,
+          credit: amountCents,
         },
       ]
     : [
         {
           journal_entry_id: entry.id,
           account_id: bankAccountGlId,
-          debit: amountDollars,
+          debit: amountCents,
           credit: 0,
         },
-        { journal_entry_id: entry.id, account_id: accountId, debit: 0, credit: amountDollars },
+        { journal_entry_id: entry.id, account_id: accountId, debit: 0, credit: amountCents },
       ];
 
   await admin.from('journal_lines').insert(lines);
