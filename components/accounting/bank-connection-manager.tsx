@@ -116,15 +116,21 @@ export function BankConnectionManager({ communityId, onSync }: BankConnectionMan
         }),
       });
 
+      const body = await res.json().catch(() => ({}));
+
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
         toast.error(body.error || 'Failed to connect bank account.');
         return;
       }
 
-      toast.success('Bank account connected successfully.');
+      toast.success('Bank account connected. Syncing transactions...');
       setLinkToken(null);
-      fetchData();
+      await fetchData();
+
+      // Auto-sync immediately after connecting
+      if (body.connection?.id) {
+        handleSync(body.connection.id);
+      }
     },
     onExit: () => {
       setLinkToken(null);
@@ -259,6 +265,15 @@ export function BankConnectionManager({ communityId, onSync }: BankConnectionMan
     if (result.success) {
       toast.success('Account mapped to GL.');
       fetchData();
+
+      // Auto-sync if this connection has never been synced
+      const conn = connections.find((c) =>
+        c.plaid_bank_accounts.some((a) => a.id === bankAccountId),
+      );
+      if (conn && !conn.last_synced_at) {
+        toast.info('Syncing transactions from your bank...');
+        handleSync(conn.id);
+      }
     } else {
       toast.error(result.error || 'Failed to map account.');
     }
