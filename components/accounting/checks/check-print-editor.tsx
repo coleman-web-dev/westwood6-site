@@ -5,10 +5,10 @@ import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/shared/ui/button';
 import { Input } from '@/components/shared/ui/input';
 import { Label } from '@/components/shared/ui/label';
-import { Switch } from '@/components/shared/ui/switch';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/shared/ui/popover';
 import {
   Printer, Loader2, Move, Upload, Trash2, RotateCcw, Image as ImageIcon,
-  Eye, EyeOff, Minus, Plus,
+  Eye, EyeOff, Minus, Plus, X, Type,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -139,6 +139,20 @@ function getFieldFontWeight(fieldId: CheckFieldId): number {
     case 'amountBox': return 700;
     case 'payTo': return 500;
     default: return 400;
+  }
+}
+
+// ─── Payer text helpers ────────────────────────────────────────────
+
+/** Fields whose text content is user-editable (payer info stored in settings) */
+const PAYER_FIELDS: CheckFieldId[] = ['payerName', 'payerAddress1', 'payerAddress2'];
+
+function getPayerSettingsKey(fieldId: CheckFieldId): 'payer_name' | 'payer_address_line1' | 'payer_address_line2' | null {
+  switch (fieldId) {
+    case 'payerName': return 'payer_name';
+    case 'payerAddress1': return 'payer_address_line1';
+    case 'payerAddress2': return 'payer_address_line2';
+    default: return null;
   }
 }
 
@@ -543,16 +557,6 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
 
   // ── Field property updates ─────────────────────────────────────────
 
-  function updateFieldPos(fieldId: CheckFieldId, key: 'left' | 'top', value: number) {
-    setFieldPositions((prev) => ({
-      ...prev,
-      [fieldId]: {
-        ...prev[fieldId],
-        [key]: roundTo2(snap(value)),
-      },
-    }));
-  }
-
   function toggleFieldLine(fieldId: CheckFieldId) {
     setFieldPositions((prev) => ({
       ...prev,
@@ -780,7 +784,7 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
               <rect width={NATIVE_WIDTH} height={SECTION_HEIGHT_PX} fill="url(#grid-dots)" />
             </svg>
 
-            {/* Draggable fields */}
+            {/* Draggable fields with floating editor popovers */}
             {ALL_FIELD_IDS.map((fieldId) => {
               const pos = fieldPositions[fieldId];
               const content = getFieldContent(fieldId, check, formattedAmount, amountInWords, settings);
@@ -788,152 +792,158 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
               const isHidden = pos.visible === false;
               const fontSize = pos.fontSize ?? DEFAULT_FIELD_POSITIONS[fieldId].fontSize ?? 10;
               const labelFontSize = Math.max(Math.round(fontSize * 0.7), 6);
+              const payerKey = getPayerSettingsKey(fieldId);
 
               return (
-                <div
+                <Popover
                   key={fieldId}
-                  className={`absolute transition-shadow ${
-                    isSelected
-                      ? 'ring-2 ring-blue-500 ring-offset-1 z-20'
-                      : 'hover:ring-1 hover:ring-blue-300 z-10'
-                  }`}
-                  style={{
-                    left: `${pos.left * PPI}px`,
-                    top: `${(getSectionTopIn(settings.check_position) + pos.top) * PPI}px`,
-                    fontSize: `${fontSize}pt`,
-                    fontWeight: getFieldFontWeight(fieldId),
-                    whiteSpace: 'nowrap',
-                    padding: fieldId === 'amountBox' ? '1px 4px' : '1px 2px',
-                    border: fieldId === 'amountBox' ? '1px solid #333' : 'none',
-                    borderBottom: (pos.showLine && fieldId !== 'amountBox' && fieldId !== 'signatureLine')
-                      ? '1px solid #999' : 'none',
-                    borderTop: (pos.showLine && fieldId === 'signatureLine')
-                      ? '1px solid #999' : 'none',
-                    borderRadius: '2px',
-                    background: isSelected ? 'rgba(59,130,246,0.06)' : 'transparent',
-                    opacity: isHidden ? 0.25 : 1,
-                    cursor: 'grab',
-                  }}
-                  onMouseDown={(e) => handleMouseDown(e, fieldId)}
-                  onTouchStart={(e) => handleTouchStart(e, fieldId)}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedField(fieldId);
-                  }}
+                  open={isSelected}
+                  onOpenChange={(open) => { if (!open) setSelectedField(null); }}
+                  modal={false}
                 >
-                  {content.label && (
-                    <span style={{ color: '#666', fontSize: `${labelFontSize}pt`, marginRight: '4px' }}>
-                      {content.label}
-                    </span>
+                  <PopoverTrigger asChild>
+                    <div
+                      className={`absolute transition-shadow ${
+                        isSelected
+                          ? 'ring-2 ring-blue-500 ring-offset-1 z-20'
+                          : 'hover:ring-1 hover:ring-blue-300 z-10'
+                      }`}
+                      style={{
+                        left: `${pos.left * PPI}px`,
+                        top: `${(getSectionTopIn(settings.check_position) + pos.top) * PPI}px`,
+                        fontSize: `${fontSize}pt`,
+                        fontWeight: getFieldFontWeight(fieldId),
+                        whiteSpace: 'nowrap',
+                        padding: fieldId === 'amountBox' ? '1px 4px' : '1px 2px',
+                        border: fieldId === 'amountBox' ? '1px solid #333' : 'none',
+                        borderBottom: (pos.showLine && fieldId !== 'amountBox' && fieldId !== 'signatureLine')
+                          ? '1px solid #999' : 'none',
+                        borderTop: (pos.showLine && fieldId === 'signatureLine')
+                          ? '1px solid #999' : 'none',
+                        borderRadius: '2px',
+                        background: isSelected ? 'rgba(59,130,246,0.06)' : 'transparent',
+                        opacity: isHidden ? 0.25 : 1,
+                        cursor: 'grab',
+                      }}
+                      onMouseDown={(e) => handleMouseDown(e, fieldId)}
+                      onTouchStart={(e) => handleTouchStart(e, fieldId)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedField(fieldId);
+                      }}
+                    >
+                      {content.label && (
+                        <span style={{ color: '#666', fontSize: `${labelFontSize}pt`, marginRight: '4px' }}>
+                          {content.label}
+                        </span>
+                      )}
+                      {content.value}
+                    </div>
+                  </PopoverTrigger>
+
+                  {isSelected && (
+                    <PopoverContent
+                      side="top"
+                      sideOffset={8}
+                      align="start"
+                      className="w-auto min-w-[240px] p-0 shadow-lg"
+                      onOpenAutoFocus={(e) => e.preventDefault()}
+                    >
+                      {/* ─── Floating field editor toolbar ─── */}
+                      <div className="p-2 space-y-1.5">
+                        {/* Row 1: Field name + close */}
+                        <div className="flex items-center justify-between gap-4">
+                          <span className="text-xs font-semibold text-gray-700">
+                            {FIELD_LABELS[fieldId]}
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-5 w-5 p-0 text-gray-400 hover:text-gray-600"
+                            onClick={() => setSelectedField(null)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+
+                        {/* Row 2: Font size, Show Line, Visibility */}
+                        <div className="flex items-center gap-2">
+                          {/* Font size */}
+                          <div className="flex items-center gap-0.5 border rounded px-1 py-0.5 bg-gray-50">
+                            <button
+                              className="h-5 w-5 flex items-center justify-center text-gray-500 hover:text-gray-800 disabled:opacity-30"
+                              onClick={() => updateFieldFontSize(fieldId, -1)}
+                              disabled={fontSize <= 6}
+                            >
+                              <Minus className="h-3 w-3" />
+                            </button>
+                            <span className="text-[10px] font-mono w-5 text-center text-gray-700">{fontSize}</span>
+                            <button
+                              className="h-5 w-5 flex items-center justify-center text-gray-500 hover:text-gray-800 disabled:opacity-30"
+                              onClick={() => updateFieldFontSize(fieldId, 1)}
+                              disabled={fontSize >= 24}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </button>
+                          </div>
+
+                          {/* Divider */}
+                          <div className="w-px h-4 bg-gray-200" />
+
+                          {/* Show Line */}
+                          <button
+                            className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                              pos.showLine
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                            }`}
+                            onClick={() => toggleFieldLine(fieldId)}
+                            title={pos.showLine ? 'Hide guide line' : 'Show guide line'}
+                          >
+                            <span className="w-3 border-b border-current" />
+                            Line
+                          </button>
+
+                          {/* Divider */}
+                          <div className="w-px h-4 bg-gray-200" />
+
+                          {/* Visibility */}
+                          <button
+                            className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                              isHidden
+                                ? 'bg-red-50 text-red-500'
+                                : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                            }`}
+                            onClick={() => toggleFieldVisible(fieldId)}
+                            title={isHidden ? 'Show field' : 'Hide field'}
+                          >
+                            {isHidden ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                            {isHidden ? 'Hidden' : 'Visible'}
+                          </button>
+                        </div>
+
+                        {/* Row 3: Text input (payer fields only) */}
+                        {payerKey && (
+                          <div className="flex items-center gap-1.5 pt-0.5">
+                            <Type className="h-3 w-3 text-gray-400 shrink-0" />
+                            <input
+                              type="text"
+                              value={settings[payerKey] || ''}
+                              onChange={(e) => setSettings((prev) => ({ ...prev, [payerKey]: e.target.value }))}
+                              placeholder={FIELD_LABELS[fieldId]}
+                              className="flex-1 h-6 px-1.5 text-xs border rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </PopoverContent>
                   )}
-                  {content.value}
-                </div>
+                </Popover>
               );
             })}
           </div>
         </div>
       </div>
-
-      {/* ─── Field Properties (selected field) ──────────────────────── */}
-      {selectedField && (
-        <div className="rounded-panel border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 p-card-padding">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-section-title text-text-primary-light dark:text-text-primary-dark">
-              {FIELD_LABELS[selectedField]}
-            </span>
-            <Button size="sm" variant="ghost" onClick={() => setSelectedField(null)} className="text-meta">
-              Done
-            </Button>
-          </div>
-          <div className="flex flex-wrap items-center gap-4">
-            {/* Visibility toggle */}
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="ghost"
-                className={`h-7 w-7 p-0 ${fieldPositions[selectedField].visible === false ? 'text-red-500' : 'text-green-600'}`}
-                onClick={() => toggleFieldVisible(selectedField)}
-                title={fieldPositions[selectedField].visible === false ? 'Show field' : 'Hide field'}
-              >
-                {fieldPositions[selectedField].visible === false ? (
-                  <EyeOff className="h-4 w-4" />
-                ) : (
-                  <Eye className="h-4 w-4" />
-                )}
-              </Button>
-              <Label className="text-meta shrink-0">
-                {fieldPositions[selectedField].visible === false ? 'Hidden' : 'Visible'}
-              </Label>
-            </div>
-
-            {/* Show Line toggle */}
-            <div className="flex items-center gap-2">
-              <Label className="text-meta shrink-0">Show Line</Label>
-              <Switch
-                checked={fieldPositions[selectedField].showLine}
-                onCheckedChange={() => toggleFieldLine(selectedField)}
-              />
-            </div>
-
-            {/* Font Size +/- */}
-            <div className="flex items-center gap-1.5">
-              <Label className="text-meta shrink-0">Size</Label>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 w-7 p-0"
-                onClick={() => updateFieldFontSize(selectedField, -1)}
-                disabled={(fieldPositions[selectedField].fontSize ?? DEFAULT_FIELD_POSITIONS[selectedField].fontSize ?? 10) <= 6}
-              >
-                <Minus className="h-3 w-3" />
-              </Button>
-              <span className="text-meta w-8 text-center font-mono">
-                {fieldPositions[selectedField].fontSize ?? DEFAULT_FIELD_POSITIONS[selectedField].fontSize ?? 10}
-              </span>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 w-7 p-0"
-                onClick={() => updateFieldFontSize(selectedField, 1)}
-                disabled={(fieldPositions[selectedField].fontSize ?? DEFAULT_FIELD_POSITIONS[selectedField].fontSize ?? 10) >= 24}
-              >
-                <Plus className="h-3 w-3" />
-              </Button>
-              <span className="text-meta text-text-muted-light dark:text-text-muted-dark">pt</span>
-            </div>
-
-            {/* X coordinate */}
-            <div className="flex items-center gap-2">
-              <Label className="text-meta shrink-0">X</Label>
-              <Input
-                type="number"
-                step={GRID_SNAP}
-                min={0}
-                max={CHECK_WIDTH_IN}
-                value={fieldPositions[selectedField].left}
-                onChange={(e) => updateFieldPos(selectedField, 'left', parseFloat(e.target.value) || 0)}
-                className="h-7 w-20 text-meta text-center"
-              />
-              <span className="text-meta text-text-muted-light dark:text-text-muted-dark">&quot;</span>
-            </div>
-
-            {/* Y coordinate */}
-            <div className="flex items-center gap-2">
-              <Label className="text-meta shrink-0">Y</Label>
-              <Input
-                type="number"
-                step={GRID_SNAP}
-                min={0}
-                max={CHECK_SECTION_HEIGHT}
-                value={fieldPositions[selectedField].top}
-                onChange={(e) => updateFieldPos(selectedField, 'top', parseFloat(e.target.value) || 0)}
-                className="h-7 w-20 text-meta text-center"
-              />
-              <span className="text-meta text-text-muted-light dark:text-text-muted-dark">&quot;</span>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ─── Controls ─────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
