@@ -908,6 +908,45 @@ export function buildPrintHtml(params: {
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
+    .print-tip {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      background: #fef3c7;
+      border-bottom: 2px solid #f59e0b;
+      padding: 12px 20px;
+      font-family: Arial, sans-serif;
+      font-size: 13px;
+      color: #92400e;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .print-tip strong { color: #78350f; }
+    .scale-mark {
+      position: absolute;
+      bottom: 0.25in;
+      right: 0.25in;
+      font-family: Arial, sans-serif;
+      font-size: 7pt;
+      color: #999;
+    }
+    .scale-mark .ruler {
+      width: 1in;
+      height: 0;
+      border-top: 1px solid #999;
+      margin-bottom: 2px;
+    }
+    .scale-mark .ticks {
+      display: flex;
+      justify-content: space-between;
+      width: 1in;
+    }
+    .scale-mark .ticks span {
+      width: 0;
+      border-left: 1px solid #999;
+      height: 4px;
+    }
     @media print {
       html, body {
         margin: 0 !important;
@@ -917,13 +956,25 @@ export function buildPrintHtml(params: {
         size: letter;
         margin: 0;
       }
+      .print-tip { display: none !important; }
     }
   </style>
 </head>
 <body>
+  <div class="print-tip">
+    <span style="font-size:16px;">&#9888;</span>
+    <span>
+      <strong>Print settings:</strong> Set Margins to <strong>None</strong> and Scale to <strong>100%</strong> for accurate alignment on check stock.
+    </span>
+  </div>
   ${dividerLines}
   ${checkHtml}
   ${!testMode ? stubHtml : ''}
+  <div class="scale-mark">
+    <div class="ticks"><span></span><span></span><span></span><span></span><span></span></div>
+    <div class="ruler"></div>
+    <div style="text-align:center;">1 inch (verify scale)</div>
+  </div>
 </body>
 </html>`;
 }
