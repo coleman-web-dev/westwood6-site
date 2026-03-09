@@ -57,6 +57,12 @@ export default function VendorsPage() {
     ? vendors
     : vendors.filter((v) => v.category_id === categoryFilter);
 
+  // Count vendors per category for the filter pills
+  const countByCategory: Record<string, number> = {};
+  for (const v of vendors) {
+    countByCategory[v.category_id] = (countByCategory[v.category_id] ?? 0) + 1;
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -88,21 +94,32 @@ export default function VendorsPage() {
           }`}
         >
           All
+          <span className={`ml-1.5 text-meta ${categoryFilter === 'all' ? 'opacity-70' : 'opacity-50'}`}>
+            {vendors.length}
+          </span>
         </button>
-        {categories.map((cat) => (
-          <button
-            key={cat.id}
-            type="button"
-            onClick={() => setCategoryFilter(cat.id)}
-            className={`px-3 py-1.5 rounded-pill text-label transition-colors ${
-              categoryFilter === cat.id
-                ? 'bg-primary-700 text-white dark:bg-primary-300 dark:text-primary-900'
-                : 'bg-surface-light-2 dark:bg-surface-dark-2 text-text-secondary-light dark:text-text-secondary-dark hover:bg-primary-100 dark:hover:bg-primary-800'
-            }`}
-          >
-            {cat.name}
-          </button>
-        ))}
+        {categories.map((cat) => {
+          const count = countByCategory[cat.id] ?? 0;
+          return (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() => setCategoryFilter(cat.id)}
+              className={`px-3 py-1.5 rounded-pill text-label transition-colors ${
+                categoryFilter === cat.id
+                  ? 'bg-primary-700 text-white dark:bg-primary-300 dark:text-primary-900'
+                  : 'bg-surface-light-2 dark:bg-surface-dark-2 text-text-secondary-light dark:text-text-secondary-dark hover:bg-primary-100 dark:hover:bg-primary-800'
+              }`}
+            >
+              {cat.name}
+              {count > 0 && (
+                <span className={`ml-1.5 text-meta ${categoryFilter === cat.id ? 'opacity-70' : 'opacity-50'}`}>
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
         {canWrite('vendors') && (
           <button
             type="button"
