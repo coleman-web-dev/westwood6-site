@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { getCheckPrintSettings } from '@/lib/actions/check-actions';
 import { Button } from '@/components/shared/ui/button';
@@ -114,7 +114,6 @@ export function CheckPrintPreview({
 }: CheckPrintPreviewProps) {
   const [signatures, setSignatures] = useState<(CheckSignature & { signedUrl?: string })[]>([]);
   const [printSettings, setPrintSettings] = useState<CheckPrintSettings | null>(null);
-  const printFrameRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -205,19 +204,16 @@ export function CheckPrintPreview({
       fieldPositions: printSettings!.field_positions,
     });
 
-    // Use a hidden iframe to print without affecting the main page
-    const iframe = printFrameRef.current;
-    if (iframe) {
-      const doc = iframe.contentDocument || iframe.contentWindow?.document;
-      if (doc) {
-        doc.open();
-        doc.write(printHtml);
-        doc.close();
-        // Wait for images to load, then print
-        setTimeout(() => {
-          iframe.contentWindow?.print();
-        }, 500);
-      }
+    // Open in a new window so user can see the output and adjust print settings
+    const printWindow = window.open('', '_blank', 'width=850,height=1100');
+    if (printWindow) {
+      printWindow.document.open();
+      printWindow.document.write(printHtml);
+      printWindow.document.close();
+      // Wait for content/images to load, then trigger print
+      setTimeout(() => {
+        printWindow.print();
+      }, 600);
     }
   }
 
@@ -339,12 +335,6 @@ export function CheckPrintPreview({
           </div>
         </div>
 
-        {/* Hidden iframe for printing */}
-        <iframe
-          ref={printFrameRef}
-          style={{ display: 'none' }}
-          title="Check Print Frame"
-        />
       </DialogContent>
     </Dialog>
   );
@@ -807,8 +797,8 @@ export function buildPrintHtml(params: {
   } else if (fieldPositions) {
     // New per-field positioning system with dynamic font sizes and visibility
     const fp = fieldPositions;
-    function fpTop(fieldTop: number) { return `${sectionTopIn + fieldTop}in`; }
-    function fpLeft(fieldLeft: number) { return `${fieldLeft}in`; }
+    function fpTop(fieldTop: number) { return `${sectionTopIn + fieldTop + offsetY}in`; }
+    function fpLeft(fieldLeft: number) { return `${fieldLeft + offsetX}in`; }
     function ffs(fieldId: CheckFieldId) { return fp[fieldId].fontSize ?? DEFAULT_FIELD_POSITIONS[fieldId].fontSize ?? 10; }
     function flbl(fieldId: CheckFieldId) { return Math.max(Math.round(ffs(fieldId) * 0.7), 6); }
     function isVis(fieldId: CheckFieldId) { return fp[fieldId].visible !== false; }
@@ -887,24 +877,63 @@ export function buildPrintHtml(params: {
   return `<!DOCTYPE html>
 <html>
 <head>
+  <title>Check Print</title>
   <style>
     @page {
       size: letter;
       margin: 0;
     }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
+    html, body {
+      margin: 0;
+      padding: 0;
       width: 8.5in;
       height: 11in;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
       position: relative;
       font-family: Georgia, "Times New Roman", serif;
       color: #000;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
+    @media print {
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 8.5in !important;
+        height: 11in !important;
+      }
+      /* Hide browser header/footer */
+      @page {
+        size: letter;
+        margin: 0;
+      }
+    }
+    /* Print instructions banner (hidden during print) */
+    .print-instructions {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: #fef3c7;
+      border-bottom: 2px solid #f59e0b;
+      padding: 8px 16px;
+      font-family: system-ui, sans-serif;
+      font-size: 13px;
+      color: #92400e;
+      z-index: 9999;
+      text-align: center;
+    }
+    @media print {
+      .print-instructions { display: none !important; }
+    }
   </style>
 </head>
 <body>
+  <div class="print-instructions">
+    <strong>Important:</strong> Set Margins to &quot;None&quot; and Scale to &quot;100%&quot; in your print dialog for accurate alignment.
+  </div>
   ${dividerLines}
   ${checkHtml}
   ${!testMode ? stubHtml : ''}

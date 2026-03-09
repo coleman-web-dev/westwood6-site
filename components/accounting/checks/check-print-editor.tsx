@@ -8,7 +8,7 @@ import { Label } from '@/components/shared/ui/label';
 import { Switch } from '@/components/shared/ui/switch';
 import {
   Printer, Loader2, Move, Upload, Trash2, RotateCcw, Image as ImageIcon,
-  Eye, EyeOff, Minus, Plus,
+  Eye, EyeOff, Minus, Plus, Info,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -160,7 +160,6 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
   const [containerWidth, setContainerWidth] = useState(NATIVE_WIDTH);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const printFrameRef = useRef<HTMLIFrameElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<{
     fieldId: CheckFieldId;
@@ -376,24 +375,22 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
       amountInWords,
       printSettings: { ...settings, field_positions: fieldPositions },
       sectionTopIn,
-      offsetX: 0,
-      offsetY: 0,
+      offsetX: settings.offset_x || 0,
+      offsetY: settings.offset_y || 0,
       signatures: [],
       testMode: false,
       fieldPositions,
     });
 
-    const iframe = printFrameRef.current;
-    if (iframe) {
-      const doc = iframe.contentDocument || iframe.contentWindow?.document;
-      if (doc) {
-        doc.open();
-        doc.write(printHtml);
-        doc.close();
-        setTimeout(() => {
-          iframe.contentWindow?.print();
-        }, 500);
-      }
+    // Open in a new window so user can see the output and adjust print settings
+    const printWindow = window.open('', '_blank', 'width=850,height=1100');
+    if (printWindow) {
+      printWindow.document.open();
+      printWindow.document.write(printHtml);
+      printWindow.document.close();
+      setTimeout(() => {
+        printWindow.print();
+      }, 600);
     }
   }
 
@@ -559,6 +556,14 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
               Print Test
             </Button>
           </div>
+        </div>
+
+        {/* Print instructions hint */}
+        <div className="flex items-start gap-2 mb-3 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+          <Info className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <span className="text-meta text-amber-800 dark:text-amber-300">
+            When printing, set Margins to &quot;None&quot; and Scale to &quot;100%&quot; in the print dialog for accurate alignment.
+          </span>
         </div>
 
         {/* ─── Drag Canvas (check section only, transform-scaled) ── */}
@@ -788,7 +793,7 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
       )}
 
       {/* ─── Controls ─────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Check Position */}
         <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding space-y-3">
           <h3 className="text-section-title text-text-primary-light dark:text-text-primary-dark">
@@ -809,6 +814,44 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
                 {pos}
               </Button>
             ))}
+          </div>
+        </div>
+
+        {/* Printer Offset */}
+        <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding space-y-3">
+          <h3 className="text-section-title text-text-primary-light dark:text-text-primary-dark">
+            Printer Offset
+          </h3>
+          <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+            Compensate for your printer&apos;s margins. Use small adjustments (+/- 0.05&quot;) to fine-tune.
+          </p>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Label className="text-meta w-20 shrink-0">Horizontal</Label>
+              <Input
+                type="number"
+                step={0.05}
+                min={-1}
+                max={1}
+                value={settings.offset_x || 0}
+                onChange={(e) => setSettings((prev) => ({ ...prev, offset_x: parseFloat(e.target.value) || 0 }))}
+                className="h-7 w-20 text-meta text-center"
+              />
+              <span className="text-meta text-text-muted-light dark:text-text-muted-dark">&quot;</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-meta w-20 shrink-0">Vertical</Label>
+              <Input
+                type="number"
+                step={0.05}
+                min={-1}
+                max={1}
+                value={settings.offset_y || 0}
+                onChange={(e) => setSettings((prev) => ({ ...prev, offset_y: parseFloat(e.target.value) || 0 }))}
+                className="h-7 w-20 text-meta text-center"
+              />
+              <span className="text-meta text-text-muted-light dark:text-text-muted-dark">&quot;</span>
+            </div>
           </div>
         </div>
 
@@ -951,11 +994,6 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
           if (file) handleBgUpload(file);
           e.target.value = '';
         }}
-      />
-      <iframe
-        ref={printFrameRef}
-        style={{ display: 'none' }}
-        title="Check Print Frame"
       />
     </div>
   );
