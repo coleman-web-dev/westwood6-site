@@ -5,6 +5,7 @@ import { useCommunity } from '@/lib/providers/community-provider';
 import { NotificationBell } from '@/components/notifications/notification-bell';
 import { ViewModeToggle } from './view-mode-toggle';
 import { SearchIcon, MailIcon, MenuIcon } from 'lucide-react';
+import { useKBar } from '@shipixen/kbar';
 
 interface DashboardTopbarProps {
   onMenuClick: () => void;
@@ -12,6 +13,7 @@ interface DashboardTopbarProps {
 
 export function DashboardTopbar({ onMenuClick }: DashboardTopbarProps) {
   const { member, actualIsBoard } = useCommunity();
+  const { query } = useKBar();
 
   const initials = [member?.first_name?.[0], member?.last_name?.[0]]
     .filter(Boolean)
@@ -42,18 +44,28 @@ export function DashboardTopbar({ onMenuClick }: DashboardTopbarProps) {
 
       {/* Search (centered) */}
       <div className="hidden sm:flex flex-1 justify-center">
-        <div className="relative w-full max-w-xs">
-          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted-light dark:text-text-muted-dark" />
-          <input
-            type="text"
-            placeholder="Search"
-            className="w-full h-9 pl-9 pr-4 bg-surface-light-2 dark:bg-surface-dark-2 border-0 rounded-pill text-body text-text-primary-light dark:text-text-primary-dark placeholder:text-text-muted-light dark:placeholder:text-text-muted-dark focus:outline-none focus:ring-2 focus:ring-secondary-400/30 transition-all"
-          />
-        </div>
+        <button
+          onClick={() => query.toggle()}
+          className="flex items-center gap-2 w-full max-w-xs h-9 pl-3 pr-3 bg-surface-light-2 dark:bg-surface-dark-2 border-0 rounded-pill text-body text-text-muted-light dark:text-text-muted-dark hover:bg-surface-light dark:hover:bg-surface-dark-2/80 focus:outline-none focus:ring-2 focus:ring-secondary-400/30 transition-all cursor-pointer"
+        >
+          <SearchIcon className="w-4 h-4 shrink-0" />
+          <span className="flex-1 text-left">Search</span>
+          <kbd className="hidden md:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark text-[10px] font-medium text-text-muted-light dark:text-text-muted-dark">
+            Ctrl K
+          </kbd>
+        </button>
       </div>
 
       {/* Right actions */}
       <div className="flex items-center gap-1.5 sm:gap-3 ml-auto">
+        {/* Mobile search button */}
+        <button
+          onClick={() => query.toggle()}
+          className="sm:hidden p-2 rounded-inner-card text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors"
+        >
+          <SearchIcon className="w-[18px] h-[18px]" />
+        </button>
+
         <ThemeSwitch />
 
         <NotificationBell />

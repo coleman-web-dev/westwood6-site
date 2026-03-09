@@ -847,8 +847,8 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
                         setSelectedField(fieldId);
                       }}
                     >
-                      {/* Show faded hint when label is hidden (editor only, won't print) */}
-                      {labelHidden && (
+                      {/* Show faded hint when label is hidden and field is selected (editor only, won't print) */}
+                      {labelHidden && isSelected && (
                         <span style={{ color: '#bbb', fontSize: `${labelFontSize}pt`, marginRight: '4px', fontStyle: 'italic', fontWeight: 400 }}>
                           {FIELD_LABELS[fieldId]}
                         </span>
@@ -872,6 +872,8 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
                       onPointerDownOutside={(e) => e.preventDefault()}
                       onInteractOutside={(e) => e.preventDefault()}
                       onFocusOutside={(e) => e.preventDefault()}
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
                     >
                       {/* ─── Floating field editor toolbar ─── */}
                       <div className="p-2 space-y-1.5">
