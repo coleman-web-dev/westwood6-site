@@ -7,19 +7,22 @@ import { Input } from '@/components/shared/ui/input';
 import { Label } from '@/components/shared/ui/label';
 import { Badge } from '@/components/shared/ui/badge';
 import { Switch } from '@/components/shared/ui/switch';
-import { Loader2, Plus, Settings, Hash, PenLine } from 'lucide-react';
+import { Loader2, Plus, Settings, Hash, PenLine, Printer } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   getCheckSettings,
   updateCheckSettings,
+  getCheckPrintSettings,
+  updateCheckPrintSettings,
   getCheckSequences,
   createCheckSequence,
   updateCheckSequence,
   getSignatures,
 } from '@/lib/actions/check-actions';
+import { CheckPrintPreview } from './check-print-preview';
 import { SignatureUpload } from './signature-upload';
 import { useCommunity } from '@/lib/providers/community-provider';
-import type { CheckSettings, CheckNumberSequence } from '@/lib/types/check';
+import type { CheckSettings, CheckPrintSettings, CheckPosition, CheckNumberSequence, CheckWithDetails } from '@/lib/types/check';
 
 interface CheckSettingsProps {
   communityId: string;
@@ -47,13 +50,24 @@ export function CheckSettingsPanel({ communityId }: CheckSettingsProps) {
   const [newSeqLabel, setNewSeqLabel] = useState('');
   const [newSeqStart, setNewSeqStart] = useState('1001');
   const [newSeqPrefix, setNewSeqPrefix] = useState('');
+  const [printSettings, setPrintSettings] = useState<CheckPrintSettings>({
+    check_position: 'top',
+    offset_x: 0,
+    offset_y: 0,
+    payer_name: '',
+    payer_address_line1: '',
+    payer_address_line2: '',
+  });
+  const [savingPrint, setSavingPrint] = useState(false);
+  const [testPrintOpen, setTestPrintOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     const supabase = createClient();
 
-    const [settingsData, seqData, membersRes] = await Promise.all([
+    const [settingsData, printData, seqData, membersRes] = await Promise.all([
       getCheckSettings(communityId),
+      getCheckPrintSettings(communityId),
       getCheckSequences(communityId),
       supabase
         .from('members')
@@ -63,6 +77,7 @@ export function CheckSettingsPanel({ communityId }: CheckSettingsProps) {
     ]);
 
     setSettings(settingsData);
+    setPrintSettings(printData);
     setSequences(seqData as CheckNumberSequence[]);
     setBoardMembers((membersRes.data as MemberOption[]) || []);
     setLoading(false);
@@ -81,6 +96,18 @@ export function CheckSettingsPanel({ communityId }: CheckSettingsProps) {
       toast.success('Check settings saved.');
     } else {
       toast.error(result.error || 'Failed to save settings.');
+    }
+  }
+
+  async function handleSavePrintSettings() {
+    setSavingPrint(true);
+    const result = await updateCheckPrintSettings(communityId, printSettings);
+    setSavingPrint(false);
+
+    if (result.success) {
+      toast.success('Print settings saved.');
+    } else {
+      toast.error(result.error || 'Failed to save print settings.');
     }
   }
 
@@ -359,6 +386,218 @@ export function CheckSettingsPanel({ communityId }: CheckSettingsProps) {
           )}
         </div>
       </div>
+
+      {/* Print Alignment */}
+      <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Printer className="h-4 w-4 text-text-muted-light dark:text-text-muted-dark" />
+            <h3 className="text-section-title text-text-primary-light dark:text-text-primary-dark">
+              Print Alignment
+            </h3>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setTestPrintOpen(true)}
+          >
+            Print Test Page
+          </Button>
+        </div>
+
+        <p className="text-body text-text-secondary-light dark:text-text-secondary-dark">
+          Configure where check fields print on your check stock paper. Use the test page to verify alignment.
+        </p>
+
+        <div className="space-y-4">
+          {/* Check Position */}
+          <div className="space-y-2">
+            <Label className="text-meta">Check Position on Page</Label>
+            <div className="flex items-center gap-3">
+              {(['top', 'middle', 'bottom'] as CheckPosition[]).map((pos) => (
+                <Button
+                  key={pos}
+                  size="sm"
+                  variant={printSettings.check_position === pos ? 'default' : 'outline'}
+                  onClick={() => setPrintSettings((prev) => ({ ...prev, check_position: pos }))}
+                  className="capitalize"
+                >
+                  {pos}
+                </Button>
+              ))}
+            </div>
+            <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+              Select which third of the page has the check (the other two sections are stubs for your records).
+            </p>
+          </div>
+
+          {/* Payer Information */}
+          <div className="space-y-2">
+            <Label className="text-meta">Payer Name (printed on check)</Label>
+            <Input
+              value={printSettings.payer_name}
+              onChange={(e) => setPrintSettings((prev) => ({ ...prev, payer_name: e.target.value }))}
+              placeholder="e.g. Westwood Community Six HOA"
+              className="h-8 text-body"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label className="text-meta">Address Line 1</Label>
+              <Input
+                value={printSettings.payer_address_line1}
+                onChange={(e) => setPrintSettings((prev) => ({ ...prev, payer_address_line1: e.target.value }))}
+                placeholder="123 Main Street"
+                className="h-8 text-body"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-meta">Address Line 2</Label>
+              <Input
+                value={printSettings.payer_address_line2}
+                onChange={(e) => setPrintSettings((prev) => ({ ...prev, payer_address_line2: e.target.value }))}
+                placeholder="City, State ZIP"
+                className="h-8 text-body"
+              />
+            </div>
+          </div>
+
+          {/* Fine-tune Offsets */}
+          <div className="space-y-2">
+            <Label className="text-meta">Fine-tune Alignment (inches)</Label>
+            <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+              Adjust if text doesn&apos;t align with your check stock fields. Print a test page after each change.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-meta">Horizontal offset</Label>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={() => setPrintSettings((prev) => ({
+                      ...prev,
+                      offset_x: Math.round((prev.offset_x - 0.05) * 100) / 100,
+                    }))}
+                  >
+                    -
+                  </Button>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={printSettings.offset_x}
+                    onChange={(e) => setPrintSettings((prev) => ({
+                      ...prev,
+                      offset_x: parseFloat(e.target.value) || 0,
+                    }))}
+                    className="h-8 text-body text-center w-24"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={() => setPrintSettings((prev) => ({
+                      ...prev,
+                      offset_x: Math.round((prev.offset_x + 0.05) * 100) / 100,
+                    }))}
+                  >
+                    +
+                  </Button>
+                  <span className="text-meta text-text-muted-light dark:text-text-muted-dark shrink-0">&quot;</span>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-meta">Vertical offset</Label>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={() => setPrintSettings((prev) => ({
+                      ...prev,
+                      offset_y: Math.round((prev.offset_y - 0.05) * 100) / 100,
+                    }))}
+                  >
+                    -
+                  </Button>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={printSettings.offset_y}
+                    onChange={(e) => setPrintSettings((prev) => ({
+                      ...prev,
+                      offset_y: parseFloat(e.target.value) || 0,
+                    }))}
+                    className="h-8 text-body text-center w-24"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={() => setPrintSettings((prev) => ({
+                      ...prev,
+                      offset_y: Math.round((prev.offset_y + 0.05) * 100) / 100,
+                    }))}
+                  >
+                    +
+                  </Button>
+                  <span className="text-meta text-text-muted-light dark:text-text-muted-dark shrink-0">&quot;</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <Button size="sm" onClick={handleSavePrintSettings} disabled={savingPrint}>
+            {savingPrint && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />}
+            Save Print Settings
+          </Button>
+        </div>
+      </div>
+
+      {/* Test Print Preview Dialog */}
+      {testPrintOpen && (
+        <CheckPrintPreview
+          check={dummyCheck}
+          communityId={communityId}
+          open={testPrintOpen}
+          onOpenChange={setTestPrintOpen}
+          testMode
+        />
+      )}
     </div>
   );
 }
+
+/** Dummy check used for the test print alignment page */
+const dummyCheck: CheckWithDetails = {
+  id: 'test',
+  community_id: '',
+  check_number: 1001,
+  check_sequence_id: '',
+  date: new Date().toISOString().split('T')[0],
+  amount: 125000, // $1,250.00
+  payee_vendor_id: null,
+  payee_name: 'Sample Vendor Co.',
+  memo: 'Monthly maintenance services',
+  expense_account_id: '',
+  bank_account_id: '',
+  status: 'approved',
+  created_by: null,
+  printed_at: null,
+  voided_at: null,
+  voided_by: null,
+  void_reason: null,
+  journal_entry_id: null,
+  bank_transaction_id: null,
+  check_image_path: null,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+  expense_account: { code: '6000', name: 'Maintenance Expense' },
+  bank_account: { code: '1000', name: 'Operating Account' },
+};

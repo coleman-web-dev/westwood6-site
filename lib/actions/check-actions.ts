@@ -3,7 +3,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createJournalEntry, reverseJournalEntry } from '@/lib/utils/accounting-entries';
 import { queueEmail } from '@/lib/email/queue';
-import type { CheckSettings, CheckWithDetails } from '@/lib/types/check';
+import type { CheckSettings, CheckPrintSettings, CheckWithDetails } from '@/lib/types/check';
 import { requirePermission } from '@/lib/actions/auth-guard';
 
 /** Get check settings from community theme */
@@ -49,6 +49,55 @@ export async function updateCheckSettings(communityId: string, settings: CheckSe
   } catch (error) {
     console.error('Failed to update check settings:', error);
     return { success: false, error: 'Failed to update settings' };
+  }
+}
+
+/** Get check print settings from community theme */
+export async function getCheckPrintSettings(communityId: string): Promise<CheckPrintSettings> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from('communities')
+    .select('theme, name, address')
+    .eq('id', communityId)
+    .single();
+
+  const theme = data?.theme as Record<string, unknown> | null;
+  const settings = theme?.check_print_settings as CheckPrintSettings | undefined;
+
+  return settings || {
+    check_position: 'top',
+    offset_x: 0,
+    offset_y: 0,
+    payer_name: data?.name || '',
+    payer_address_line1: '',
+    payer_address_line2: '',
+  };
+}
+
+/** Update check print settings in community theme */
+export async function updateCheckPrintSettings(communityId: string, printSettings: CheckPrintSettings) {
+  try {
+    await requirePermission(communityId, 'checks', 'read');
+    const admin = createAdminClient();
+
+    const { data: community } = await admin
+      .from('communities')
+      .select('theme')
+      .eq('id', communityId)
+      .single();
+
+    const currentTheme = (community?.theme || {}) as Record<string, unknown>;
+    const updatedTheme = { ...currentTheme, check_print_settings: printSettings };
+
+    await admin
+      .from('communities')
+      .update({ theme: updatedTheme })
+      .eq('id', communityId);
+
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to update check print settings:', error);
+    return { success: false, error: 'Failed to update print settings' };
   }
 }
 

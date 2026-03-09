@@ -82,6 +82,23 @@ export interface CheckSettings {
   auto_approve_under: number | null; // amount in cents, checks below this skip approval
 }
 
+export type CheckPosition = 'top' | 'middle' | 'bottom';
+
+export interface CheckPrintSettings {
+  /** Where the check is on the page: top, middle, or bottom third */
+  check_position: CheckPosition;
+  /** Horizontal offset in inches (positive = right, negative = left) */
+  offset_x: number;
+  /** Vertical offset in inches (positive = down, negative = up) */
+  offset_y: number;
+  /** Community/HOA name printed on the check */
+  payer_name: string;
+  /** Payer address line 1 */
+  payer_address_line1: string;
+  /** Payer address line 2 (city, state, zip) */
+  payer_address_line2: string;
+}
+
 // ─── Form Types ─────────────────────────────────────────────────────
 
 export interface WriteCheckFormData {
