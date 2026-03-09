@@ -166,6 +166,7 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
   const [bgImageUrl, setBgImageUrl] = useState<string | null>(null);
   const [bgRenderedUrl, setBgRenderedUrl] = useState<string | null>(null); // data URL for rendered PDF
   const [bgIsPdf, setBgIsPdf] = useState(false);
+  const [bgLoading, setBgLoading] = useState(false); // loading state for PDF rendering
   const [uploadingBg, setUploadingBg] = useState(false);
   const [containerWidth, setContainerWidth] = useState(NATIVE_WIDTH);
 
@@ -206,13 +207,27 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
     }
 
     let cancelled = false;
+    setBgLoading(true);
 
     async function renderPdf() {
       try {
         const pdfjsLib = await import('pdfjs-dist');
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+
+        // Load worker as blob to avoid CORS issues with CDN-hosted workers
+        const workerUrl = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+        try {
+          const workerResponse = await fetch(workerUrl);
+          if (workerResponse.ok) {
+            const workerBlob = await workerResponse.blob();
+            pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(workerBlob);
+          }
+        } catch {
+          // Fall back to direct URL (will use main thread if worker fails)
+          pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+        }
 
         const response = await fetch(bgImageUrl!);
+        if (!response.ok) throw new Error(`Failed to fetch image: ${response.status}`);
         const arrayBuffer = await response.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         const page = await pdf.getPage(1);
@@ -230,9 +245,14 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
 
         if (!cancelled) {
           setBgRenderedUrl(canvas.toDataURL('image/png'));
+          setBgLoading(false);
         }
       } catch (err) {
         console.error('Failed to render PDF:', err);
+        if (!cancelled) {
+          setBgLoading(false);
+          toast.error('Failed to render PDF background. Try uploading a PNG or JPG scan instead.');
+        }
       }
     }
 
@@ -656,7 +676,7 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
                 src={bgImageUrl}
                 alt="Check stock background"
                 className="absolute inset-0 w-full h-full object-fill pointer-events-none"
-                style={{ opacity: 0.35 }}
+                style={{ opacity: 0.55 }}
               />
             )}
             {bgIsPdf && bgRenderedUrl && (
@@ -669,9 +689,18 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
                   width: `${NATIVE_WIDTH}px`,
                   height: `${NATIVE_HEIGHT}px`,
                   objectFit: 'fill',
-                  opacity: 0.4,
+                  opacity: 0.55,
                 }}
               />
+            )}
+            {/* PDF loading indicator */}
+            {bgIsPdf && bgLoading && !bgRenderedUrl && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 1 }}>
+                <div className="flex items-center gap-2 bg-white/80 rounded-lg px-4 py-2 shadow-sm">
+                  <Loader2 className="h-4 w-4 animate-spin text-text-muted-light" />
+                  <span className="text-meta text-text-secondary-light">Rendering PDF...</span>
+                </div>
+              </div>
             )}
 
             {/* Margin guides (shaded no-print zone) */}
@@ -1008,7 +1037,7 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
             Check Stock Image
           </h3>
           <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-            Upload a scan of your blank check as a positioning reference. PNG or JPG recommended for best preview.
+            Upload a scan of your blank check stock (full page) as a positioning reference. Use PNG or JPG for best results.
           </p>
 
           {bgImageUrl ? (
