@@ -385,6 +385,9 @@ export function CheckContent({
     function isVis(fieldId: CheckFieldId): boolean {
       return fp[fieldId].visible !== false;
     }
+    function hasLabel(fieldId: CheckFieldId): boolean {
+      return fp[fieldId].showLabel !== false;
+    }
 
     return (
       <>
@@ -415,7 +418,7 @@ export function CheckContent({
         {/* Date */}
         {isVis('date') && (
           <div style={{ position: 'absolute', top: `${topPct(fp.date.top)}%`, left: `${leftPct(fp.date.left)}%`, fontSize: fs('date') }}>
-            <span style={{ color: '#666', fontSize: lblFs('date'), marginRight: '4px' }}>DATE</span>
+            {hasLabel('date') && <span style={{ color: '#666', fontSize: lblFs('date'), marginRight: '4px' }}>DATE</span>}
             {fp.date.showLine ? (
               <span style={{ borderBottom: '1px solid #999', paddingBottom: '1px' }}>{formatDate(check.date)}</span>
             ) : (
@@ -427,7 +430,7 @@ export function CheckContent({
         {/* Pay to the order of */}
         {isVis('payTo') && (
           <div style={{ position: 'absolute', top: `${topPct(fp.payTo.top)}%`, left: `${leftPct(fp.payTo.left)}%`, fontSize: fs('payTo'), maxWidth: '65%' }}>
-            <span style={{ color: '#666', fontSize: lblFs('payTo'), marginRight: '6px' }}>PAY TO THE ORDER OF</span>
+            {hasLabel('payTo') && <span style={{ color: '#666', fontSize: lblFs('payTo'), marginRight: '6px' }}>PAY TO THE ORDER OF</span>}
             {fp.payTo.showLine ? (
               <span style={{ fontWeight: 500, borderBottom: '1px solid #999', paddingBottom: '1px' }}>{check.payee_name}</span>
             ) : (
@@ -466,7 +469,7 @@ export function CheckContent({
             position: 'absolute', top: `${topPct(fp.memo.top)}%`, left: `${leftPct(fp.memo.left)}%`,
             fontSize: fs('memo'),
           }}>
-            <span style={{ color: '#666', fontSize: lblFs('memo'), marginRight: '4px' }}>MEMO</span>
+            {hasLabel('memo') && <span style={{ color: '#666', fontSize: lblFs('memo'), marginRight: '4px' }}>MEMO</span>}
             {fp.memo.showLine ? (
               <span style={{ borderBottom: '1px solid #999', paddingBottom: '1px' }}>{check.memo || ''}</span>
             ) : (
@@ -493,7 +496,7 @@ export function CheckContent({
               borderTop: fp.signatureLine.showLine ? '1px solid #999' : 'none',
               paddingTop: '1px', fontSize: fs('signatureLine'), color: '#666', minWidth: '120px',
             }}>
-              AUTHORIZED SIGNATURE
+              {hasLabel('signatureLine') ? 'AUTHORIZED SIGNATURE' : ''}
             </div>
           </div>
         )}
@@ -803,6 +806,7 @@ export function buildPrintHtml(params: {
     function ffs(fieldId: CheckFieldId) { return fp[fieldId].fontSize ?? DEFAULT_FIELD_POSITIONS[fieldId].fontSize ?? 10; }
     function flbl(fieldId: CheckFieldId) { return Math.max(Math.round(ffs(fieldId) * 0.7), 6); }
     function isVis(fieldId: CheckFieldId) { return fp[fieldId].visible !== false; }
+    function hasLbl(fieldId: CheckFieldId) { return fp[fieldId].showLabel !== false; }
 
     const parts: string[] = [];
 
@@ -820,11 +824,13 @@ export function buildPrintHtml(params: {
     }
     if (isVis('date')) {
       const dateLine = fp.date.showLine ? 'border-bottom:1px solid #999;padding-bottom:1px;' : '';
-      parts.push(`<div style="position:absolute; top:${fpTop(fp.date.top)}; left:${fpLeft(fp.date.left)}; font-size:${ffs('date')}pt;"><span style="color:#666;font-size:${flbl('date')}pt;margin-right:4px;">DATE</span> <span style="${dateLine}">${date}</span></div>`);
+      const dateLabel = hasLbl('date') ? `<span style="color:#666;font-size:${flbl('date')}pt;margin-right:4px;">DATE</span> ` : '';
+      parts.push(`<div style="position:absolute; top:${fpTop(fp.date.top)}; left:${fpLeft(fp.date.left)}; font-size:${ffs('date')}pt;">${dateLabel}<span style="${dateLine}">${date}</span></div>`);
     }
     if (isVis('payTo')) {
       const payToLine = fp.payTo.showLine ? 'border-bottom:1px solid #999;padding-bottom:1px;' : '';
-      parts.push(`<div style="position:absolute; top:${fpTop(fp.payTo.top)}; left:${fpLeft(fp.payTo.left)}; font-size:${ffs('payTo')}pt;"><span style="color:#666;font-size:${flbl('payTo')}pt;margin-right:4px;">PAY TO THE ORDER OF</span> <span style="font-weight:500;${payToLine}">${check.payee_name}</span></div>`);
+      const payToLabel = hasLbl('payTo') ? `<span style="color:#666;font-size:${flbl('payTo')}pt;margin-right:4px;">PAY TO THE ORDER OF</span> ` : '';
+      parts.push(`<div style="position:absolute; top:${fpTop(fp.payTo.top)}; left:${fpLeft(fp.payTo.left)}; font-size:${ffs('payTo')}pt;">${payToLabel}<span style="font-weight:500;${payToLine}">${check.payee_name}</span></div>`);
     }
     if (isVis('amountBox')) {
       parts.push(`<div style="position:absolute; top:${fpTop(fp.amountBox.top)}; left:${fpLeft(fp.amountBox.left)}; border:1.5px solid #333; padding:2px 8px; font-size:${ffs('amountBox')}pt; font-weight:bold;">${formattedAmount}</div>`);
@@ -835,13 +841,15 @@ export function buildPrintHtml(params: {
     }
     if (isVis('memo')) {
       const memoLine = fp.memo.showLine ? 'border-bottom:1px solid #999;padding-bottom:1px;' : '';
-      parts.push(`<div style="position:absolute; top:${fpTop(fp.memo.top)}; left:${fpLeft(fp.memo.left)}; font-size:${ffs('memo')}pt;"><span style="color:#666;font-size:${flbl('memo')}pt;margin-right:4px;">MEMO</span> <span style="${memoLine}">${check.memo || ''}</span></div>`);
+      const memoLabel = hasLbl('memo') ? `<span style="color:#666;font-size:${flbl('memo')}pt;margin-right:4px;">MEMO</span> ` : '';
+      parts.push(`<div style="position:absolute; top:${fpTop(fp.memo.top)}; left:${fpLeft(fp.memo.left)}; font-size:${ffs('memo')}pt;">${memoLabel}<span style="${memoLine}">${check.memo || ''}</span></div>`);
     }
     if (isVis('signatureLine')) {
       const sigLine = fp.signatureLine.showLine ? 'border-top:1px solid #999;' : '';
+      const sigLabel = hasLbl('signatureLine') ? 'AUTHORIZED SIGNATURE' : '';
       parts.push(`<div style="position:absolute; top:${fpTop(fp.signatureLine.top)}; left:${fpLeft(fp.signatureLine.left)}; text-align:center;">
         ${signatureImg}
-        <div style="${sigLine} padding-top:2px; font-size:${ffs('signatureLine')}pt; color:#666; min-width:2in;">AUTHORIZED SIGNATURE</div>
+        <div style="${sigLine} padding-top:2px; font-size:${ffs('signatureLine')}pt; color:#666; min-width:2in;">${sigLabel}</div>
       </div>`);
     }
 

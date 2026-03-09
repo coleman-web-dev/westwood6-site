@@ -91,6 +91,7 @@ export interface CheckFieldLayout {
   showLine: boolean;  // whether to render underline/border for this field
   fontSize?: number;  // font size in pt (defaults vary by field type)
   visible?: boolean;  // whether to include when printing (default true)
+  showLabel?: boolean; // whether to print the field label prefix, e.g. "MEMO", "DATE" (default true)
 }
 
 export type CheckFieldId =

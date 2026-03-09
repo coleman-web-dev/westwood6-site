@@ -8,7 +8,7 @@ import { Label } from '@/components/shared/ui/label';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/shared/ui/popover';
 import {
   Printer, Loader2, Move, Upload, Trash2, RotateCcw, Image as ImageIcon,
-  Eye, EyeOff, Minus, Plus, X, Type,
+  Eye, EyeOff, Minus, Plus, X, Type, Tag,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -103,6 +103,7 @@ function getFieldContent(
   formattedAmount: string,
   amountInWords: string,
   settings: CheckPrintSettings,
+  showLabel: boolean = true,
 ): { label?: string; value: string } {
   switch (fieldId) {
     case 'payerName':
@@ -114,17 +115,17 @@ function getFieldContent(
     case 'checkNumber':
       return { value: String(check.check_number) };
     case 'date':
-      return { label: 'DATE', value: formatDate(check.date) };
+      return showLabel ? { label: 'DATE', value: formatDate(check.date) } : { value: formatDate(check.date) };
     case 'payTo':
-      return { label: 'PAY TO THE ORDER OF', value: check.payee_name };
+      return showLabel ? { label: 'PAY TO THE ORDER OF', value: check.payee_name } : { value: check.payee_name };
     case 'amountBox':
       return { value: formattedAmount };
     case 'amountWords':
       return { value: `${amountInWords} DOLLARS` };
     case 'memo':
-      return { label: 'MEMO', value: check.memo || '' };
+      return showLabel ? { label: 'MEMO', value: check.memo || '' } : { value: check.memo || '' };
     case 'signatureLine':
-      return { value: 'AUTHORIZED SIGNATURE' };
+      return showLabel ? { value: 'AUTHORIZED SIGNATURE' } : { value: '' };
     default:
       return { value: '' };
   }
@@ -155,6 +156,9 @@ function getPayerSettingsKey(fieldId: CheckFieldId): 'payer_name' | 'payer_addre
     default: return null;
   }
 }
+
+/** Fields that have a printed label prefix (e.g. "MEMO", "DATE", "PAY TO THE ORDER OF") */
+const FIELDS_WITH_LABELS: Set<CheckFieldId> = new Set(['date', 'payTo', 'memo', 'signatureLine']);
 
 // ─── Component ──────────────────────────────────────────────────────
 
@@ -590,6 +594,16 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
     }));
   }
 
+  function toggleFieldLabel(fieldId: CheckFieldId) {
+    setFieldPositions((prev) => ({
+      ...prev,
+      [fieldId]: {
+        ...prev[fieldId],
+        showLabel: prev[fieldId].showLabel === false ? true : false,
+      },
+    }));
+  }
+
   // ── Derived values ─────────────────────────────────────────────────
 
   const check = PREVIEW_CHECK;
@@ -787,7 +801,9 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
             {/* Draggable fields with floating editor popovers */}
             {ALL_FIELD_IDS.map((fieldId) => {
               const pos = fieldPositions[fieldId];
-              const content = getFieldContent(fieldId, check, formattedAmount, amountInWords, settings);
+              const hasLabel = FIELDS_WITH_LABELS.has(fieldId);
+              const labelHidden = hasLabel && pos.showLabel === false;
+              const content = getFieldContent(fieldId, check, formattedAmount, amountInWords, settings, !labelHidden);
               const isSelected = selectedField === fieldId;
               const isHidden = pos.visible === false;
               const fontSize = pos.fontSize ?? DEFAULT_FIELD_POSITIONS[fieldId].fontSize ?? 10;
@@ -831,6 +847,12 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
                         setSelectedField(fieldId);
                       }}
                     >
+                      {/* Show faded hint when label is hidden (editor only, won't print) */}
+                      {labelHidden && (
+                        <span style={{ color: '#bbb', fontSize: `${labelFontSize}pt`, marginRight: '4px', fontStyle: 'italic', fontWeight: 400 }}>
+                          {FIELD_LABELS[fieldId]}
+                        </span>
+                      )}
                       {content.label && (
                         <span style={{ color: '#666', fontSize: `${labelFontSize}pt`, marginRight: '4px' }}>
                           {content.label}
@@ -868,8 +890,8 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
                           </Button>
                         </div>
 
-                        {/* Row 2: Font size, Show Line, Visibility */}
-                        <div className="flex items-center gap-2">
+                        {/* Row 2: Font size, Show Line, Label, Visibility */}
+                        <div className="flex items-center gap-2 flex-wrap">
                           {/* Font size */}
                           <div className="flex items-center gap-0.5 border rounded px-1 py-0.5 bg-gray-50">
                             <button
@@ -905,6 +927,25 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
                             <span className="w-3 border-b border-current" />
                             Line
                           </button>
+
+                          {/* Label toggle (only for fields that have label prefixes) */}
+                          {hasLabel && (
+                            <>
+                              <div className="w-px h-4 bg-gray-200" />
+                              <button
+                                className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                                  labelHidden
+                                    ? 'bg-amber-50 text-amber-600'
+                                    : 'bg-blue-100 text-blue-700'
+                                }`}
+                                onClick={() => toggleFieldLabel(fieldId)}
+                                title={labelHidden ? 'Show label on print (e.g. "MEMO")' : 'Hide label from print (your check stock already has it)'}
+                              >
+                                <Tag className={`h-3 w-3 ${labelHidden ? 'opacity-50' : ''}`} />
+                                Label
+                              </button>
+                            </>
+                          )}
 
                           {/* Divider */}
                           <div className="w-px h-4 bg-gray-200" />
