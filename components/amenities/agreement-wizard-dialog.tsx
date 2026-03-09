@@ -132,46 +132,37 @@ export function AgreementWizardDialog({
     [onOpenChange, existingTemplate, existingFields],
   );
 
-  // PDF text extraction
+  // PDF text extraction via server-side API (avoids client-side worker/CSP issues)
   async function handlePdfUpload(file: File) {
     setExtractingPdf(true);
     try {
-      const pdfjsLib = await import('pdfjs-dist');
+      const formData = new FormData();
+      formData.append('file', file);
 
-      // Use local worker from public/ (excluded from middleware via matcher config)
-      pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+      const res = await fetch('/api/extract-pdf', {
+        method: 'POST',
+        body: formData,
+      });
 
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const data = await res.json();
 
-      let fullText = '';
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const content = await page.getTextContent();
-        const pageText = (content.items as Array<{ str?: string }>)
-          .map((item) => item.str ?? '')
-          .join(' ');
-        fullText += pageText + '\n\n';
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to extract text from PDF. Try pasting the text instead.');
+        return;
       }
 
-      const trimmed = fullText.trim();
-
-      if (!trimmed) {
+      if (!data.text) {
         toast.error(
           'No text found in this PDF. It may be a scanned image. Try pasting the text instead.',
         );
         return;
       }
 
-      setRawText(trimmed);
-      toast.success(`Extracted text from ${pdf.numPages} page${pdf.numPages > 1 ? 's' : ''}.`);
+      setRawText(data.text);
+      toast.success(`Extracted text from ${data.pageCount} page${data.pageCount > 1 ? 's' : ''}.`);
     } catch (err) {
       console.error('PDF extraction error:', err);
-      const message =
-        err instanceof Error && err.message.includes('password')
-          ? 'This PDF is password-protected. Please remove the password and try again, or paste the text instead.'
-          : 'Failed to extract text from PDF. Try pasting the text instead.';
-      toast.error(message);
+      toast.error('Failed to extract text from PDF. Try pasting the text instead.');
     } finally {
       setExtractingPdf(false);
     }
