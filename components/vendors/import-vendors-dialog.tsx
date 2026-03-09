@@ -12,6 +12,7 @@ import {
   DialogFooter,
 } from '@/components/shared/ui/dialog';
 import { Button } from '@/components/shared/ui/button';
+import { Input } from '@/components/shared/ui/input';
 import {
   Select,
   SelectContent,
@@ -27,6 +28,7 @@ import {
   AlertTriangle,
   CheckCircle,
   Download,
+  Plus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -44,7 +46,7 @@ interface ImportVendorsDialogProps {
   onImported: () => void;
 }
 
-type Step = 'upload' | 'mapping' | 'preview' | 'importing' | 'done';
+type Step = 'upload' | 'mapping' | 'categories' | 'preview' | 'importing' | 'done';
 
 const VENDOR_FIELDS: { value: keyof ParsedVendor | ''; label: string }[] = [
   { value: '', label: 'Skip this column' },
@@ -96,6 +98,43 @@ function generateTemplate(): string {
   return headers.join(',') + '\n' + sampleRow.join(',') + '\n';
 }
 
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/**
+ * Try to auto-match a CSV category string to an existing category.
+ * Returns the category ID if matched, or null if no match found.
+ */
+function tryAutoMatch(categoryStr: string, cats: VendorCategoryRow[]): string | null {
+  if (!categoryStr) return null;
+
+  const lower = categoryStr.toLowerCase().trim();
+
+  // Exact name match
+  const exact = cats.find((c) => c.name.toLowerCase() === lower);
+  if (exact) return exact.id;
+
+  // Slug match
+  const slug = slugify(categoryStr);
+  const slugMatch = cats.find((c) => c.slug === slug);
+  if (slugMatch) return slugMatch.id;
+
+  // Partial match (either direction)
+  const partial = cats.find(
+    (c) =>
+      c.name.toLowerCase().includes(lower) ||
+      lower.includes(c.name.toLowerCase()),
+  );
+  if (partial) return partial.id;
+
+  return null;
+}
+
 export function ImportVendorsDialog({
   open,
   onOpenChange,
@@ -116,6 +155,15 @@ export function ImportVendorsDialog({
   const [isDragActive, setIsDragActive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Category mapping state
+  const [uniqueFileCategories, setUniqueFileCategories] = useState<string[]>([]);
+  // Maps CSV category string -> category ID
+  const [categoryMapping, setCategoryMapping] = useState<Record<string, string>>({});
+  // Local copy of categories that grows as user creates new ones during import
+  const [localCategories, setLocalCategories] = useState<VendorCategoryRow[]>([]);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [creatingCategory, setCreatingCategory] = useState(false);
+
   function reset() {
     setStep('upload');
     setFileName(null);
@@ -127,6 +175,11 @@ export function ImportVendorsDialog({
     setParseErrors([]);
     setImportedCount(0);
     setSkippedCount(0);
+    setUniqueFileCategories([]);
+    setCategoryMapping({});
+    setLocalCategories([]);
+    setNewCategoryName('');
+    setCreatingCategory(false);
   }
 
   function handleOpenChange(isOpen: boolean) {
@@ -134,11 +187,6 @@ export function ImportVendorsDialog({
     onOpenChange(isOpen);
   }
 
-  /**
-   * Convert file content to CSV string.
-   * For XLSX/XLS, reads the first sheet and converts to CSV.
-   * For CSV, returns as-is.
-   */
   function processFile(file: File) {
     setFileName(file.name);
     const ext = file.name.split('.').pop()?.toLowerCase();
@@ -172,7 +220,6 @@ export function ImportVendorsDialog({
   function handleCsvLoaded(csv: string) {
     setCsvContent(csv);
 
-    // Parse just headers + first few rows for the mapping step
     const preview = Papa.parse<Record<string, string>>(csv, {
       header: true,
       skipEmptyLines: true,
@@ -188,7 +235,6 @@ export function ImportVendorsDialog({
     setHeaders(detectedHeaders);
     setSampleRows(preview.data);
 
-    // Auto-detect mapping
     const mapping = autoMapVendorColumns(detectedHeaders);
     setColumnMapping(mapping);
 
@@ -199,8 +245,10 @@ export function ImportVendorsDialog({
     setColumnMapping((prev) => ({ ...prev, [csvColumn]: vendorField }));
   }
 
-  function handleProceedToPreview() {
-    // Validate that at least "name" or "company" is mapped
+  /**
+   * After column mapping, parse the file and determine if we need a category mapping step.
+   */
+  function handleAfterColumnMapping() {
     const mappedFields = Object.values(columnMapping);
     const hasName = mappedFields.includes('name');
     const hasCompany = mappedFields.includes('company');
@@ -209,42 +257,100 @@ export function ImportVendorsDialog({
       return;
     }
 
-    // Parse with the mapping
+    // Parse the full file
     const result = parseVendorsCSV(csvContent, columnMapping);
     setParsedVendors(result.data);
     setParseErrors(result.errors);
+
+    // Check if category column was mapped
+    const hasCategoryColumn = mappedFields.includes('category');
+
+    if (hasCategoryColumn) {
+      // Extract unique non-empty category values from parsed data
+      const catValues = new Set<string>();
+      for (const v of result.data) {
+        if (v.category.trim()) catValues.add(v.category.trim());
+      }
+      const uniqueCats = Array.from(catValues).sort();
+      setUniqueFileCategories(uniqueCats);
+
+      // Initialize local categories with the prop
+      setLocalCategories([...categories]);
+
+      // Auto-match what we can
+      const autoMap: Record<string, string> = {};
+      const generalId = categories.find((c) => c.slug === 'general')?.id ?? categories[0]?.id ?? '';
+
+      for (const catStr of uniqueCats) {
+        const matched = tryAutoMatch(catStr, categories);
+        autoMap[catStr] = matched ?? generalId;
+      }
+      setCategoryMapping(autoMap);
+
+      // If there are categories to map, show the step
+      if (uniqueCats.length > 0) {
+        setStep('categories');
+        return;
+      }
+    }
+
+    // No category column or no category values, skip to preview
     setStep('preview');
   }
 
-  /**
-   * Match a category string from CSV to an existing category.
-   * Falls back to General.
-   */
-  function matchCategory(categoryStr: string): string {
-    if (!categoryStr) {
-      return categories.find((c) => c.slug === 'general')?.id ?? categories[0]?.id ?? '';
+  function handleCategoryMappingChange(csvCategory: string, categoryId: string) {
+    setCategoryMapping((prev) => ({ ...prev, [csvCategory]: categoryId }));
+  }
+
+  async function handleCreateCategory() {
+    const name = newCategoryName.trim();
+    if (!name) return;
+
+    // Check if already exists locally
+    if (localCategories.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
+      toast.error(`Category "${name}" already exists.`);
+      return;
     }
 
-    const lower = categoryStr.toLowerCase().trim();
+    setCreatingCategory(true);
+    const supabase = createClient();
 
-    // Try exact name match
-    const exact = categories.find((c) => c.name.toLowerCase() === lower);
-    if (exact) return exact.id;
+    const slug = slugify(name);
+    const maxOrder = localCategories.reduce((max, c) => Math.max(max, c.display_order), 0);
 
-    // Try slug match
-    const slugMatch = categories.find((c) => c.slug === lower.replace(/[^a-z0-9]+/g, '-'));
-    if (slugMatch) return slugMatch.id;
+    const { data, error } = await supabase
+      .from('vendor_categories')
+      .insert({
+        community_id: communityId,
+        name,
+        slug,
+        display_order: maxOrder + 1,
+        is_system: false,
+      })
+      .select()
+      .single();
 
-    // Try partial match
-    const partial = categories.find(
-      (c) =>
-        c.name.toLowerCase().includes(lower) ||
-        lower.includes(c.name.toLowerCase()),
-    );
-    if (partial) return partial.id;
+    setCreatingCategory(false);
 
-    // Default to General
-    return categories.find((c) => c.slug === 'general')?.id ?? categories[0]?.id ?? '';
+    if (error) {
+      toast.error(`Failed to create category: ${error.message}`);
+      return;
+    }
+
+    const newCat = data as VendorCategoryRow;
+    setLocalCategories((prev) => [...prev, newCat]);
+    setNewCategoryName('');
+    toast.success(`Created "${name}" category.`);
+  }
+
+  function resolveCategoryId(csvCategoryStr: string): string {
+    if (!csvCategoryStr.trim()) {
+      return localCategories.find((c) => c.slug === 'general')?.id ?? localCategories[0]?.id ?? '';
+    }
+    return categoryMapping[csvCategoryStr.trim()]
+      ?? localCategories.find((c) => c.slug === 'general')?.id
+      ?? localCategories[0]?.id
+      ?? '';
   }
 
   async function handleImport() {
@@ -254,7 +360,6 @@ export function ImportVendorsDialog({
     let imported = 0;
     let skipped = 0;
 
-    // Fetch existing vendor names for duplicate detection
     const { data: existingVendors } = await supabase
       .from('vendors')
       .select('name')
@@ -264,7 +369,6 @@ export function ImportVendorsDialog({
       (existingVendors ?? []).map((v) => v.name.toLowerCase().trim()),
     );
 
-    // Batch insert in groups of 50
     const batchSize = 50;
     const toInsert: Record<string, unknown>[] = [];
 
@@ -280,7 +384,7 @@ export function ImportVendorsDialog({
         company: vendor.company || null,
         phone: vendor.phone || null,
         email: vendor.email || null,
-        category_id: matchCategory(vendor.category),
+        category_id: resolveCategoryId(vendor.category),
         license_number: vendor.license_number || null,
         insurance_expiry: vendor.insurance_expiry || null,
         tax_id: vendor.tax_id || null,
@@ -356,6 +460,13 @@ export function ImportVendorsDialog({
     [],
   );
 
+  // Count how many vendors use each file category
+  const categoryCounts: Record<string, number> = {};
+  for (const v of parsedVendors) {
+    const cat = v.category.trim();
+    if (cat) categoryCounts[cat] = (categoryCounts[cat] ?? 0) + 1;
+  }
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
@@ -363,6 +474,7 @@ export function ImportVendorsDialog({
           <DialogTitle>
             {step === 'upload' && 'Import Vendors'}
             {step === 'mapping' && 'Map Columns'}
+            {step === 'categories' && 'Map Categories'}
             {step === 'preview' && 'Review Import'}
             {step === 'importing' && 'Importing...'}
             {step === 'done' && 'Import Complete'}
@@ -519,14 +631,123 @@ export function ImportVendorsDialog({
               <Button variant="outline" onClick={() => { reset(); }}>
                 Back
               </Button>
-              <Button onClick={handleProceedToPreview}>
+              <Button onClick={handleAfterColumnMapping}>
+                Continue
+              </Button>
+            </DialogFooter>
+          </div>
+        )}
+
+        {/* Step 3: Category Mapping */}
+        {step === 'categories' && (
+          <div className="space-y-4 py-2">
+            <p className="text-body text-text-secondary-light dark:text-text-secondary-dark">
+              Your file has {uniqueFileCategories.length} categor{uniqueFileCategories.length !== 1 ? 'ies' : 'y'}.
+              Match each to an existing category, or create new ones.
+            </p>
+
+            <div className="space-y-2">
+              {/* Column headers */}
+              <div className="flex items-center gap-3 px-3 pb-1">
+                <p className="flex-1 text-meta font-semibold uppercase tracking-wide text-text-muted-light dark:text-text-muted-dark">
+                  In Your File
+                </p>
+                <div className="w-48 shrink-0">
+                  <p className="text-meta font-semibold uppercase tracking-wide text-text-muted-light dark:text-text-muted-dark">
+                    Assign To
+                  </p>
+                </div>
+              </div>
+
+              {uniqueFileCategories.map((fileCat) => {
+                const isAutoMatched = tryAutoMatch(fileCat, categories) !== null;
+                return (
+                  <div
+                    key={fileCat}
+                    className="flex items-center gap-3 px-3 py-2 rounded-inner-card border border-stroke-light dark:border-stroke-dark"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-body font-medium text-text-primary-light dark:text-text-primary-dark truncate">
+                        {fileCat}
+                      </p>
+                      <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                        {categoryCounts[fileCat] ?? 0} vendor{(categoryCounts[fileCat] ?? 0) !== 1 ? 's' : ''}
+                        {isAutoMatched && (
+                          <span className="ml-1.5 text-green-600 dark:text-green-400">
+                            (auto-matched)
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <div className="w-48 shrink-0">
+                      <Select
+                        value={categoryMapping[fileCat] || '_general'}
+                        onValueChange={(v) => handleCategoryMappingChange(fileCat, v)}
+                      >
+                        <SelectTrigger className="h-8 text-label">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {localCategories.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Create new category inline */}
+            <div className="rounded-inner-card border border-dashed border-stroke-light dark:border-stroke-dark p-3">
+              <p className="text-label font-medium text-text-secondary-light dark:text-text-secondary-dark mb-2">
+                Need a new category?
+              </p>
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Category name"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleCreateCategory();
+                    }
+                  }}
+                  className="h-8 text-label flex-1"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCreateCategory}
+                  disabled={!newCategoryName.trim() || creatingCategory}
+                  className="shrink-0"
+                >
+                  {creatingCategory ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                  )}
+                  Create
+                </Button>
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" onClick={() => setStep('mapping')}>
+                Back
+              </Button>
+              <Button onClick={() => setStep('preview')}>
                 Continue to Preview
               </Button>
             </DialogFooter>
           </div>
         )}
 
-        {/* Step 3: Preview */}
+        {/* Step 4: Preview */}
         {step === 'preview' && (
           <div className="space-y-4 py-2">
             {parseErrors.length > 0 && (
@@ -563,23 +784,17 @@ export function ImportVendorsDialog({
                   </thead>
                   <tbody className="divide-y divide-stroke-light dark:divide-stroke-dark">
                     {parsedVendors.slice(0, 50).map((v, i) => {
-                      const catId = matchCategory(v.category);
-                      const catName = categories.find((c) => c.id === catId)?.name ?? 'General';
+                      const catId = resolveCategoryId(v.category);
+                      const catName = (localCategories.length > 0 ? localCategories : categories)
+                        .find((c) => c.id === catId)?.name ?? 'General';
                       return (
                         <tr key={i} className="text-text-primary-light dark:text-text-primary-dark">
                           <td className="px-3 py-1.5 whitespace-nowrap">{v.name}</td>
                           <td className="px-3 py-1.5 whitespace-nowrap text-text-secondary-light dark:text-text-secondary-dark">{v.company || '-'}</td>
                           <td className="px-3 py-1.5 whitespace-nowrap text-text-secondary-light dark:text-text-secondary-dark">{v.phone || '-'}</td>
                           <td className="px-3 py-1.5 whitespace-nowrap text-text-secondary-light dark:text-text-secondary-dark">{v.email || '-'}</td>
-                          <td className="px-3 py-1.5 whitespace-nowrap">
-                            <span className={`text-meta ${v.category && catName !== v.category ? 'text-yellow-600 dark:text-yellow-400' : 'text-text-muted-light dark:text-text-muted-dark'}`}>
-                              {catName}
-                              {v.category && catName !== v.category && v.category !== catName && (
-                                <span className="ml-1 text-text-muted-light dark:text-text-muted-dark">
-                                  ({v.category})
-                                </span>
-                              )}
-                            </span>
+                          <td className="px-3 py-1.5 whitespace-nowrap text-text-muted-light dark:text-text-muted-dark">
+                            {catName}
                           </td>
                         </tr>
                       );
@@ -595,7 +810,10 @@ export function ImportVendorsDialog({
             </div>
 
             <DialogFooter className="gap-2 sm:gap-0">
-              <Button variant="outline" onClick={() => setStep('mapping')}>
+              <Button
+                variant="outline"
+                onClick={() => setStep(uniqueFileCategories.length > 0 ? 'categories' : 'mapping')}
+              >
                 Back
               </Button>
               <Button onClick={handleImport} disabled={parsedVendors.length === 0}>
@@ -605,7 +823,7 @@ export function ImportVendorsDialog({
           </div>
         )}
 
-        {/* Step 4: Importing */}
+        {/* Step 5: Importing */}
         {step === 'importing' && (
           <div className="flex flex-col items-center justify-center gap-4 py-12">
             <Loader2 className="h-10 w-10 animate-spin text-secondary-400" />
@@ -615,7 +833,7 @@ export function ImportVendorsDialog({
           </div>
         )}
 
-        {/* Step 5: Done */}
+        {/* Step 6: Done */}
         {step === 'done' && (
           <div className="space-y-4 py-2">
             <div className="flex flex-col items-center gap-3 py-6">
