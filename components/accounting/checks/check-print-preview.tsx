@@ -16,8 +16,8 @@ import type { CheckWithDetails, CheckSignature, CheckPrintSettings } from '@/lib
 // ─── Constants ──────────────────────────────────────────────────────
 // Standard US check stock: 8.5" x 11" letter, divided into 3 sections
 // Each section is approximately 3.667" tall (11 / 3)
-const SECTION_HEIGHT_IN = 3.667;
-const CHECK_WIDTH_IN = 8.5;
+export const SECTION_HEIGHT_IN = 3.667;
+export const CHECK_WIDTH_IN = 8.5;
 
 // Field positions within the check area (inches from top-left of check section)
 // These positions match standard blank check stock (e.g., VersaCheck, Deluxe)
@@ -36,7 +36,7 @@ const FIELD_POSITIONS = {
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
-function numberToWords(amount: number): string {
+export function numberToWords(amount: number): string {
   const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
     'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen',
     'Eighteen', 'Nineteen'];
@@ -58,7 +58,7 @@ function numberToWords(amount: number): string {
   return `${convert(dollars)} and ${cents.toString().padStart(2, '0')}/100`;
 }
 
-function formatDate(dateStr: string): string {
+export function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('en-US', {
     month: '2-digit',
     day: '2-digit',
@@ -322,7 +322,7 @@ export function CheckPrintPreview({
 
 // ─── Sub-components for preview ─────────────────────────────────────
 
-function CheckContent({
+export function CheckContent({
   check,
   formattedAmount,
   amountInWords,
@@ -431,7 +431,7 @@ function CheckContent({
   );
 }
 
-function StubContent({
+export function StubContent({
   check,
   formattedAmount,
   sectionTopPercent,
@@ -573,7 +573,7 @@ function TestAlignmentGrid({ sectionTopPercent }: { sectionTopPercent: number })
 
 // ─── Print HTML Builder ─────────────────────────────────────────────
 
-function buildPrintHtml(params: {
+export function buildPrintHtml(params: {
   check: CheckWithDetails;
   formattedAmount: string;
   amountInWords: string;
