@@ -847,12 +847,6 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
                         setSelectedField(fieldId);
                       }}
                     >
-                      {/* Show faded hint when label is hidden and field is selected (editor only, won't print) */}
-                      {labelHidden && isSelected && (
-                        <span style={{ color: '#bbb', fontSize: `${labelFontSize}pt`, marginRight: '4px', fontStyle: 'italic', fontWeight: 400 }}>
-                          {FIELD_LABELS[fieldId]}
-                        </span>
-                      )}
                       {content.label && (
                         <span style={{ color: '#666', fontSize: `${labelFontSize}pt`, marginRight: '4px' }}>
                           {content.label}
