@@ -137,7 +137,9 @@ export function AgreementWizardDialog({
     setExtractingPdf(true);
     try {
       const pdfjsLib = await import('pdfjs-dist');
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+
+      // Use local worker from public/ instead of CDN (avoids CORS/ad-blocker issues)
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -152,11 +154,24 @@ export function AgreementWizardDialog({
         fullText += pageText + '\n\n';
       }
 
-      setRawText(fullText.trim());
+      const trimmed = fullText.trim();
+
+      if (!trimmed) {
+        toast.error(
+          'No text found in this PDF. It may be a scanned image. Try pasting the text instead.',
+        );
+        return;
+      }
+
+      setRawText(trimmed);
       toast.success(`Extracted text from ${pdf.numPages} page${pdf.numPages > 1 ? 's' : ''}.`);
     } catch (err) {
       console.error('PDF extraction error:', err);
-      toast.error('Failed to extract text from PDF. Try pasting the text instead.');
+      const message =
+        err instanceof Error && err.message.includes('password')
+          ? 'This PDF is password-protected. Please remove the password and try again, or paste the text instead.'
+          : 'Failed to extract text from PDF. Try pasting the text instead.';
+      toast.error(message);
     } finally {
       setExtractingPdf(false);
     }
