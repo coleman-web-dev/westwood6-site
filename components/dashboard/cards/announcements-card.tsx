@@ -5,25 +5,57 @@ import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { DashboardCardShell } from './dashboard-card-shell';
 import { Badge } from '@/components/shared/ui/badge';
-import type { Announcement } from '@/lib/types/database';
+import { CalendarDays } from 'lucide-react';
+import type { Announcement, Event } from '@/lib/types/database';
+
+type FeedItem =
+  | { type: 'announcement'; data: Announcement; sortDate: string; pinned: false }
+  | { type: 'event'; data: Event; sortDate: string; pinned: boolean };
 
 export function AnnouncementsCard() {
   const { community } = useCommunity();
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const supabase = createClient();
 
     async function fetch() {
-      const { data } = await supabase
-        .from('announcements')
-        .select('*')
-        .eq('community_id', community.id)
-        .order('created_at', { ascending: false })
-        .limit(5);
+      const [{ data: announcements }, { data: events }] = await Promise.all([
+        supabase
+          .from('announcements')
+          .select('*')
+          .eq('community_id', community.id)
+          .order('created_at', { ascending: false })
+          .limit(5),
+        supabase
+          .from('events')
+          .select('*')
+          .eq('community_id', community.id)
+          .eq('show_on_announcements', true)
+          .gte('end_datetime', new Date().toISOString())
+          .order('start_datetime', { ascending: true })
+          .limit(3),
+      ]);
 
-      setAnnouncements((data as Announcement[]) ?? []);
+      const feed: FeedItem[] = [];
+
+      for (const a of (announcements as Announcement[]) ?? []) {
+        feed.push({ type: 'announcement', data: a, sortDate: a.created_at, pinned: false });
+      }
+
+      for (const e of (events as Event[]) ?? []) {
+        feed.push({ type: 'event', data: e, sortDate: e.created_at, pinned: e.is_pinned });
+      }
+
+      // Sort: pinned first, then by date descending
+      feed.sort((a, b) => {
+        if (a.pinned && !b.pinned) return -1;
+        if (!a.pinned && b.pinned) return 1;
+        return b.sortDate.localeCompare(a.sortDate);
+      });
+
+      setItems(feed.slice(0, 6));
       setLoading(false);
     }
 
@@ -38,25 +70,56 @@ export function AnnouncementsCard() {
             <div key={i} className="animate-pulse h-5 rounded bg-muted" />
           ))}
         </div>
-      ) : announcements.length === 0 ? (
+      ) : items.length === 0 ? (
         <p className="text-body text-text-muted-light dark:text-text-muted-dark">No announcements yet.</p>
       ) : (
         <ul className="space-y-3">
-          {announcements.map((a) => (
-            <li key={a.id} className="flex items-start gap-2">
-              {a.priority !== 'normal' && (
-                <Badge variant={a.priority === 'urgent' ? 'destructive' : 'secondary'} className="text-meta mt-0.5 shrink-0">
-                  {a.priority}
+          {items.map((item) => {
+            if (item.type === 'announcement') {
+              const a = item.data;
+              return (
+                <li key={`a-${a.id}`} className="flex items-start gap-2">
+                  {a.priority !== 'normal' && (
+                    <Badge variant={a.priority === 'urgent' ? 'destructive' : 'secondary'} className="text-meta mt-0.5 shrink-0">
+                      {a.priority}
+                    </Badge>
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-body font-medium truncate">{a.title}</p>
+                    <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                      {new Date(a.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                </li>
+              );
+            }
+
+            const e = item.data;
+            return (
+              <li key={`e-${e.id}`} className="flex items-start gap-2">
+                <Badge variant="outline" className="text-meta mt-0.5 shrink-0 gap-1">
+                  <CalendarDays className="h-3 w-3" />
+                  Event
                 </Badge>
-              )}
-              <div className="min-w-0">
-                <p className="text-body font-medium truncate">{a.title}</p>
-                <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                  {new Date(a.created_at).toLocaleDateString()}
-                </p>
-              </div>
-            </li>
-          ))}
+                {item.pinned && (
+                  <Badge variant="secondary" className="text-meta mt-0.5 shrink-0">
+                    Pinned
+                  </Badge>
+                )}
+                <div className="min-w-0">
+                  <p className="text-body font-medium truncate">{e.title}</p>
+                  <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                    {new Date(e.start_datetime).toLocaleDateString(undefined, {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                    {e.location ? ` · ${e.location}` : ''}
+                  </p>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
     </DashboardCardShell>

@@ -1,6 +1,6 @@
 'use server';
 
-import { queueAnnouncementNotification, queueWelcomeInvite } from '@/lib/email/queue';
+import { queueAnnouncementNotification, queueWelcomeInvite, queueEventNotification } from '@/lib/email/queue';
 
 export async function sendAnnouncementEmails(
   communityId: string,
@@ -32,6 +32,34 @@ export async function sendWelcomeInvites(
   } catch (error) {
     console.error('Failed to queue welcome invites:', error);
     return { success: false, error: 'Failed to queue welcome emails' };
+  }
+}
+
+export async function sendEventNotificationEmails(
+  communityId: string,
+  communitySlug: string,
+  title: string,
+  description: string,
+  location: string,
+  startDatetime: string,
+  endDatetime: string,
+  notifyRoles: string[],
+) {
+  try {
+    await queueEventNotification(
+      communityId,
+      communitySlug,
+      title,
+      description,
+      location,
+      startDatetime,
+      endDatetime,
+      notifyRoles,
+    );
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to queue event notification emails:', error);
+    return { success: false, error: 'Failed to queue event emails' };
   }
 }
 

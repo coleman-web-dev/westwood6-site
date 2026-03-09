@@ -392,6 +392,84 @@ export async function queueVendorInsuranceReminder(
 }
 
 /**
+ * Queue event notification emails for community members with selected roles.
+ */
+export async function queueEventNotification(
+  communityId: string,
+  communitySlug: string,
+  title: string,
+  description: string,
+  location: string,
+  startDatetime: string,
+  endDatetime: string,
+  notifyRoles: string[],
+) {
+  const supabase = createAdminClient();
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://duesiq.com';
+
+  const { data: community } = await supabase
+    .from('communities')
+    .select('name')
+    .eq('id', communityId)
+    .single();
+
+  // Get approved members with matching roles and email
+  const { data: members } = await supabase
+    .from('members')
+    .select('id, email, first_name, last_name, member_role')
+    .eq('community_id', communityId)
+    .eq('is_approved', true)
+    .in('member_role', notifyRoles)
+    .not('email', 'is', null);
+
+  if (!members || members.length === 0) return;
+
+  const communityName = community?.name || 'Your Community';
+
+  // Format dates for email display
+  const start = new Date(startDatetime);
+  const end = new Date(endDatetime);
+  const startDate = start.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  const startTime = start.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+  const endTime = end.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+
+  const items: QueueEmailParams[] = members.map((m) => ({
+    communityId,
+    recipientMemberId: m.id,
+    recipientEmail: m.email!,
+    recipientName: `${m.first_name} ${m.last_name}`,
+    category: 'event' as EmailCategory,
+    priority: 'normal' as EmailPriority,
+    subject: `${communityName}: ${title}`,
+    templateId: 'event-notification',
+    templateData: {
+      communityName,
+      title,
+      description,
+      location,
+      startDate,
+      startTime,
+      endTime,
+      dashboardUrl: `${baseUrl}/${communitySlug}/events`,
+      unsubscribeUrl: buildUnsubscribeUrl(m.id, 'event', communitySlug),
+    },
+  }));
+
+  return queueBulkEmails(items);
+}
+
+/**
  * Queue a violation notice email for the head-of-household of the affected unit.
  */
 export async function queueViolationNotice(

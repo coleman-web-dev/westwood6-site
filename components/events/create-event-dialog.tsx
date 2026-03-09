@@ -24,9 +24,12 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { Switch } from '@/components/shared/ui/switch';
+import { Checkbox } from '@/components/shared/ui/checkbox';
+import { Label } from '@/components/shared/ui/label';
 import { getAmenityIcon } from '@/lib/amenity-icons';
 import { toast } from 'sonner';
-import type { Amenity, Event, EventVisibility } from '@/lib/types/database';
+import { sendEventNotificationEmails } from '@/lib/actions/email-actions';
+import type { Amenity, Event, EventVisibility, MemberRole } from '@/lib/types/database';
 
 interface CreateEventDialogProps {
   open: boolean;
@@ -46,6 +49,13 @@ function toLocalTimeString(isoString: string): string {
 function combineDateAndTime(dateStr: string, timeStr: string): string {
   return new Date(`${dateStr}T${timeStr}`).toISOString();
 }
+
+const NOTIFY_ROLE_OPTIONS: { role: MemberRole; label: string }[] = [
+  { role: 'owner', label: 'Owners' },
+  { role: 'member', label: 'Members' },
+  { role: 'tenant', label: 'Tenants' },
+  { role: 'minor', label: 'Minors' },
+];
 
 export function CreateEventDialog({
   open,
@@ -68,6 +78,12 @@ export function CreateEventDialog({
   const [visibility, setVisibility] = useState<EventVisibility>('public');
   const [amenities, setAmenities] = useState<Amenity[]>([]);
   const [submitting, setSubmitting] = useState(false);
+
+  // New display/notification settings
+  const [showOnAnnouncements, setShowOnAnnouncements] = useState(true);
+  const [isPinned, setIsPinned] = useState(false);
+  const [notifyOnCreate, setNotifyOnCreate] = useState(true);
+  const [notifyRoles, setNotifyRoles] = useState<MemberRole[]>(['owner', 'member']);
 
   const isEditing = editingEvent !== null;
 
@@ -98,6 +114,10 @@ export function CreateEventDialog({
       setEndTime(toLocalTimeString(editingEvent.end_datetime));
       setVisibility(editingEvent.visibility);
       setBlocksAmenity(editingEvent.blocks_amenity);
+      setShowOnAnnouncements(editingEvent.show_on_announcements);
+      setIsPinned(editingEvent.is_pinned);
+      setNotifyOnCreate(false); // Don't re-send on edit
+      setNotifyRoles(editingEvent.notify_roles ?? ['owner', 'member']);
 
       // Determine location type from existing data
       if (editingEvent.amenity_id) {
@@ -130,6 +150,10 @@ export function CreateEventDialog({
     setEndDate('');
     setEndTime('');
     setVisibility('public');
+    setShowOnAnnouncements(true);
+    setIsPinned(false);
+    setNotifyOnCreate(true);
+    setNotifyRoles(['owner', 'member']);
   }
 
   // Auto-set end date/time to 1 hour after start when start changes
@@ -156,6 +180,12 @@ export function CreateEventDialog({
         setEndDate(startDate);
       }
     }
+  }
+
+  function toggleNotifyRole(role: MemberRole) {
+    setNotifyRoles((prev) =>
+      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
+    );
   }
 
   function isLocationValid(): boolean {
@@ -193,19 +223,25 @@ export function CreateEventDialog({
       ? amenities.find((a) => a.id === selectedAmenityId)
       : null;
 
+    const resolvedLocation = isAmenityLocation
+      ? selectedAmenityObj?.name ?? null
+      : locationType === 'other'
+        ? customLocation.trim() || null
+        : null;
+
     const payload = {
       title: title.trim(),
       description: description.trim() || null,
-      location: isAmenityLocation
-        ? selectedAmenityObj?.name ?? null
-        : locationType === 'other'
-          ? customLocation.trim() || null
-          : null,
+      location: resolvedLocation,
       start_datetime: startIso,
       end_datetime: endIso,
       visibility,
       amenity_id: isAmenityLocation ? selectedAmenityId : null,
       blocks_amenity: isAmenityLocation ? blocksAmenity : false,
+      show_on_announcements: showOnAnnouncements,
+      is_pinned: isPinned,
+      notify_on_create: notifyOnCreate,
+      notify_roles: notifyRoles,
     };
 
     if (isEditing) {
@@ -237,6 +273,26 @@ export function CreateEventDialog({
       }
 
       toast.success('Event created.');
+
+      // Fire-and-forget: send notification emails
+      if (notifyOnCreate && notifyRoles.length > 0) {
+        sendEventNotificationEmails(
+          community.id,
+          community.slug,
+          title.trim(),
+          description.trim() || '',
+          resolvedLocation || '',
+          startIso,
+          endIso,
+          notifyRoles,
+        ).then((result) => {
+          if (result.success) {
+            toast.success('Event notification emails queued.');
+          }
+        }).catch(() => {
+          // Silently fail, event was created successfully
+        });
+      }
     }
 
     resetForm();
@@ -246,7 +302,7 @@ export function CreateEventDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit Event' : 'New Event'}</DialogTitle>
           <DialogDescription>
@@ -420,6 +476,86 @@ export function CreateEventDialog({
                 <SelectItem value="private">Private</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Display & Notification Settings */}
+          <div className="space-y-3 rounded-lg border border-stroke-light dark:border-stroke-dark p-3">
+            <p className="text-label text-text-secondary-light dark:text-text-secondary-dark font-semibold">
+              Display & Notifications
+            </p>
+
+            {/* Show on announcements */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-body text-text-secondary-light dark:text-text-secondary-dark">
+                  Show in announcements
+                </p>
+                <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                  Event appears in the announcements feed until its date passes
+                </p>
+              </div>
+              <Switch
+                checked={showOnAnnouncements}
+                onCheckedChange={setShowOnAnnouncements}
+              />
+            </div>
+
+            {/* Pin event */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-body text-text-secondary-light dark:text-text-secondary-dark">
+                  Pin event
+                </p>
+                <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                  Keeps this event at the top of announcements and events
+                </p>
+              </div>
+              <Switch
+                checked={isPinned}
+                onCheckedChange={setIsPinned}
+              />
+            </div>
+
+            {/* Email notification on create */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-body text-text-secondary-light dark:text-text-secondary-dark">
+                    {isEditing ? 'Send update email' : 'Send email notification'}
+                  </p>
+                  <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                    {isEditing
+                      ? 'Notify selected members about this update'
+                      : 'Notify selected members when this event is created'}
+                  </p>
+                </div>
+                <Switch
+                  checked={notifyOnCreate}
+                  onCheckedChange={setNotifyOnCreate}
+                />
+              </div>
+
+              {/* Role checkboxes */}
+              {notifyOnCreate && (
+                <div className="flex flex-wrap gap-x-4 gap-y-2 pl-1 pt-1">
+                  {NOTIFY_ROLE_OPTIONS.map(({ role, label }) => (
+                    <div key={role} className="flex items-center gap-1.5">
+                      <Checkbox
+                        id={`notify-${role}`}
+                        checked={notifyRoles.includes(role)}
+                        onCheckedChange={() => toggleNotifyRole(role)}
+                      />
+                      <Label
+                        htmlFor={`notify-${role}`}
+                        className="text-body text-text-secondary-light dark:text-text-secondary-dark cursor-pointer"
+                      >
+                        {label}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

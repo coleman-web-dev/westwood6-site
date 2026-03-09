@@ -8,6 +8,7 @@ import { AnnouncementEmail } from '@/lib/email/templates/announcement';
 import { WelcomeInviteEmail } from '@/lib/email/templates/welcome-invite';
 import { WeeklyDigestEmail } from '@/lib/email/templates/weekly-digest';
 import { ViolationNoticeEmail } from '@/lib/email/templates/violation-notice';
+import { EventNotificationEmail } from '@/lib/email/templates/event-notification';
 import type { EmailQueueItem } from '@/lib/types/database';
 
 const BATCH_SIZE = 10;
@@ -32,6 +33,8 @@ function renderTemplate(templateId: string, data: Record<string, unknown>): Reac
       return WeeklyDigestEmail(d);
     case 'violation-notice':
       return ViolationNoticeEmail(d);
+    case 'event-notification':
+      return EventNotificationEmail(d);
     default:
       console.error(`Unknown template: ${templateId}`);
       return null;

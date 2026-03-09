@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { Pencil, Trash2, MapPin, Clock, Calendar as CalendarIcon } from 'lucide-react';
+import { Pencil, Trash2, MapPin, Clock, Calendar as CalendarIcon, Pin, Megaphone, Bell } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Button } from '@/components/shared/ui/button';
@@ -26,7 +26,12 @@ export function EventList({ events, loading, onEdit, onDeleted }: EventListProps
 
   const upcoming = events
     .filter((e) => e.end_datetime >= now)
-    .sort((a, b) => a.start_datetime.localeCompare(b.start_datetime));
+    .sort((a, b) => {
+      // Pinned first, then by start date ascending
+      if (a.is_pinned && !b.is_pinned) return -1;
+      if (!a.is_pinned && b.is_pinned) return 1;
+      return a.start_datetime.localeCompare(b.start_datetime);
+    });
 
   const past = events
     .filter((e) => e.end_datetime < now)
@@ -143,8 +148,11 @@ function EventCard({
     <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1 space-y-2">
-          {/* Title + visibility badge */}
+          {/* Title + badges */}
           <div className="flex items-center gap-2 flex-wrap">
+            {event.is_pinned && (
+              <Pin className="h-3.5 w-3.5 text-secondary-500 shrink-0" />
+            )}
             <h3 className="text-card-title text-text-primary-light dark:text-text-primary-dark">
               {event.title}
             </h3>
@@ -154,6 +162,12 @@ function EventCard({
             >
               {event.visibility === 'public' ? 'Public' : 'Private'}
             </Badge>
+            {event.show_on_announcements && (
+              <Badge variant="outline" className="text-meta shrink-0 gap-1">
+                <Megaphone className="h-3 w-3" />
+                Announcements
+              </Badge>
+            )}
           </div>
 
           {/* Description */}

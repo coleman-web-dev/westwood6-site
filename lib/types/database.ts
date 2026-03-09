@@ -316,6 +316,10 @@ export interface Event {
   end_datetime: string;
   visibility: EventVisibility;
   blocks_amenity: boolean;
+  show_on_announcements: boolean;
+  is_pinned: boolean;
+  notify_on_create: boolean;
+  notify_roles: MemberRole[];
   created_by: string;
   created_at: string;
 }
@@ -547,7 +551,7 @@ export interface BulletinComment {
 
 // ─── Email System ─────────────────────────────────
 
-export type EmailCategory = 'payment_confirmation' | 'payment_reminder' | 'announcement' | 'maintenance_update' | 'voting_notice' | 'reservation_update' | 'weekly_digest' | 'system' | 'violation_notice' | 'insurance_reminder_email';
+export type EmailCategory = 'payment_confirmation' | 'payment_reminder' | 'announcement' | 'maintenance_update' | 'voting_notice' | 'reservation_update' | 'weekly_digest' | 'system' | 'violation_notice' | 'insurance_reminder_email' | 'event';
 export type EmailStatus = 'queued' | 'sending' | 'sent' | 'failed' | 'bounced';
 export type EmailPriority = 'immediate' | 'normal' | 'scheduled';
 
