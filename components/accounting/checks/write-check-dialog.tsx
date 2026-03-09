@@ -33,12 +33,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/shared/ui/popover';
-import { ChevronsUpDown, Check, Loader2 } from 'lucide-react';
+import { ChevronsUpDown, Check, Loader2, Printer } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { CheckPrintPreview } from './check-print-preview';
 import type { Vendor } from '@/lib/types/database';
 import type { Account } from '@/lib/types/accounting';
-import type { CheckNumberSequence } from '@/lib/types/check';
+import type { CheckNumberSequence, CheckWithDetails } from '@/lib/types/check';
 
 interface WriteCheckDialogProps {
   communityId: string;
@@ -74,6 +75,7 @@ export function WriteCheckDialog({
   const [bankAccountId, setBankAccountId] = useState('');
   const [sequenceId, setSequenceId] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [testPrintOpen, setTestPrintOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -153,6 +155,52 @@ export function WriteCheckDialog({
     setExpenseAccountId('');
     setBankAccountId(sequences.length ? '' : '');
     setSequenceId(sequences.length ? sequences[0].id : '');
+  }
+
+  function buildTestCheck(): CheckWithDetails {
+    const payeeName = isCustomPayee
+      ? customPayee || 'Test Payee'
+      : vendors.find((v) => v.id === selectedVendorId)?.name || 'Test Payee';
+    const amountCents = Math.round(parseFloat(amount || '0') * 100) || 125000;
+    const expenseAcct = expenseAccounts.find((a) => a.id === expenseAccountId);
+    const bankAcct = bankAccounts.find((a) => a.id === bankAccountId);
+    const seq = sequences.find((s) => s.id === sequenceId);
+
+    return {
+      id: 'test-print',
+      community_id: communityId,
+      check_number: seq?.next_check_number ?? 1001,
+      check_sequence_id: sequenceId || '',
+      date: date || new Date().toISOString().split('T')[0],
+      amount: amountCents,
+      payee_vendor_id: isCustomPayee ? null : selectedVendorId,
+      payee_name: payeeName,
+      memo: memo || null,
+      expense_account_id: expenseAccountId || '',
+      bank_account_id: bankAccountId || '',
+      status: 'draft',
+      created_by: null,
+      printed_at: null,
+      voided_at: null,
+      voided_by: null,
+      void_reason: null,
+      journal_entry_id: null,
+      bank_transaction_id: null,
+      check_image_path: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      expense_account: expenseAcct ? { code: expenseAcct.code, name: expenseAcct.name } : { code: '0000', name: 'Expense' },
+      bank_account: bankAcct ? { code: bankAcct.code, name: bankAcct.name } : { code: '1000', name: 'Bank Account' },
+    };
+  }
+
+  function handleTestPrint() {
+    const payeeName = isCustomPayee ? customPayee : vendors.find((v) => v.id === selectedVendorId)?.name;
+    if (!payeeName) {
+      toast.error('Enter a payee name to test print.');
+      return;
+    }
+    setTestPrintOpen(true);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -413,18 +461,40 @@ export function WriteCheckDialog({
               </div>
             )}
 
-            <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
+            <div className="flex items-center justify-between pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleTestPrint}
+                className="text-text-secondary-light dark:text-text-secondary-dark"
+              >
+                <Printer className="h-3.5 w-3.5 mr-1.5" />
+                Test Print
               </Button>
-              <Button type="submit" disabled={submitting}>
-                {submitting && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-                Write Check
-              </Button>
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={submitting}>
+                  {submitting && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+                  Write Check
+                </Button>
+              </div>
             </div>
           </form>
         )}
       </DialogContent>
+
+      {/* Test print preview (no DB record created) */}
+      {testPrintOpen && (
+        <CheckPrintPreview
+          check={buildTestCheck()}
+          communityId={communityId}
+          open={testPrintOpen}
+          onOpenChange={setTestPrintOpen}
+        />
+      )}
     </Dialog>
   );
 }
