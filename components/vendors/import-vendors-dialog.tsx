@@ -29,6 +29,7 @@ import {
   CheckCircle,
   Download,
   Plus,
+  ChevronRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -163,6 +164,7 @@ export function ImportVendorsDialog({
   const [localCategories, setLocalCategories] = useState<VendorCategoryRow[]>([]);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [creatingCategory, setCreatingCategory] = useState(false);
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
 
   function reset() {
     setStep('upload');
@@ -180,6 +182,7 @@ export function ImportVendorsDialog({
     setLocalCategories([]);
     setNewCategoryName('');
     setCreatingCategory(false);
+    setExpandedCategory(null);
   }
 
   function handleOpenChange(isOpen: boolean) {
@@ -460,11 +463,16 @@ export function ImportVendorsDialog({
     [],
   );
 
-  // Count how many vendors use each file category
+  // Count vendors per file category and build vendor name lists
   const categoryCounts: Record<string, number> = {};
+  const categoryVendorNames: Record<string, string[]> = {};
   for (const v of parsedVendors) {
     const cat = v.category.trim();
-    if (cat) categoryCounts[cat] = (categoryCounts[cat] ?? 0) + 1;
+    if (cat) {
+      categoryCounts[cat] = (categoryCounts[cat] ?? 0) + 1;
+      if (!categoryVendorNames[cat]) categoryVendorNames[cat] = [];
+      categoryVendorNames[cat].push(v.name + (v.company && v.company !== v.name ? ` (${v.company})` : ''));
+    }
   }
 
   return (
@@ -661,41 +669,69 @@ export function ImportVendorsDialog({
 
               {uniqueFileCategories.map((fileCat) => {
                 const isAutoMatched = tryAutoMatch(fileCat, categories) !== null;
+                const isExpanded = expandedCategory === fileCat;
+                const vendorNames = categoryVendorNames[fileCat] ?? [];
                 return (
                   <div
                     key={fileCat}
-                    className="flex items-center gap-3 px-3 py-2 rounded-inner-card border border-stroke-light dark:border-stroke-dark"
+                    className="rounded-inner-card border border-stroke-light dark:border-stroke-dark overflow-hidden"
                   >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-body font-medium text-text-primary-light dark:text-text-primary-dark truncate">
-                        {fileCat}
-                      </p>
-                      <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                        {categoryCounts[fileCat] ?? 0} vendor{(categoryCounts[fileCat] ?? 0) !== 1 ? 's' : ''}
-                        {isAutoMatched && (
-                          <span className="ml-1.5 text-green-600 dark:text-green-400">
-                            (auto-matched)
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                    <div className="w-48 shrink-0">
-                      <Select
-                        value={categoryMapping[fileCat] || '_general'}
-                        onValueChange={(v) => handleCategoryMappingChange(fileCat, v)}
+                    <div className="flex items-center gap-3 px-3 py-2">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedCategory(isExpanded ? null : fileCat)}
+                        className="shrink-0 p-0.5 rounded hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors"
                       >
-                        <SelectTrigger className="h-8 text-label">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {localCategories.map((cat) => (
-                            <SelectItem key={cat.id} value={cat.id}>
-                              {cat.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        <ChevronRight
+                          className={`h-3.5 w-3.5 text-text-muted-light dark:text-text-muted-dark transition-transform duration-150 ${isExpanded ? 'rotate-90' : ''}`}
+                        />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedCategory(isExpanded ? null : fileCat)}
+                        className="flex-1 min-w-0 text-left"
+                      >
+                        <p className="text-body font-medium text-text-primary-light dark:text-text-primary-dark truncate">
+                          {fileCat}
+                        </p>
+                        <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                          {categoryCounts[fileCat] ?? 0} vendor{(categoryCounts[fileCat] ?? 0) !== 1 ? 's' : ''}
+                          {isAutoMatched && (
+                            <span className="ml-1.5 text-green-600 dark:text-green-400">
+                              (auto-matched)
+                            </span>
+                          )}
+                        </p>
+                      </button>
+                      <div className="w-48 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <Select
+                          value={categoryMapping[fileCat] || '_general'}
+                          onValueChange={(v) => handleCategoryMappingChange(fileCat, v)}
+                        >
+                          <SelectTrigger className="h-8 text-label">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {localCategories.map((cat) => (
+                              <SelectItem key={cat.id} value={cat.id}>
+                                {cat.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
+                    {isExpanded && vendorNames.length > 0 && (
+                      <div className="px-3 pb-2 pt-0 ml-8">
+                        <div className="rounded-lg bg-surface-light-2 dark:bg-surface-dark-2 px-3 py-2 space-y-0.5">
+                          {vendorNames.map((name, i) => (
+                            <p key={i} className="text-meta text-text-secondary-light dark:text-text-secondary-dark">
+                              {name}
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
