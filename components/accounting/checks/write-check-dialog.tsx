@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useParams } from 'next/navigation';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { createCheck } from '@/lib/actions/check-actions';
 import { Button } from '@/components/shared/ui/button';
@@ -57,6 +59,8 @@ export function WriteCheckDialog({
   onCheckCreated,
   preselectedVendorId,
 }: WriteCheckDialogProps) {
+  const params = useParams();
+  const slug = params.slug as string;
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [expenseAccounts, setExpenseAccounts] = useState<Account[]>([]);
   const [bankAccounts, setBankAccounts] = useState<Account[]>([]);
@@ -282,7 +286,15 @@ export function WriteCheckDialog({
               No check sequences configured.
             </p>
             <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-              Set up a check number sequence in Settings before writing checks.
+              Set up a{' '}
+              <Link
+                href={`/${slug}/accounting?tab=checks&subtab=settings`}
+                onClick={() => onOpenChange(false)}
+                className="text-secondary-400 underline underline-offset-2 hover:text-secondary-300"
+              >
+                check number sequence
+              </Link>
+              {' '}before writing checks.
             </p>
           </div>
         ) : (

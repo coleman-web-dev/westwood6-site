@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { BookOpen } from 'lucide-react';
@@ -73,11 +74,27 @@ type JournalSubtab = (typeof JOURNAL_SUBTABS)[number]['id'];
 
 export default function AccountingPage() {
   const { isBoard, canRead, community } = useCommunity();
-  const [activeTab, setActiveTab] = useState<Tab>('inbox');
-  const [reportTab, setReportTab] = useState<ReportSubtab>('trial-balance');
-  const [bankingTab, setBankingTab] = useState<BankingSubtab>('connections');
-  const [journalTab, setJournalTab] = useState<JournalSubtab>('entries');
-  const [checksTab, setChecksTab] = useState<'register' | 'settings'>('register');
+  const searchParams = useSearchParams();
+
+  // Allow deep-linking via ?tab=checks&subtab=settings
+  const initialTab = (searchParams.get('tab') as Tab) || 'inbox';
+  const initialSubtab = searchParams.get('subtab') || '';
+
+  const [activeTab, setActiveTab] = useState<Tab>(
+    TABS.some((t) => t.id === initialTab) ? initialTab : 'inbox',
+  );
+  const [reportTab, setReportTab] = useState<ReportSubtab>(
+    REPORT_SUBTABS.some((t) => t.id === initialSubtab) ? (initialSubtab as ReportSubtab) : 'trial-balance',
+  );
+  const [bankingTab, setBankingTab] = useState<BankingSubtab>(
+    BANKING_SUBTABS.some((t) => t.id === initialSubtab) ? (initialSubtab as BankingSubtab) : 'connections',
+  );
+  const [journalTab, setJournalTab] = useState<JournalSubtab>(
+    JOURNAL_SUBTABS.some((t) => t.id === initialSubtab) ? (initialSubtab as JournalSubtab) : 'entries',
+  );
+  const [checksTab, setChecksTab] = useState<'register' | 'settings'>(
+    initialSubtab === 'settings' ? 'settings' : 'register',
+  );
   const [isSetUp, setIsSetUp] = useState<boolean | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [pendingCount, setPendingCount] = useState(0);
