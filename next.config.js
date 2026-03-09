@@ -6,6 +6,7 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
 const ContentSecurityPolicy = `
   default-src 'self';
   script-src 'self' 'unsafe-eval' 'unsafe-inline' *.vercel-analytics.com *.vercel-scripts.com *.cloudflareinsights.com cdn.plaid.com;
+  worker-src 'self' blob:;
   frame-src 'self' cdn.plaid.com;
   style-src 'self' 'unsafe-inline';
   img-src *.supabase.co * blob: data:;

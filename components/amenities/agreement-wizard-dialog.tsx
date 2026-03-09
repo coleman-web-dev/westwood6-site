@@ -138,7 +138,7 @@ export function AgreementWizardDialog({
     try {
       const pdfjsLib = await import('pdfjs-dist');
 
-      // Use local worker from public/ instead of CDN (avoids CORS/ad-blocker issues)
+      // Use local worker from public/ (excluded from middleware via matcher config)
       pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
       const arrayBuffer = await file.arrayBuffer();
