@@ -119,6 +119,16 @@ export interface CheckPrintSettings {
   check_stock_image?: string;
   /** Page margin in inches used in print output (default 0.4, matches Chrome default) */
   print_margin?: number;
+  /** ID of the active layout template, or 'custom' if manually modified */
+  template_id?: string;
+}
+
+/** A predefined check layout template with field positions */
+export interface CheckLayoutTemplate {
+  id: string;
+  name: string;
+  description: string;
+  fieldPositions: Record<CheckFieldId, CheckFieldLayout>;
 }
 
 // ─── Form Types ─────────────────────────────────────────────────────

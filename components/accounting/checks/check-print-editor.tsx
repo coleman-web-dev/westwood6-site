@@ -7,8 +7,15 @@ import { Input } from '@/components/shared/ui/input';
 import { Label } from '@/components/shared/ui/label';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/shared/ui/popover';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/shared/ui/select';
+import {
   Printer, Loader2, Move, Upload, Trash2, RotateCcw, Image as ImageIcon,
-  Eye, EyeOff, Minus, Plus, X, Type, Tag,
+  Eye, EyeOff, Minus, Plus, X, Type, Tag, LayoutTemplate,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -21,6 +28,7 @@ import {
   CHECK_WIDTH_IN,
   SECTION_HEIGHT_IN,
   DEFAULT_FIELD_POSITIONS,
+  CHECK_LAYOUT_TEMPLATES,
   FIELD_LABELS,
   numberToWords,
   formatDate,
@@ -93,6 +101,31 @@ function snap(value: number): number {
 
 function roundTo2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+/** Compare field positions to each template, return matching ID or 'custom' */
+function detectActiveTemplate(
+  positions: Record<CheckFieldId, CheckFieldLayout>,
+): string {
+  for (const template of CHECK_LAYOUT_TEMPLATES) {
+    let matches = true;
+    for (const fieldId of ALL_FIELD_IDS) {
+      const a = positions[fieldId];
+      const b = template.fieldPositions[fieldId];
+      if (
+        a.top !== b.top ||
+        a.left !== b.left ||
+        a.fontSize !== b.fontSize ||
+        a.showLine !== b.showLine ||
+        (a.visible ?? true) !== (b.visible ?? true)
+      ) {
+        matches = false;
+        break;
+      }
+    }
+    if (matches) return template.id;
+  }
+  return 'custom';
 }
 
 // ─── Field content renderer ──────────────────────────────────────────
@@ -179,6 +212,7 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
     { ...DEFAULT_FIELD_POSITIONS },
   );
   const [selectedField, setSelectedField] = useState<CheckFieldId | null>(null);
+  const [activeTemplateId, setActiveTemplateId] = useState<string>('standard');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [bgImageUrl, setBgImageUrl] = useState<string | null>(null);
@@ -286,6 +320,7 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
           };
         }
         setFieldPositions(merged);
+        setActiveTemplateId(data.template_id ?? detectActiveTemplate(merged));
       } else {
         // Migrate from legacy global offsets
         const ox = data.offset_x || 0;
@@ -299,6 +334,7 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
           };
         }
         setFieldPositions(migrated);
+        setActiveTemplateId(detectActiveTemplate(migrated));
       }
 
       // Load background image
@@ -315,6 +351,13 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
     }
     load();
   }, [communityId]);
+
+  // ── Auto-detect template when field positions change ────────────────
+
+  useEffect(() => {
+    if (loading) return;
+    setActiveTemplateId(detectActiveTemplate(fieldPositions));
+  }, [fieldPositions, loading]);
 
   // ── Pixels-per-inch scale factor for mouse tracking ─────────────────
 
@@ -427,6 +470,7 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
     const updatedSettings: CheckPrintSettings = {
       ...settings,
       field_positions: fieldPositions,
+      template_id: activeTemplateId,
     };
     const result = await updateCheckPrintSettings(communityId, updatedSettings);
     setSaving(false);
@@ -555,8 +599,37 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
   // ── Reset layout ──────────────────────────────────────────────────
 
   function handleResetLayout() {
-    setFieldPositions({ ...DEFAULT_FIELD_POSITIONS });
-    toast.success('Layout reset to defaults.');
+    const template = CHECK_LAYOUT_TEMPLATES.find((t) => t.id === activeTemplateId);
+    if (template) {
+      const reset = {} as Record<CheckFieldId, CheckFieldLayout>;
+      for (const fid of ALL_FIELD_IDS) {
+        reset[fid] = {
+          ...template.fieldPositions[fid],
+          showLabel: fieldPositions[fid].showLabel, // preserve label prefs
+        };
+      }
+      setFieldPositions(reset);
+    } else {
+      setFieldPositions({ ...DEFAULT_FIELD_POSITIONS });
+    }
+    toast.success('Layout reset to template defaults.');
+  }
+
+  function handleSelectTemplate(templateId: string) {
+    if (templateId === 'custom') return;
+    const template = CHECK_LAYOUT_TEMPLATES.find((t) => t.id === templateId);
+    if (!template) return;
+
+    const newPositions = {} as Record<CheckFieldId, CheckFieldLayout>;
+    for (const fid of ALL_FIELD_IDS) {
+      newPositions[fid] = {
+        ...template.fieldPositions[fid],
+        showLabel: fieldPositions[fid].showLabel, // preserve label prefs
+      };
+    }
+    setFieldPositions(newPositions);
+    setActiveTemplateId(templateId);
+    toast.success(`Applied "${template.name}" layout.`);
   }
 
   // ── Field property updates ─────────────────────────────────────────
@@ -982,6 +1055,48 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
             })}
           </div>
         </div>
+      </div>
+
+      {/* ─── Layout Template ──────────────────────────────────────────── */}
+      <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <LayoutTemplate className="h-4 w-4 text-text-muted-light dark:text-text-muted-dark" />
+            <h3 className="text-section-title text-text-primary-light dark:text-text-primary-dark">
+              Layout Template
+            </h3>
+          </div>
+          {activeTemplateId === 'custom' && (
+            <span className="text-meta text-amber-600 dark:text-amber-400 font-medium">
+              Custom layout
+            </span>
+          )}
+        </div>
+        <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+          Choose a preset that matches your check stock, then fine-tune field positions if needed.
+        </p>
+        <Select value={activeTemplateId} onValueChange={handleSelectTemplate}>
+          <SelectTrigger className="h-9">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {CHECK_LAYOUT_TEMPLATES.map((template) => (
+              <SelectItem key={template.id} value={template.id}>
+                <div>
+                  <span>{template.name}</span>
+                  <span className="ml-2 text-meta text-text-muted-light dark:text-text-muted-dark">
+                    {template.description}
+                  </span>
+                </div>
+              </SelectItem>
+            ))}
+            {activeTemplateId === 'custom' && (
+              <SelectItem value="custom" disabled>
+                Custom (manually adjusted)
+              </SelectItem>
+            )}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* ─── Controls ─────────────────────────────────────────────────── */}

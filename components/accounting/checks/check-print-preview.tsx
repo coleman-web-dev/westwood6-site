@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from '@/components/shared/ui/dialog';
 import { Printer, Info } from 'lucide-react';
-import type { CheckWithDetails, CheckSignature, CheckPrintSettings, CheckFieldId, CheckFieldLayout } from '@/lib/types/check';
+import type { CheckWithDetails, CheckSignature, CheckPrintSettings, CheckFieldId, CheckFieldLayout, CheckLayoutTemplate } from '@/lib/types/check';
 
 // ─── Constants ──────────────────────────────────────────────────────
 // Standard US check stock: 8.5" x 11" letter, divided into 3 sections
@@ -33,6 +33,53 @@ export const DEFAULT_FIELD_POSITIONS: Record<CheckFieldId, CheckFieldLayout> = {
   memo:          { top: 2.60, left: 0.40, showLine: true, fontSize: 9, visible: true },
   signatureLine: { top: 2.50, left: 5.50, showLine: true, fontSize: 7, visible: true },
 };
+
+// ─── Layout Templates ────────────────────────────────────────────────
+// Standard check stock formats. "Custom" is a virtual entry (not in this array),
+// auto-detected when the user modifies any field position.
+
+export const CHECK_LAYOUT_TEMPLATES: CheckLayoutTemplate[] = [
+  {
+    id: 'standard',
+    name: 'Standard (QuickBooks)',
+    description: 'Most common layout. Works with QuickBooks, Quicken, and most check stock.',
+    fieldPositions: { ...DEFAULT_FIELD_POSITIONS },
+  },
+  {
+    id: 'compact',
+    name: 'Compact',
+    description: 'Fields packed tighter for check stock with less vertical space.',
+    fieldPositions: {
+      payerName:     { top: 0.15, left: 0.35, showLine: false, fontSize: 10, visible: true },
+      payerAddress1: { top: 0.35, left: 0.35, showLine: false, fontSize: 8,  visible: true },
+      payerAddress2: { top: 0.50, left: 0.35, showLine: false, fontSize: 8,  visible: true },
+      checkNumber:   { top: 0.15, left: 6.80, showLine: false, fontSize: 11, visible: true },
+      date:          { top: 0.40, left: 6.20, showLine: true,  fontSize: 9,  visible: true },
+      payTo:         { top: 0.85, left: 0.35, showLine: true,  fontSize: 10, visible: true },
+      amountBox:     { top: 0.80, left: 6.50, showLine: false, fontSize: 10, visible: true },
+      amountWords:   { top: 1.20, left: 0.35, showLine: true,  fontSize: 8,  visible: true },
+      memo:          { top: 2.20, left: 0.35, showLine: true,  fontSize: 8,  visible: true },
+      signatureLine: { top: 2.10, left: 5.50, showLine: true,  fontSize: 7,  visible: true },
+    },
+  },
+  {
+    id: 'no-payer',
+    name: 'No Payer Info (Pre-Printed)',
+    description: 'Hides payer name and address. Use when your check stock has them pre-printed.',
+    fieldPositions: {
+      payerName:     { top: 0.25, left: 0.40, showLine: false, fontSize: 11, visible: false },
+      payerAddress1: { top: 0.50, left: 0.40, showLine: false, fontSize: 9,  visible: false },
+      payerAddress2: { top: 0.70, left: 0.40, showLine: false, fontSize: 9,  visible: false },
+      checkNumber:   { top: 0.25, left: 6.80, showLine: false, fontSize: 12, visible: true },
+      date:          { top: 0.55, left: 6.20, showLine: true,  fontSize: 10, visible: true },
+      payTo:         { top: 1.10, left: 0.40, showLine: true,  fontSize: 11, visible: true },
+      amountBox:     { top: 1.05, left: 6.50, showLine: false, fontSize: 11, visible: true },
+      amountWords:   { top: 1.50, left: 0.40, showLine: true,  fontSize: 9,  visible: true },
+      memo:          { top: 2.60, left: 0.40, showLine: true,  fontSize: 9,  visible: true },
+      signatureLine: { top: 2.50, left: 5.50, showLine: true,  fontSize: 7,  visible: true },
+    },
+  },
+];
 
 /** Human-readable labels for each check field */
 export const FIELD_LABELS: Record<CheckFieldId, string> = {
