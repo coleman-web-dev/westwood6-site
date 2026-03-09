@@ -1,8 +1,19 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
+import { rateLimit, getClientIp } from '@/lib/rate-limit';
 
 export async function POST(request: Request) {
   try {
+    // Rate limit: 5 demo requests per IP per 15 minutes
+    const ip = getClientIp(request);
+    const limiter = rateLimit(`demo-request:${ip}`, 5);
+    if (!limiter.success) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429 },
+      );
+    }
+
     const body = await request.json();
     const { name, email, community_name, unit_count, phone, message } = body;
 

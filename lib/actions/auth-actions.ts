@@ -2,22 +2,20 @@
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { logAuditEvent } from '@/lib/audit';
-
-// Check if a member with this email exists (for first-timer detection on login page)
-export async function checkMemberExists(email: string): Promise<boolean> {
-  const supabase = createAdminClient();
-  const { count } = await supabase
-    .from('members')
-    .select('*', { count: 'exact', head: true })
-    .eq('email', email)
-    .eq('is_approved', true);
-  return (count ?? 0) > 0;
-}
+import { rateLimit } from '@/lib/rate-limit';
 
 // Send a password setup/reset link to the given email
+// Rate limited to 3 requests per email per 15 minutes to prevent abuse
 export async function sendPasswordSetupLink(
   email: string,
 ): Promise<{ success: boolean; error?: string }> {
+  // Rate limit by email to prevent password reset flooding
+  const limiter = rateLimit(`password-setup:${email.toLowerCase()}`, 3);
+  if (!limiter.success) {
+    // Return success to not leak info, but don't actually send
+    return { success: true };
+  }
+
   const supabase = createAdminClient();
 
   // Try to generate a recovery link. If the user does not exist in auth,

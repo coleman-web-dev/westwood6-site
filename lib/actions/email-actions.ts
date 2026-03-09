@@ -1,6 +1,46 @@
 'use server';
 
 import { queueAnnouncementNotification, queueWelcomeInvite, queueEventNotification } from '@/lib/email/queue';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient } from '@/lib/supabase/server';
+
+/**
+ * Verify the caller is an authenticated board member of the given community.
+ * Returns { authorized: true } or { authorized: false, error: string }.
+ */
+async function requireBoardAuth(communityId: string): Promise<
+  { authorized: true } | { authorized: false; error: string }
+> {
+  const userClient = await createClient();
+  const { data: { user }, error: authError } = await userClient.auth.getUser();
+
+  if (authError || !user) {
+    return { authorized: false, error: 'Authentication required' };
+  }
+
+  const supabase = createAdminClient();
+  const { data: member } = await supabase
+    .from('members')
+    .select('system_role')
+    .eq('user_id', user.id)
+    .eq('community_id', communityId)
+    .single();
+
+  if (!member) {
+    return { authorized: false, error: 'Not a member of this community' };
+  }
+
+  const isBoardOrHigher =
+    member.system_role === 'board' ||
+    member.system_role === 'manager' ||
+    member.system_role === 'super_admin';
+
+  if (!isBoardOrHigher) {
+    return { authorized: false, error: 'Board member access required' };
+  }
+
+  return { authorized: true };
+}
 
 export async function sendAnnouncementEmails(
   communityId: string,
@@ -9,6 +49,11 @@ export async function sendAnnouncementEmails(
   body: string,
   priority: string,
 ) {
+  const auth = await requireBoardAuth(communityId);
+  if (!auth.authorized) {
+    return { success: false, error: auth.error };
+  }
+
   try {
     await queueAnnouncementNotification(communityId, communitySlug, title, body, priority);
     return { success: true };
@@ -24,6 +69,11 @@ export async function sendWelcomeInvites(
   communityName: string,
   members: { email: string; name: string }[],
 ) {
+  const auth = await requireBoardAuth(communityId);
+  if (!auth.authorized) {
+    return { success: false, error: auth.error };
+  }
+
   try {
     for (const m of members) {
       await queueWelcomeInvite(communityId, communitySlug, communityName, m.email, m.name);
@@ -45,6 +95,11 @@ export async function sendEventNotificationEmails(
   endDatetime: string,
   notifyRoles: string[],
 ) {
+  const auth = await requireBoardAuth(communityId);
+  if (!auth.authorized) {
+    return { success: false, error: auth.error };
+  }
+
   try {
     await queueEventNotification(
       communityId,
@@ -64,6 +119,11 @@ export async function sendEventNotificationEmails(
 }
 
 export async function sendPaymentReminders(communityId: string) {
+  const auth = await requireBoardAuth(communityId);
+  if (!auth.authorized) {
+    return { success: false, error: auth.error };
+  }
+
   try {
     const cronSecret = process.env.CRON_SECRET;
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://duesiq.com';

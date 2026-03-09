@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripeClient } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient } from '@/lib/supabase/server';
 
 /**
  * GET /api/stripe/connect/callback
  * Return URL after Stripe onboarding. The user is redirected here after
  * completing (or exiting) the Stripe Express onboarding flow.
  * Checks account status and redirects to the community settings page.
+ * Requires board member authentication.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -17,7 +19,37 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(new URL('/', req.url));
     }
 
+    // Verify the user is authenticated
+    const userClient = await createClient();
+    const { data: { user }, error: authError } = await userClient.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.redirect(new URL('/login', req.url));
+    }
+
     const supabase = createAdminClient();
+
+    // Verify user is a board member of this community
+    const { data: callerMember } = await supabase
+      .from('members')
+      .select('system_role')
+      .eq('user_id', user.id)
+      .eq('community_id', communityId)
+      .single();
+
+    if (!callerMember) {
+      return NextResponse.redirect(new URL('/', req.url));
+    }
+
+    const isBoardOrHigher =
+      callerMember.system_role === 'board' ||
+      callerMember.system_role === 'manager' ||
+      callerMember.system_role === 'super_admin';
+
+    if (!isBoardOrHigher) {
+      return NextResponse.redirect(new URL('/', req.url));
+    }
+
     const stripe = getStripeClient();
 
     // Get the stripe_accounts row for this community

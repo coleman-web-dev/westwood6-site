@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripeClient } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient } from '@/lib/supabase/server';
 
 /**
  * POST /api/stripe/connect
  * Creates a Stripe Express connected account and returns an onboarding link.
  * Accepts { communityId } in the request body.
+ * Requires board member authentication.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -18,7 +20,45 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Verify the user is authenticated and is a board member
+    const userClient = await createClient();
+    const { data: { user }, error: authError } = await userClient.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
     const supabase = createAdminClient();
+
+    // Verify user is a board member of this community
+    const { data: callerMember } = await supabase
+      .from('members')
+      .select('system_role')
+      .eq('user_id', user.id)
+      .eq('community_id', communityId)
+      .single();
+
+    if (!callerMember) {
+      return NextResponse.json(
+        { error: 'Member not found for this community' },
+        { status: 403 }
+      );
+    }
+
+    const isBoardOrHigher =
+      callerMember.system_role === 'board' ||
+      callerMember.system_role === 'manager' ||
+      callerMember.system_role === 'super_admin';
+
+    if (!isBoardOrHigher) {
+      return NextResponse.json(
+        { error: 'Board member access required' },
+        { status: 403 }
+      );
+    }
     const stripe = getStripeClient();
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://duesiq.com';
 

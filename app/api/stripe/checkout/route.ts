@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripeClient } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient } from '@/lib/supabase/server';
 
 /**
  * POST /api/stripe/checkout
  * Creates a Stripe Checkout Session for an invoice payment.
  * Body: { invoiceId, communityId, successUrl, cancelUrl }
+ * Requires authentication. Verifies the user belongs to the invoice's unit.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -18,7 +20,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Verify the user is authenticated
+    const userClient = await createClient();
+    const { data: { user }, error: authError } = await userClient.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
     const supabase = createAdminClient();
+
+    // Verify the user belongs to this community
+    const { data: callerMember } = await supabase
+      .from('members')
+      .select('id, unit_id, system_role')
+      .eq('user_id', user.id)
+      .eq('community_id', communityId)
+      .single();
+
+    if (!callerMember) {
+      return NextResponse.json(
+        { error: 'You do not belong to this community' },
+        { status: 403 }
+      );
+    }
     const stripe = getStripeClient();
 
     // Look up the invoice
@@ -33,6 +61,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: 'Invoice not found' },
         { status: 404 }
+      );
+    }
+
+    // Verify the authenticated user owns this invoice's unit (or is board)
+    const isBoardOrHigher =
+      callerMember.system_role === 'board' ||
+      callerMember.system_role === 'manager' ||
+      callerMember.system_role === 'super_admin';
+
+    if (!isBoardOrHigher && callerMember.unit_id !== invoice.unit_id) {
+      return NextResponse.json(
+        { error: 'You do not have permission to pay this invoice' },
+        { status: 403 }
       );
     }
 

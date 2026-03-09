@@ -417,6 +417,75 @@ const { isBoard } = useCommunity();
 
 In development, `[slug]/layout.tsx` injects a mock super_admin member when no real Supabase connection exists, so all features are accessible without auth setup.
 
+## Security Guidelines
+
+DuesIQ is a multi-tenant app handling financial data. Every feature must be built with security in mind. Follow these rules strictly:
+
+### Authentication & Authorization
+
+- **Every API route** (`app/api/**/route.ts`) that modifies data or returns sensitive data MUST verify authentication using `createClient()` + `getUser()` before doing anything else. Never use `createAdminClient()` without first authenticating the caller.
+- **Every server action** (`'use server'` functions in `lib/actions/`) that performs privileged operations MUST verify the caller is authenticated and authorized (e.g., board member check) before executing. Server actions are callable from any client code.
+- **Board-only operations** must check `system_role IN ('board', 'manager', 'super_admin')` on the server side, not just hide UI elements.
+- **Cron/webhook endpoints** must verify their respective secrets (`CRON_SECRET`, `STRIPE_WEBHOOK_SECRET`) before processing.
+
+### Multi-Tenant Data Isolation
+
+- All database queries MUST be scoped to the user's `community_id`. Never allow cross-community data access.
+- Storage bucket policies MUST scope access by community (e.g., file paths prefixed with `community_id`).
+- RLS policies are the last line of defense but should not be the only line. Always add application-level checks too.
+
+### Information Leakage
+
+- Never reveal whether an email address exists in the system. Password reset flows should always return success regardless of whether the email was found.
+- Error messages sent to clients should be generic. Log detailed errors server-side only.
+- Use timing-safe comparison (`crypto.timingSafeEqual`) for any token/secret verification.
+
+### Rate Limiting
+
+- Public endpoints (no auth required) MUST have rate limiting using `lib/rate-limit.ts`.
+- Password reset and email-sending endpoints should be rate-limited per email address.
+
+### Input Validation
+
+- Sanitize filenames before using in storage paths (strip `../` and special characters).
+- Enforce file size limits on all upload endpoints.
+- Validate and sanitize all user input on the server side, even if client-side validation exists.
+
+### Environment & Secrets
+
+- Never fall back to weak default values for secrets. If a required secret is missing, throw an error.
+- The dev bypass in middleware must be protected against accidental activation in production (check `VERCEL_ENV`).
+
+### Webhooks & Idempotency
+
+- Webhook handlers must be idempotent. Check for duplicate events before processing (e.g., check if `stripe_session_id` already exists).
+- Always verify webhook signatures before processing payloads.
+
+### Reference Pattern for Authenticated API Routes
+
+```typescript
+import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+
+// 1. Authenticate first
+const userClient = await createClient();
+const { data: { user }, error: authError } = await userClient.auth.getUser();
+if (authError || !user) {
+  return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+}
+
+// 2. Then use admin client for authorized operations
+const supabase = createAdminClient();
+
+// 3. Verify community membership / role
+const { data: member } = await supabase
+  .from('members')
+  .select('system_role')
+  .eq('user_id', user.id)
+  .eq('community_id', communityId)
+  .single();
+```
+
 ## Writing Style
 
 - NEVER use em dashes or en dashes in any customer-facing material. Use commas, periods, or rewrite the sentence instead.

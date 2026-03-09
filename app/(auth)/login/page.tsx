@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import {
-  checkMemberExists,
   sendPasswordSetupLink,
   logLoginAttempt,
 } from '@/lib/actions/auth-actions';
@@ -51,17 +50,16 @@ function LoginForm() {
     });
 
     if (authError) {
-      // Check if this is a member who has not set their password yet
-      if (authError.message === 'Invalid login credentials') {
-        const memberExists = await checkMemberExists(email);
-        if (memberExists) {
-          setNeedsPasswordSetup(true);
-          setLoading(false);
-          return;
-        }
-      }
       logLoginAttempt(email, false);
-      setError(authError.message);
+      // Show both the error and a "first time?" option so users who need
+      // to set their password can do so, without revealing whether the
+      // email exists in the system (prevents email enumeration).
+      if (authError.message === 'Invalid login credentials') {
+        setError(authError.message);
+        setNeedsPasswordSetup(true);
+      } else {
+        setError(authError.message);
+      }
       setLoading(false);
       return;
     }
@@ -281,17 +279,17 @@ function LoginForm() {
     );
   }
 
-  // State: needs password setup (member exists but login failed)
+  // State: needs password setup (login failed, offer first-time setup)
   if (needsPasswordSetup) {
     return (
       <div className="rounded-panel p-card-padding bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark surface-elevation">
         <div className="text-center mb-6">
           <h1 className="text-page-title text-text-primary-light dark:text-text-primary-dark">
-            Set up your password
+            Unable to sign in
           </h1>
           <p className="text-body text-text-muted-light dark:text-text-muted-dark mt-2">
-            It looks like you need to set your password. We can send you a link
-            to get started.
+            The email or password you entered is incorrect. If this is your
+            first time signing in, you may need to set up your password.
           </p>
         </div>
 
@@ -320,7 +318,7 @@ function LoginForm() {
               }}
               className="text-meta text-secondary-500 dark:text-secondary-400 hover:text-secondary-600 dark:hover:text-secondary-300 transition-colors"
             >
-              Back to login
+              Try again
             </button>
           </div>
         </div>
