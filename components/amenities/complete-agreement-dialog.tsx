@@ -127,13 +127,20 @@ export function CompleteAgreementDialog({
     }
 
     // Notify the unit's household about inspection completion
+    const { data: unitMembers } = await supabase
+      .from('members')
+      .select('id')
+      .eq('unit_id', agreement.unit_id)
+      .eq('community_id', community.id);
+
     await supabase.rpc('create_member_notifications', {
-      p_unit_id: agreement.unit_id,
+      p_community_id: community.id,
       p_type: 'general',
       p_title: `${agreement.amenities?.name ?? 'Amenity'} inspection completed`,
       p_body: `The post-event inspection for your ${agreement.amenities?.name ?? 'amenity'} reservation has been completed.`,
       p_reference_id: agreement.reservation_id,
       p_reference_type: 'reservation',
+      p_member_ids: (unitMembers ?? []).map((m) => m.id),
     }).catch(() => {
       // Non-critical: don't fail the whole operation if notification fails
     });

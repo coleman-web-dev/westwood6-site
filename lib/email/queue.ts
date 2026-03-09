@@ -470,6 +470,99 @@ export async function queueEventNotification(
 }
 
 /**
+ * Queue reservation notification emails to all board members.
+ */
+export async function queueReservationBoardNotification(
+  communityId: string,
+  communitySlug: string,
+  amenityName: string,
+  memberName: string,
+  unitNumber: string,
+  startDatetime: string,
+  endDatetime: string,
+  purpose: string | null,
+  guestCount: number | null,
+  feeAmount: number,
+  depositAmount: number,
+  status: 'pending' | 'approved',
+) {
+  const supabase = createAdminClient();
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://duesiq.com';
+
+  const { data: community } = await supabase
+    .from('communities')
+    .select('name')
+    .eq('id', communityId)
+    .single();
+
+  // Get board/manager/super_admin members
+  const { data: boardMembers } = await supabase
+    .from('members')
+    .select('id, email, first_name, last_name, system_role')
+    .eq('community_id', communityId)
+    .eq('is_approved', true)
+    .in('system_role', ['board', 'manager', 'super_admin'])
+    .not('email', 'is', null);
+
+  if (!boardMembers || boardMembers.length === 0) return;
+
+  const communityName = community?.name || 'Your Community';
+
+  const start = new Date(startDatetime);
+  const end = new Date(endDatetime);
+  const isFullDay = end.getTime() - start.getTime() >= 23 * 60 * 60 * 1000;
+
+  const date = start.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  const startTime = start.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+  const endTime = end.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+
+  const fee = feeAmount > 0 ? `$${(feeAmount / 100).toFixed(2)}` : '$0.00';
+  const deposit = depositAmount > 0 ? `$${(depositAmount / 100).toFixed(2)}` : '$0.00';
+
+  const items: QueueEmailParams[] = boardMembers.map((m) => ({
+    communityId,
+    recipientMemberId: m.id,
+    recipientEmail: m.email!,
+    recipientName: `${m.first_name} ${m.last_name}`,
+    category: 'reservation_update' as EmailCategory,
+    priority: 'normal' as EmailPriority,
+    subject: status === 'pending'
+      ? `${communityName}: New ${amenityName} reservation request`
+      : `${communityName}: New ${amenityName} reservation`,
+    templateId: 'reservation-board-notification',
+    templateData: {
+      communityName,
+      amenityName,
+      memberName,
+      unitNumber,
+      date,
+      startTime: isFullDay ? 'Full day' : startTime,
+      endTime: isFullDay ? '' : endTime,
+      purpose: purpose || undefined,
+      guestCount: guestCount?.toString() || undefined,
+      fee,
+      deposit,
+      status,
+      dashboardUrl: `${baseUrl}/${communitySlug}/amenities`,
+      unsubscribeUrl: buildUnsubscribeUrl(m.id, 'reservation_update', communitySlug),
+    },
+  }));
+
+  return queueBulkEmails(items);
+}
+
+/**
  * Queue a violation notice email for the head-of-household of the affected unit.
  */
 export async function queueViolationNotice(

@@ -8,7 +8,7 @@ import { Badge } from '@/components/shared/ui/badge';
 import { Button } from '@/components/shared/ui/button';
 import { DepositReturnDialog } from '@/components/amenities/deposit-return-dialog';
 import { SignedAgreementViewer } from '@/components/amenities/signed-agreement-viewer';
-import { FileSignature, ClipboardCheck } from 'lucide-react';
+import { FileSignature, ClipboardCheck, CheckCircle2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Reservation, ReservationStatus } from '@/lib/types/database';
 
@@ -128,6 +128,80 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
     );
   }
 
+  async function handleApprove(reservation: ReservationWithAmenity) {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('reservations')
+      .update({ status: 'approved' as ReservationStatus })
+      .eq('id', reservation.id);
+
+    if (error) {
+      toast.error('Failed to approve reservation.');
+      return;
+    }
+
+    toast.success('Reservation approved.');
+    setReservations((prev) =>
+      prev.map((r) =>
+        r.id === reservation.id ? { ...r, status: 'approved' as ReservationStatus } : r
+      )
+    );
+
+    // Notify the member's household
+    const { data: unitMembers } = await supabase
+      .from('members')
+      .select('id')
+      .eq('unit_id', reservation.unit_id)
+      .eq('community_id', community.id);
+
+    await supabase.rpc('create_member_notifications', {
+      p_community_id: community.id,
+      p_type: 'reservation_approved',
+      p_title: `${reservation.amenities?.name ?? 'Amenity'} reservation approved`,
+      p_body: `Your reservation for ${reservation.amenities?.name ?? 'the amenity'} has been approved.`,
+      p_reference_id: reservation.id,
+      p_reference_type: 'reservation',
+      p_member_ids: (unitMembers ?? []).map((m) => m.id),
+    }).catch(() => {});
+  }
+
+  async function handleDeny(reservation: ReservationWithAmenity) {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('reservations')
+      .update({ status: 'denied' as ReservationStatus })
+      .eq('id', reservation.id);
+
+    if (error) {
+      toast.error('Failed to deny reservation.');
+      return;
+    }
+
+    toast.success('Reservation denied.');
+    setReservations((prev) =>
+      prev.map((r) =>
+        r.id === reservation.id ? { ...r, status: 'denied' as ReservationStatus } : r
+      )
+    );
+
+    // Notify the member's household
+    const { data: unitMembers } = await supabase
+      .from('members')
+      .select('id')
+      .eq('unit_id', reservation.unit_id)
+      .eq('community_id', community.id);
+
+    await supabase.rpc('create_member_notifications', {
+      p_community_id: community.id,
+      p_type: 'reservation_denied',
+      p_title: `${reservation.amenities?.name ?? 'Amenity'} reservation denied`,
+      p_body: `Your reservation for ${reservation.amenities?.name ?? 'the amenity'} has been denied.`,
+      p_reference_id: reservation.id,
+      p_reference_type: 'reservation',
+      p_member_ids: (unitMembers ?? []).map((m) => m.id),
+    }).catch(() => {});
+  }
+
   function handleDepositReturnSuccess() {
     // Refetch reservations to get updated deposit status
     const supabase = createClient();
@@ -194,6 +268,11 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
                 )}
                 <Badge variant={badge.variant}>{badge.label}</Badge>
               </div>
+              {isBoard && r.units && (
+                <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                  Unit {r.units.unit_number}{unitOwnerMap[r.unit_id] ? ` - ${unitOwnerMap[r.unit_id]}` : ''}
+                </p>
+              )}
               <p className="text-meta text-text-muted-light dark:text-text-muted-dark mt-0.5">
                 {isFullDay
                   ? format(new Date(r.start_datetime), 'MMM d, yyyy')
@@ -218,7 +297,31 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
             </div>
 
             <div className="flex gap-2 shrink-0">
-              {canCancel && (
+              {/* Board approve/deny for pending reservations */}
+              {isBoard && r.status === 'pending' && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-950/40"
+                    onClick={() => handleApprove(r)}
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                    Approve
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/40"
+                    onClick={() => handleDeny(r)}
+                  >
+                    <XCircle className="h-3.5 w-3.5 mr-1" />
+                    Deny
+                  </Button>
+                </>
+              )}
+
+              {canCancel && !isBoard && (
                 <Button
                   variant="outline"
                   size="sm"

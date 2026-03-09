@@ -362,6 +362,28 @@ export function ReservationDialog({
         p_reference_id: reservationData.id,
         p_reference_type: 'reservation',
       });
+
+      // Queue email notification to board members (fire-and-forget)
+      fetch('/api/email/reservation-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          communityId: community.id,
+          communitySlug: community.slug,
+          amenityName: amenity.name,
+          memberName: resolved.name,
+          unitNumber: resolved.unitNumber,
+          startDatetime: startDate.toISOString(),
+          endDatetime: endDate.toISOString(),
+          purpose: purpose.trim() || null,
+          guestCount: guestCount ? parseInt(guestCount, 10) : null,
+          feeAmount: amenity.fee,
+          depositAmount: amenity.deposit,
+          status: amenity.auto_approve ? 'approved' : 'pending',
+        }),
+      }).catch(() => {
+        // Non-critical: don't fail the reservation if email fails
+      });
     }
 
     setSubmitting(false);

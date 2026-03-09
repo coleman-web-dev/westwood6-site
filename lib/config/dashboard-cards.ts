@@ -123,4 +123,13 @@ export const CARD_REGISTRY: Record<DashboardCardId, DashboardCardConfig> = {
     defaultW: 6,
     defaultH: 6,
   },
+  'board-tasks': {
+    id: 'board-tasks',
+    title: 'Board Tasks',
+    icon: 'ClipboardCheck',
+    minW: 3,
+    minH: 3,
+    defaultW: 6,
+    defaultH: 4,
+  },
 };
