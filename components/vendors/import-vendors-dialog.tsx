@@ -10,7 +10,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogClose,
 } from '@/components/shared/ui/dialog';
 import { Button } from '@/components/shared/ui/button';
 import {
@@ -49,8 +48,8 @@ type Step = 'upload' | 'mapping' | 'preview' | 'importing' | 'done';
 
 const VENDOR_FIELDS: { value: keyof ParsedVendor | ''; label: string }[] = [
   { value: '', label: 'Skip this column' },
-  { value: 'name', label: 'Name *' },
-  { value: 'company', label: 'Company' },
+  { value: 'name', label: 'Contact Name' },
+  { value: 'company', label: 'Company Name' },
   { value: 'phone', label: 'Phone' },
   { value: 'email', label: 'Email' },
   { value: 'category', label: 'Category' },
@@ -201,10 +200,12 @@ export function ImportVendorsDialog({
   }
 
   function handleProceedToPreview() {
-    // Validate that at least "name" is mapped
-    const hasName = Object.values(columnMapping).includes('name');
-    if (!hasName) {
-      toast.error('You must map at least the "Name" column.');
+    // Validate that at least "name" or "company" is mapped
+    const mappedFields = Object.values(columnMapping);
+    const hasName = mappedFields.includes('name');
+    const hasCompany = mappedFields.includes('company');
+    if (!hasName && !hasCompany) {
+      toast.error('You must map at least "Contact Name" or "Company Name".');
       return;
     }
 
@@ -458,11 +459,24 @@ export function ImportVendorsDialog({
         {step === 'mapping' && (
           <div className="space-y-4 py-2">
             <p className="text-body text-text-secondary-light dark:text-text-secondary-dark">
-              We detected {headers.length} columns. Map each column to a vendor field, or skip
-              columns you don&apos;t need. At minimum, &quot;Name&quot; is required.
+              We detected {headers.length} columns in your file. Match each column to a vendor
+              field, or skip columns you don&apos;t need. Each vendor needs at least a contact
+              name or company name.
             </p>
 
             <div className="space-y-2">
+              {/* Column headers */}
+              <div className="flex items-center gap-3 px-3 pb-1">
+                <p className="flex-1 text-meta font-semibold uppercase tracking-wide text-text-muted-light dark:text-text-muted-dark">
+                  Your File
+                </p>
+                <div className="w-44 shrink-0">
+                  <p className="text-meta font-semibold uppercase tracking-wide text-text-muted-light dark:text-text-muted-dark">
+                    Import As
+                  </p>
+                </div>
+              </div>
+
               {headers.map((header) => (
                 <div
                   key={header}
@@ -531,7 +545,7 @@ export function ImportVendorsDialog({
 
             <p className="text-body text-text-secondary-light dark:text-text-secondary-dark">
               Ready to import <span className="font-semibold text-text-primary-light dark:text-text-primary-dark">{parsedVendors.length}</span> vendor{parsedVendors.length !== 1 ? 's' : ''}.
-              Duplicates (by name) will be skipped automatically.
+              Vendors without a contact name will use their company name. Duplicates will be skipped automatically.
             </p>
 
             {/* Preview table */}

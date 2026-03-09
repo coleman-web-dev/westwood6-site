@@ -292,9 +292,10 @@ export function parseVendorsCSV(
     const rowNum = i + 1;
 
     const name = getField(row, 'name');
+    const company = getField(row, 'company');
 
-    if (!name) {
-      errors.push(`Row ${rowNum}: Missing required field "name".`);
+    if (!name && !company) {
+      errors.push(`Row ${rowNum}: Must have at least a "Name" or "Company".`);
       continue;
     }
 
@@ -305,8 +306,9 @@ export function parseVendorsCSV(
     }
 
     data.push({
-      name,
-      company: getField(row, 'company'),
+      // If no name provided, use company as the name
+      name: name || company,
+      company,
       phone: getField(row, 'phone'),
       email,
       category: getField(row, 'category'),
