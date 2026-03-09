@@ -115,16 +115,16 @@ export function VendorList({ vendors, loading, onSelect, onWriteCheck }: VendorL
               </div>
               {onWriteCheck && (
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
-                  className="shrink-0 text-text-muted-light dark:text-text-muted-dark hover:text-text-primary-light dark:hover:text-text-primary-dark"
+                  className="shrink-0 self-center"
                   onClick={(e) => {
                     e.stopPropagation();
                     onWriteCheck(v);
                   }}
-                  title="Write check"
                 >
-                  <Printer className="h-4 w-4" />
+                  <Printer className="h-3.5 w-3.5 mr-1.5" />
+                  Print Check
                 </Button>
               )}
             </div>
