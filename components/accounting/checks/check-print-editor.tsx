@@ -798,7 +798,6 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
                 <Popover
                   key={fieldId}
                   open={isSelected}
-                  onOpenChange={(open) => { if (!open) setSelectedField(null); }}
                   modal={false}
                 >
                   <PopoverTrigger asChild>
@@ -848,6 +847,9 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
                       align="start"
                       className="w-auto min-w-[240px] p-0 shadow-lg"
                       onOpenAutoFocus={(e) => e.preventDefault()}
+                      onPointerDownOutside={(e) => e.preventDefault()}
+                      onInteractOutside={(e) => e.preventDefault()}
+                      onFocusOutside={(e) => e.preventDefault()}
                     >
                       {/* ─── Floating field editor toolbar ─── */}
                       <div className="p-2 space-y-1.5">
