@@ -167,6 +167,7 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [bgImageUrl, setBgImageUrl] = useState<string | null>(null);
+  const [bgIsPdf, setBgIsPdf] = useState(false);
   const [uploadingBg, setUploadingBg] = useState(false);
 
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -214,6 +215,7 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
           .from('hoa-documents')
           .createSignedUrl(data.check_stock_image, 3600);
         setBgImageUrl(urlData?.signedUrl || null);
+        setBgIsPdf(data.check_stock_image.toLowerCase().endsWith('.pdf'));
       }
 
       setLoading(false);
@@ -390,12 +392,14 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
   // ── Background image upload ────────────────────────────────────────
 
   async function handleBgUpload(file: File) {
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please upload an image file (PNG, JPG).');
+    const isImage = file.type.startsWith('image/');
+    const isPdf = file.type === 'application/pdf';
+    if (!isImage && !isPdf) {
+      toast.error('Please upload a PNG, JPG, or PDF file.');
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be under 5MB.');
+      toast.error('File must be under 5MB.');
       return;
     }
 
@@ -428,6 +432,7 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
       .from('hoa-documents')
       .createSignedUrl(filePath, 3600);
     setBgImageUrl(urlData?.signedUrl || null);
+    setBgIsPdf(ext.toLowerCase() === 'pdf');
     setUploadingBg(false);
     toast.success('Check stock image uploaded.');
   }
@@ -445,6 +450,7 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
     await updateCheckPrintSettings(communityId, updatedSettings);
     setSettings(updatedSettings);
     setBgImageUrl(null);
+    setBgIsPdf(false);
     toast.success('Background image removed.');
   }
 
@@ -535,15 +541,26 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
           }}
           onClick={() => setSelectedField(null)}
         >
-          {/* Background image */}
+          {/* Background image / PDF */}
           {bgImageUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={bgImageUrl}
-              alt="Check stock background"
-              className="absolute inset-0 w-full h-full object-fill pointer-events-none"
-              style={{ opacity: 0.35 }}
-            />
+            bgIsPdf ? (
+              <object
+                data={bgImageUrl}
+                type="application/pdf"
+                className="absolute inset-0 w-full h-full pointer-events-none"
+                style={{ opacity: 0.35 }}
+              >
+                <p className="text-meta text-center p-4">PDF preview not supported in this browser</p>
+              </object>
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={bgImageUrl}
+                alt="Check stock background"
+                className="absolute inset-0 w-full h-full object-fill pointer-events-none"
+                style={{ opacity: 0.35 }}
+              />
+            )
           )}
 
           {/* Grid dots */}
@@ -738,12 +755,23 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
           {bgImageUrl ? (
             <div className="space-y-2">
               <div className="rounded-lg border border-gray-200 overflow-hidden bg-white">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={bgImageUrl}
-                  alt="Check stock"
-                  className="w-full h-auto object-contain max-h-20"
-                />
+                {bgIsPdf ? (
+                  <div className="flex items-center gap-2 p-3">
+                    <div className="shrink-0 w-8 h-8 rounded bg-red-100 flex items-center justify-center text-red-600 text-meta font-bold">
+                      PDF
+                    </div>
+                    <span className="text-meta text-text-secondary-light dark:text-text-secondary-dark truncate">
+                      blank-check.pdf
+                    </span>
+                  </div>
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={bgImageUrl}
+                    alt="Check stock"
+                    className="w-full h-auto object-contain max-h-20"
+                  />
+                )}
               </div>
               <div className="flex gap-2">
                 <Button
@@ -787,7 +815,10 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
                 <>
                   <ImageIcon className="h-5 w-5 text-text-muted-light dark:text-text-muted-dark mb-1.5" />
                   <p className="text-meta text-text-secondary-light dark:text-text-secondary-dark text-center">
-                    Drop image or click to upload
+                    Drop file or click to upload
+                  </p>
+                  <p className="text-meta text-text-muted-light dark:text-text-muted-dark text-center">
+                    PNG, JPG, or PDF
                   </p>
                 </>
               )}
@@ -808,7 +839,7 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,.pdf,application/pdf"
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
