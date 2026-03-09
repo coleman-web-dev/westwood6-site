@@ -3,7 +3,14 @@
  *
  * System variables are auto-filled from the reservation context.
  * Custom field answers come from the member's form responses.
+ * Fields can be phased: 'reservation' (filled by member at booking)
+ * or 'post_event' (filled by board after the event).
  */
+
+import type { AgreementField } from '@/lib/types/database';
+
+/** Marker text inserted for post-event placeholders during reservation signing */
+export const POST_EVENT_PLACEHOLDER = '[To be completed after event]';
 
 export const SYSTEM_VARIABLES = [
   { key: 'member_name', label: 'Member Name', example: 'John Smith' },
@@ -118,4 +125,94 @@ export function fillTemplateWithExamples(
     systemExamples[v.key] = v.example;
   }
   return fillAgreementTemplate(template, systemExamples, customFieldExamples);
+}
+
+// ─── Phase-aware helpers ─────────────────────────────────────────────
+
+/**
+ * Split agreement fields into reservation-phase and post-event-phase groups.
+ * Fields without a fill_phase default to 'reservation'.
+ */
+export function partitionFieldsByPhase(fields: AgreementField[]): {
+  reservationFields: AgreementField[];
+  postEventFields: AgreementField[];
+} {
+  const reservationFields: AgreementField[] = [];
+  const postEventFields: AgreementField[] = [];
+
+  for (const field of fields) {
+    if (field.fill_phase === 'post_event') {
+      postEventFields.push(field);
+    } else {
+      reservationFields.push(field);
+    }
+  }
+
+  return { reservationFields, postEventFields };
+}
+
+/**
+ * Fill template for the reservation phase.
+ * System variables + reservation-phase field answers are filled normally.
+ * Post-event field placeholders get a styled marker: "[To be completed after event]".
+ */
+export function fillAgreementForReservation(
+  template: string,
+  systemContext: Record<string, string>,
+  fieldAnswers: Record<string, string>,
+  postEventKeys: Set<string>,
+): string {
+  const allValues: Record<string, string> = { ...systemContext, ...fieldAnswers };
+  return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (_match, key: string) => {
+    if (postEventKeys.has(key)) {
+      return POST_EVENT_PLACEHOLDER;
+    }
+    return allValues[key] ?? `{{${key}}}`;
+  });
+}
+
+/**
+ * Fill template HTML for the reservation phase.
+ * Post-event placeholders show as italic styled markers instead of underlined values.
+ */
+export function fillAgreementForReservationHtml(
+  template: string,
+  systemContext: Record<string, string>,
+  fieldAnswers: Record<string, string>,
+  postEventKeys: Set<string>,
+): string {
+  const allValues: Record<string, string> = { ...systemContext, ...fieldAnswers };
+  const escaped = escapeHtml(template);
+  return escaped.replace(/\{\{\s*(\w+)\s*\}\}/g, (_match, key: string) => {
+    if (postEventKeys.has(key)) {
+      return `<em style="color: var(--text-muted); font-style: italic;">${POST_EVENT_PLACEHOLDER}</em>`;
+    }
+    const val = allValues[key];
+    if (val) return `<u>${escapeHtml(val)}</u>`;
+    return `{{${key}}}`;
+  });
+}
+
+/**
+ * Replace post-event placeholder markers in already-filled text with actual values.
+ * Used when the board completes the post-event inspection.
+ */
+export function fillPostEventFields(
+  filledText: string,
+  postEventAnswers: Record<string, string>,
+  postEventKeys: Set<string>,
+  originalTemplate: string,
+  systemContext: Record<string, string>,
+  reservationAnswers: Record<string, string>,
+): string {
+  // Merge all answers: reservation + post-event
+  const allValues: Record<string, string> = {
+    ...systemContext,
+    ...reservationAnswers,
+    ...postEventAnswers,
+  };
+  // Re-fill from the original template with all values now available
+  return originalTemplate.replace(/\{\{\s*(\w+)\s*\}\}/g, (_match, key: string) => {
+    return allValues[key] ?? `{{${key}}}`;
+  });
 }

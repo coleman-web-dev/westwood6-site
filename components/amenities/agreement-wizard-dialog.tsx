@@ -45,7 +45,8 @@ import {
   SYSTEM_VARIABLES,
   fillTemplateWithExamples,
 } from '@/lib/utils/agreement-template';
-import type { AgreementField, AgreementFieldType } from '@/lib/types/database';
+import type { AgreementField, AgreementFieldType, AgreementFieldPhase } from '@/lib/types/database';
+import { partitionFieldsByPhase } from '@/lib/utils/agreement-template';
 
 interface AgreementWizardDialogProps {
   open: boolean;
@@ -299,6 +300,7 @@ export function AgreementWizardDialog({
       label: '',
       type: 'text',
       required: true,
+      fill_phase: 'reservation',
     };
     setFields((prev) => [...prev, newField]);
     setEditingFieldId(newField.id);
@@ -576,8 +578,8 @@ export function AgreementWizardDialog({
                 </Button>
               </div>
               <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                These questions will be asked when a member makes a reservation. System fields
-                (name, dates, amounts) are filled automatically.
+                Questions filled during reservation by the member, or after the event by the board.
+                System fields (name, dates, amounts) are filled automatically.
               </p>
 
               {fields.length === 0 ? (
@@ -657,7 +659,27 @@ export function AgreementWizardDialog({
                                 <span className="text-meta text-text-muted-light dark:text-text-muted-dark">{'}}'}</span>
                               </div>
                             </div>
-                            <div className="flex items-end gap-3 pb-1">
+                            <div className="space-y-1">
+                              <label className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                                When filled
+                              </label>
+                              <Select
+                                value={field.fill_phase ?? 'reservation'}
+                                onValueChange={(v) =>
+                                  updateField(field.id, { fill_phase: v as AgreementFieldPhase })
+                                }
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="reservation">During reservation (member)</SelectItem>
+                                  <SelectItem value="post_event">After event (board)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          <div className="flex items-end gap-3 pb-1">
                               <label className="flex items-center gap-2 cursor-pointer">
                                 <Switch
                                   checked={field.required}
@@ -669,7 +691,6 @@ export function AgreementWizardDialog({
                                   Required
                                 </span>
                               </label>
-                            </div>
                           </div>
                           {field.type === 'select' && (
                             <div className="space-y-1">
@@ -723,6 +744,11 @@ export function AgreementWizardDialog({
                               <Badge variant="outline" className="text-[10px] shrink-0">
                                 {FIELD_TYPE_BADGE[field.type]}
                               </Badge>
+                              {field.fill_phase === 'post_event' && (
+                                <Badge variant="outline" className="text-[10px] shrink-0 border-amber-400/50 text-amber-600 dark:text-amber-400">
+                                  Post-event
+                                </Badge>
+                              )}
                               {field.required && (
                                 <span className="text-red-500 text-meta">*</span>
                               )}
@@ -835,28 +861,57 @@ export function AgreementWizardDialog({
               </div>
             </ScrollArea>
 
-            {fields.length > 0 && (
-              <div className="space-y-1">
-                <h4 className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-                  Questions that will be asked:
-                </h4>
-                <ul className="space-y-1">
-                  {fields.map((f) => (
-                    <li
-                      key={f.id}
-                      className="flex items-center gap-2 text-body text-text-secondary-light dark:text-text-secondary-dark"
-                    >
-                      <span className="w-1.5 h-1.5 rounded-full bg-secondary-400 shrink-0" />
-                      {f.label}
-                      {f.required && <span className="text-red-500 text-meta">*</span>}
-                      <Badge variant="outline" className="text-[10px]">
-                        {FIELD_TYPE_BADGE[f.type]}
-                      </Badge>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            {fields.length > 0 && (() => {
+              const { reservationFields, postEventFields } = partitionFieldsByPhase(fields);
+              return (
+                <div className="space-y-3">
+                  {reservationFields.length > 0 && (
+                    <div className="space-y-1">
+                      <h4 className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                        Questions asked during reservation:
+                      </h4>
+                      <ul className="space-y-1">
+                        {reservationFields.map((f) => (
+                          <li
+                            key={f.id}
+                            className="flex items-center gap-2 text-body text-text-secondary-light dark:text-text-secondary-dark"
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-secondary-400 shrink-0" />
+                            {f.label}
+                            {f.required && <span className="text-red-500 text-meta">*</span>}
+                            <Badge variant="outline" className="text-[10px]">
+                              {FIELD_TYPE_BADGE[f.type]}
+                            </Badge>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {postEventFields.length > 0 && (
+                    <div className="space-y-1">
+                      <h4 className="text-label text-amber-600 dark:text-amber-400">
+                        Completed after event (board only):
+                      </h4>
+                      <ul className="space-y-1">
+                        {postEventFields.map((f) => (
+                          <li
+                            key={f.id}
+                            className="flex items-center gap-2 text-body text-text-secondary-light dark:text-text-secondary-dark"
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                            {f.label}
+                            {f.required && <span className="text-red-500 text-meta">*</span>}
+                            <Badge variant="outline" className="text-[10px]">
+                              {FIELD_TYPE_BADGE[f.type]}
+                            </Badge>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
 

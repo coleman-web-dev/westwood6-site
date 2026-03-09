@@ -8,7 +8,7 @@ import { Badge } from '@/components/shared/ui/badge';
 import { Button } from '@/components/shared/ui/button';
 import { DepositReturnDialog } from '@/components/amenities/deposit-return-dialog';
 import { SignedAgreementViewer } from '@/components/amenities/signed-agreement-viewer';
-import { FileSignature } from 'lucide-react';
+import { FileSignature, ClipboardCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Reservation, ReservationStatus } from '@/lib/types/database';
 
@@ -20,7 +20,7 @@ interface MyReservationsProps {
 type ReservationWithAmenity = Reservation & {
   amenities: { name: string };
   units: { unit_number: string };
-  signed_agreements: { id: string }[] | null;
+  signed_agreements: { id: string; post_event_completed: boolean }[] | null;
 };
 
 const STATUS_BADGE: Record<ReservationStatus, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
@@ -49,7 +49,7 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
     async function fetch() {
       let query = supabase
         .from('reservations')
-        .select('*, amenities(name), units(unit_number), signed_agreements(id)')
+        .select('*, amenities(name), units(unit_number), signed_agreements(id, post_event_completed)')
         .order('start_datetime', { ascending: false })
         .limit(20);
 
@@ -133,7 +133,7 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
     const supabase = createClient();
     let query = supabase
       .from('reservations')
-      .select('*, amenities(name), units(unit_number), signed_agreements(id)')
+      .select('*, amenities(name), units(unit_number), signed_agreements(id, post_event_completed)')
       .order('start_datetime', { ascending: false })
       .limit(20);
 
@@ -250,14 +250,22 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
 
               {/* View signed agreement */}
               {r.signed_agreements && r.signed_agreements.length > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setViewingAgreementId(r.id)}
-                >
-                  <FileSignature className="h-4 w-4 mr-1" />
-                  Agreement
-                </Button>
+                <>
+                  {isBoard && !isFuture(new Date(r.start_datetime)) && r.signed_agreements.some((a) => !a.post_event_completed) && (
+                    <Badge variant="outline" className="text-[10px] border-amber-400/50 text-amber-600 dark:text-amber-400">
+                      <ClipboardCheck className="h-3 w-3 mr-0.5" />
+                      Pending inspection
+                    </Badge>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setViewingAgreementId(r.id)}
+                  >
+                    <FileSignature className="h-4 w-4 mr-1" />
+                    Agreement
+                  </Button>
+                </>
               )}
             </div>
           </div>

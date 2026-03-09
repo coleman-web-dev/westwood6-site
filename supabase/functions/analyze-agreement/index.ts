@@ -136,7 +136,13 @@ Return a JSON object with exactly this structure:
   "summary": "Brief description of what you changed"
 }
 
-Each field object must have: id (UUID string), key (lowercase_underscore), label (question text), type (text|number|yes_no|select|date), required (boolean). Include "options" array only for select type.
+Each field object must have: id (UUID string), key (lowercase_underscore), label (question text), type (text|number|yes_no|select|date), required (boolean), fill_phase ("reservation" or "post_event"). Include "options" array only for select type.
+
+fill_phase rules:
+- "reservation" = filled by the member when they book the reservation (default)
+- "post_event" = filled by a board member after the event (inspection checklist items, board member signatures, post-inspection notes, damage assessment, deposit return decisions, condition reports)
+- If a field is about post-rental inspection, board-only actions, or things that happen after the event, set fill_phase to "post_event"
+- When in doubt, default to "reservation"
 
 Keep any existing field IDs unchanged if the field still exists. Generate new UUIDs only for new fields.
 
@@ -178,7 +184,8 @@ Return a JSON object with exactly this structure:
       "type": "text|number|yes_no|select|date",
       "required": true/false,
       "options": ["option1", "option2"],
-      "placeholder": "Optional input placeholder text"
+      "placeholder": "Optional input placeholder text",
+      "fill_phase": "reservation"
     }
   ],
   "summary": "Brief 1-2 sentence description of what was found"
@@ -186,6 +193,17 @@ Return a JSON object with exactly this structure:
 
 Only include "options" array for fields with type "select".
 Generate a unique UUID for each field's "id".
+
+fill_phase must be either "reservation" or "post_event":
+- "reservation" (default): filled by the member when they make the reservation
+- "post_event": filled by a board member after the event has occurred
+Set fill_phase to "post_event" for fields related to:
+  - Post-rental or post-event inspection items and checklists
+  - Board member signatures or names on inspection sections
+  - Damage assessment, condition reports, or cleaning status
+  - Deposit return decisions (full refund, partial, forfeited)
+  - Any field that logically cannot be answered until after the event
+When in doubt, default to "reservation".
 
 Here is the rental agreement text to analyze:
 

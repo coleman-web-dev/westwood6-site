@@ -50,8 +50,9 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
   buildSystemContext,
-  fillAgreementTemplate,
-  fillAgreementTemplateHtml,
+  fillAgreementForReservation,
+  fillAgreementForReservationHtml,
+  partitionFieldsByPhase,
 } from '@/lib/utils/agreement-template';
 import { formatAgreementHtml } from '@/lib/utils/format-agreement';
 import type { Amenity, Member, Unit } from '@/lib/types/database';
@@ -221,8 +222,7 @@ export function ReservationDialog({
       return;
     }
 
-    // Validate required custom fields
-    const agreementFields = amenity.agreement_fields ?? [];
+    // Validate only reservation-phase fields (not post-event ones)
     for (const field of agreementFields) {
       if (field.required && !fieldAnswers[field.key]?.trim()) {
         toast.error(`Please answer: ${field.label}`);
@@ -247,18 +247,21 @@ export function ReservationDialog({
       signingDate: format(new Date(), 'MMMM d, yyyy'),
     });
 
-    const filled = fillAgreementTemplate(
+    // Use phase-aware fill: reservation fields get values, post-event fields get placeholder marker
+    const filled = fillAgreementForReservation(
       amenity.agreement_template!,
       systemContext,
       fieldAnswers,
+      postEventKeys,
     );
     setFilledAgreement(filled);
 
-    // Build formatted HTML version with underlined values and paragraphs
-    const htmlRaw = fillAgreementTemplateHtml(
+    // Build formatted HTML version with underlined values and styled post-event placeholders
+    const htmlRaw = fillAgreementForReservationHtml(
       amenity.agreement_template!,
       systemContext,
       fieldAnswers,
+      postEventKeys,
     );
     setFilledAgreementHtml(formatAgreementHtml(htmlRaw));
     setESignConsent(false);
@@ -379,7 +382,9 @@ export function ReservationDialog({
     onSuccess();
   }
 
-  const agreementFields = amenity.agreement_fields ?? [];
+  const allAgreementFields = amenity.agreement_fields ?? [];
+  const { reservationFields: agreementFields, postEventFields } = partitionFieldsByPhase(allAgreementFields);
+  const postEventKeys = new Set(postEventFields.map((f) => f.key));
 
   return (
     <>

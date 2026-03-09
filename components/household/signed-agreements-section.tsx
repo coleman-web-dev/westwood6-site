@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/shared/ui/button';
+import { Badge } from '@/components/shared/ui/badge';
 import { SignedAgreementViewer } from '@/components/amenities/signed-agreement-viewer';
 import { FileSignature } from 'lucide-react';
 
@@ -12,6 +13,7 @@ interface SignedAgreementRow {
   reservation_id: string;
   signer_name: string;
   signed_at: string;
+  post_event_completed: boolean;
   amenities: { name: string };
   reservations: { start_datetime: string };
 }
@@ -31,7 +33,7 @@ export function SignedAgreementsSection({ unitId }: SignedAgreementsSectionProps
     async function fetchAgreements() {
       const { data } = await supabase
         .from('signed_agreements')
-        .select('id, reservation_id, signer_name, signed_at, amenities(name), reservations(start_datetime)')
+        .select('id, reservation_id, signer_name, signed_at, post_event_completed, amenities(name), reservations(start_datetime)')
         .eq('unit_id', unitId)
         .order('signed_at', { ascending: false })
         .limit(20);
@@ -70,9 +72,16 @@ export function SignedAgreementsSection({ unitId }: SignedAgreementsSectionProps
             className="flex items-center justify-between gap-3 py-dense-row-y px-dense-row-x rounded-inner-card bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark"
           >
             <div className="flex-1 min-w-0">
-              <span className="text-label text-text-primary-light dark:text-text-primary-dark truncate block">
-                {a.amenities?.name ?? 'Agreement'}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-label text-text-primary-light dark:text-text-primary-dark truncate">
+                  {a.amenities?.name ?? 'Agreement'}
+                </span>
+                {!a.post_event_completed && a.reservations?.start_datetime && new Date(a.reservations.start_datetime) < new Date() && (
+                  <Badge variant="outline" className="text-[10px] border-amber-400/50 text-amber-600 dark:text-amber-400 shrink-0">
+                    Pending inspection
+                  </Badge>
+                )}
+              </div>
               <p className="text-meta text-text-muted-light dark:text-text-muted-dark mt-0.5">
                 Signed by {a.signer_name} on {format(new Date(a.signed_at), 'MMM d, yyyy')}
                 {a.reservations?.start_datetime && (

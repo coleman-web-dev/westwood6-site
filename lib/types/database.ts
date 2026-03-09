@@ -237,6 +237,7 @@ export interface Payment {
 }
 
 export type AgreementFieldType = 'text' | 'number' | 'yes_no' | 'select' | 'date';
+export type AgreementFieldPhase = 'reservation' | 'post_event';
 
 export interface AgreementField {
   id: string;
@@ -246,6 +247,7 @@ export interface AgreementField {
   required: boolean;
   options?: string[];
   placeholder?: string;
+  fill_phase?: AgreementFieldPhase; // defaults to 'reservation' if absent
 }
 
 export interface Amenity {
@@ -387,6 +389,11 @@ export interface SignedAgreement {
   field_answers: Record<string, string>;
   signed_at: string;
   created_at: string;
+  // Post-event inspection tracking
+  post_event_completed: boolean;
+  post_event_field_answers: Record<string, string> | null;
+  post_event_completed_by: string | null;
+  post_event_completed_at: string | null;
 }
 
 export type NotificationType =
