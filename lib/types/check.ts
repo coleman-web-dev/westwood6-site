@@ -84,12 +84,25 @@ export interface CheckSettings {
 
 export type CheckPosition = 'top' | 'middle' | 'bottom';
 
+/** Position of a single check field in inches from top-left of check section */
+export interface CheckFieldLayout {
+  top: number;        // inches from top of check section
+  left: number;       // inches from left edge of page
+  showLine: boolean;  // whether to render underline/border for this field
+}
+
+export type CheckFieldId =
+  | 'payerName' | 'payerAddress1' | 'payerAddress2'
+  | 'checkNumber' | 'date'
+  | 'payTo' | 'amountBox' | 'amountWords'
+  | 'memo' | 'signatureLine';
+
 export interface CheckPrintSettings {
   /** Where the check is on the page: top, middle, or bottom third */
   check_position: CheckPosition;
-  /** Horizontal offset in inches (positive = right, negative = left) */
+  /** Horizontal offset in inches (legacy, ignored when field_positions exists) */
   offset_x: number;
-  /** Vertical offset in inches (positive = down, negative = up) */
+  /** Vertical offset in inches (legacy, ignored when field_positions exists) */
   offset_y: number;
   /** Community/HOA name printed on the check */
   payer_name: string;
@@ -97,6 +110,10 @@ export interface CheckPrintSettings {
   payer_address_line1: string;
   /** Payer address line 2 (city, state, zip) */
   payer_address_line2: string;
+  /** Per-field position overrides. When present, offset_x/offset_y are ignored */
+  field_positions?: Record<CheckFieldId, CheckFieldLayout>;
+  /** Supabase storage path for uploaded blank check image (editor background) */
+  check_stock_image?: string;
 }
 
 // ─── Form Types ─────────────────────────────────────────────────────

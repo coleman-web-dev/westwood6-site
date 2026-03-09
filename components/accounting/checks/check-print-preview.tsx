@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from '@/components/shared/ui/dialog';
 import { Printer, Info } from 'lucide-react';
-import type { CheckWithDetails, CheckSignature, CheckPrintSettings } from '@/lib/types/check';
+import type { CheckWithDetails, CheckSignature, CheckPrintSettings, CheckFieldId, CheckFieldLayout } from '@/lib/types/check';
 
 // ─── Constants ──────────────────────────────────────────────────────
 // Standard US check stock: 8.5" x 11" letter, divided into 3 sections
@@ -19,9 +19,37 @@ import type { CheckWithDetails, CheckSignature, CheckPrintSettings } from '@/lib
 export const SECTION_HEIGHT_IN = 3.667;
 export const CHECK_WIDTH_IN = 8.5;
 
-// Field positions within the check area (inches from top-left of check section)
-// These positions match standard blank check stock (e.g., VersaCheck, Deluxe)
-const FIELD_POSITIONS = {
+// Default field positions within the check area (inches from top-left of check section)
+// All positions use left-based coordinates for consistency with drag-and-drop editor
+export const DEFAULT_FIELD_POSITIONS: Record<CheckFieldId, CheckFieldLayout> = {
+  payerName:     { top: 0.25, left: 0.40, showLine: false },
+  payerAddress1: { top: 0.50, left: 0.40, showLine: false },
+  payerAddress2: { top: 0.70, left: 0.40, showLine: false },
+  checkNumber:   { top: 0.25, left: 6.80, showLine: false },
+  date:          { top: 0.55, left: 6.20, showLine: true },
+  payTo:         { top: 1.10, left: 0.40, showLine: true },
+  amountBox:     { top: 1.05, left: 6.50, showLine: false },
+  amountWords:   { top: 1.50, left: 0.40, showLine: true },
+  memo:          { top: 2.60, left: 0.40, showLine: true },
+  signatureLine: { top: 2.50, left: 5.50, showLine: true },
+};
+
+/** Human-readable labels for each check field */
+export const FIELD_LABELS: Record<CheckFieldId, string> = {
+  payerName: 'Payer Name',
+  payerAddress1: 'Address Line 1',
+  payerAddress2: 'Address Line 2',
+  checkNumber: 'Check Number',
+  date: 'Date',
+  payTo: 'Pay To',
+  amountBox: 'Amount',
+  amountWords: 'Amount in Words',
+  memo: 'Memo',
+  signatureLine: 'Signature',
+};
+
+// Legacy field positions for backward compatibility (used when field_positions is not set)
+const LEGACY_FIELD_POSITIONS = {
   payerName: { top: 0.25, left: 0.4 },
   payerAddress1: { top: 0.5, left: 0.4 },
   payerAddress2: { top: 0.7, left: 0.4 },
@@ -174,6 +202,7 @@ export function CheckPrintPreview({
       offsetY,
       signatures,
       testMode,
+      fieldPositions: printSettings!.field_positions,
     });
 
     // Use a hidden iframe to print without affecting the main page
@@ -293,6 +322,7 @@ export function CheckPrintPreview({
                 }
                 offsetXPercent={(offsetX / CHECK_WIDTH_IN) * 100}
                 offsetYPercent={(offsetY / 11) * 100}
+                fieldPositions={printSettings.field_positions}
               />
             )}
 
@@ -331,6 +361,7 @@ export function CheckContent({
   sectionTopPercent,
   offsetXPercent,
   offsetYPercent,
+  fieldPositions,
 }: {
   check: CheckWithDetails;
   formattedAmount: string;
@@ -340,7 +371,123 @@ export function CheckContent({
   sectionTopPercent: number;
   offsetXPercent: number;
   offsetYPercent: number;
+  fieldPositions?: Record<CheckFieldId, CheckFieldLayout>;
 }) {
+  // If per-field positions are provided, use them (new system)
+  if (fieldPositions) {
+    const fp = fieldPositions;
+    const PAGE_HEIGHT = 11;
+
+    // Convert inches to percentage of the full 8.5x11 page
+    function topPct(fieldTop: number) {
+      return sectionTopPercent + (fieldTop / PAGE_HEIGHT) * 100;
+    }
+    function leftPct(fieldLeft: number) {
+      return (fieldLeft / CHECK_WIDTH_IN) * 100;
+    }
+
+    return (
+      <>
+        {/* Payer name & address */}
+        {printSettings.payer_name && (
+          <div style={{ position: 'absolute', top: `${topPct(fp.payerName.top)}%`, left: `${leftPct(fp.payerName.left)}%`, fontSize: '11px', fontWeight: 'bold' }}>
+            {printSettings.payer_name}
+          </div>
+        )}
+        {printSettings.payer_address_line1 && (
+          <div style={{ position: 'absolute', top: `${topPct(fp.payerAddress1.top)}%`, left: `${leftPct(fp.payerAddress1.left)}%`, fontSize: '9px' }}>
+            {printSettings.payer_address_line1}
+          </div>
+        )}
+        {printSettings.payer_address_line2 && (
+          <div style={{ position: 'absolute', top: `${topPct(fp.payerAddress2.top)}%`, left: `${leftPct(fp.payerAddress2.left)}%`, fontSize: '9px' }}>
+            {printSettings.payer_address_line2}
+          </div>
+        )}
+
+        {/* Check number */}
+        <div style={{ position: 'absolute', top: `${topPct(fp.checkNumber.top)}%`, left: `${leftPct(fp.checkNumber.left)}%`, fontSize: '12px', fontWeight: 'bold' }}>
+          {check.check_number}
+        </div>
+
+        {/* Date */}
+        <div style={{ position: 'absolute', top: `${topPct(fp.date.top)}%`, left: `${leftPct(fp.date.left)}%`, fontSize: '10px' }}>
+          <span style={{ color: '#666', fontSize: '8px', marginRight: '4px' }}>DATE</span>
+          {fp.date.showLine ? (
+            <span style={{ borderBottom: '1px solid #999', paddingBottom: '1px' }}>{formatDate(check.date)}</span>
+          ) : (
+            formatDate(check.date)
+          )}
+        </div>
+
+        {/* Pay to the order of */}
+        <div style={{ position: 'absolute', top: `${topPct(fp.payTo.top)}%`, left: `${leftPct(fp.payTo.left)}%`, fontSize: '10px', maxWidth: '65%' }}>
+          <span style={{ color: '#666', fontSize: '7px', marginRight: '6px' }}>PAY TO THE ORDER OF</span>
+          {fp.payTo.showLine ? (
+            <span style={{ fontWeight: 500, borderBottom: '1px solid #999', paddingBottom: '1px' }}>{check.payee_name}</span>
+          ) : (
+            <span style={{ fontWeight: 500 }}>{check.payee_name}</span>
+          )}
+        </div>
+
+        {/* Amount box */}
+        <div style={{
+          position: 'absolute', top: `${topPct(fp.amountBox.top)}%`, left: `${leftPct(fp.amountBox.left)}%`,
+          border: '1px solid #333', padding: '2px 6px', fontSize: '11px', fontWeight: 'bold',
+        }}>
+          {formattedAmount}
+        </div>
+
+        {/* Amount in words */}
+        <div style={{
+          position: 'absolute', top: `${topPct(fp.amountWords.top)}%`, left: `${leftPct(fp.amountWords.left)}%`,
+          maxWidth: '70%',
+          fontSize: '9px',
+          borderBottom: fp.amountWords.showLine ? '1px solid #999' : 'none',
+          paddingBottom: fp.amountWords.showLine ? '1px' : 0,
+        }}>
+          {amountInWords}
+          <span style={{ color: '#666', fontSize: '7px', marginLeft: '4px' }}>DOLLARS</span>
+        </div>
+
+        {/* Memo */}
+        <div style={{
+          position: 'absolute', top: `${topPct(fp.memo.top)}%`, left: `${leftPct(fp.memo.left)}%`,
+          fontSize: '9px',
+        }}>
+          <span style={{ color: '#666', fontSize: '7px', marginRight: '4px' }}>MEMO</span>
+          {fp.memo.showLine ? (
+            <span style={{ borderBottom: '1px solid #999', paddingBottom: '1px' }}>{check.memo || ''}</span>
+          ) : (
+            <span>{check.memo || ''}</span>
+          )}
+        </div>
+
+        {/* Signature */}
+        <div style={{
+          position: 'absolute', top: `${topPct(fp.signatureLine.top)}%`, left: `${leftPct(fp.signatureLine.left)}%`,
+          textAlign: 'center',
+        }}>
+          {signatures.length > 0 && signatures[0]?.signedUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={signatures[0].signedUrl}
+              alt="Signature"
+              style={{ height: '30px', objectFit: 'contain', marginBottom: '2px' }}
+            />
+          )}
+          <div style={{
+            borderTop: fp.signatureLine.showLine ? '1px solid #999' : 'none',
+            paddingTop: '1px', fontSize: '7px', color: '#666', minWidth: '120px',
+          }}>
+            AUTHORIZED SIGNATURE
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // Legacy path: use global offsets (backward compat)
   const yOff = offsetYPercent;
   const xOff = offsetXPercent;
 
@@ -583,28 +730,18 @@ export function buildPrintHtml(params: {
   offsetY: number;
   signatures: (CheckSignature & { signedUrl?: string })[];
   testMode: boolean;
+  fieldPositions?: Record<CheckFieldId, CheckFieldLayout>;
 }): string {
-  const { check, formattedAmount, amountInWords, printSettings, sectionTopIn, offsetX, offsetY, signatures, testMode } = params;
+  const { check, formattedAmount, amountInWords, printSettings, sectionTopIn, offsetX, offsetY, signatures, testMode, fieldPositions } = params;
 
   const date = formatDate(check.date);
-
-  // Calculate absolute inch positions for each field
-  function topIn(fieldTop: number) {
-    return `${sectionTopIn + fieldTop + offsetY}in`;
-  }
-  function leftIn(fieldLeft: number) {
-    return `${fieldLeft + offsetX}in`;
-  }
-  function rightIn(fieldRight: number) {
-    return `${fieldRight - offsetX}in`;
-  }
 
   // Determine stub sections
   const stubSections = printSettings.check_position === 'top'
     ? [1, 2] : printSettings.check_position === 'middle'
     ? [0, 2] : [0, 1];
 
-  const stubHtml = stubSections.map((section, idx) => {
+  const stubHtml = stubSections.map((section) => {
     const stubTopIn = section * SECTION_HEIGHT_IN + 0.3;
     return `
       <div style="position:absolute; top:${stubTopIn}in; left:0.5in; right:0.5in; font-family:Arial,sans-serif; font-size:9pt;">
@@ -624,31 +761,74 @@ export function buildPrintHtml(params: {
     ? `<img src="${signatures[0].signedUrl}" style="height:0.4in; object-fit:contain; margin-bottom:2px;" />`
     : '<div style="height:0.4in;"></div>';
 
-  const checkHtml = testMode ? `
-    <div style="position:absolute; top:${topIn(0.25)}; left:${leftIn(0.4)}; font-size:11pt; color:#dc2626; font-weight:600;">PAYER NAME</div>
-    <div style="position:absolute; top:${topIn(0.25)}; right:${rightIn(0.4)}; font-size:11pt; color:#dc2626; font-weight:600;">CHECK #</div>
-    <div style="position:absolute; top:${topIn(0.45)}; right:${rightIn(0.4)}; font-size:10pt; color:#dc2626;">DATE ______________</div>
-    <div style="position:absolute; top:${topIn(1.1)}; left:${leftIn(0.4)}; font-size:10pt; color:#dc2626;">PAY TO THE ORDER OF ___________________________________________</div>
-    <div style="position:absolute; top:${topIn(1.05)}; right:${rightIn(0.4)}; font-size:10pt; color:#dc2626; border:1px solid #dc2626; padding:2px 6px;">$AMOUNT</div>
-    <div style="position:absolute; top:${topIn(1.5)}; left:${leftIn(0.4)}; right:${rightIn(1.0)}; font-size:10pt; color:#dc2626;">AMOUNT IN WORDS _________________________________________________ DOLLARS</div>
-    <div style="position:absolute; top:${topIn(2.6)}; left:${leftIn(0.4)}; font-size:10pt; color:#dc2626;">MEMO ________________________</div>
-    <div style="position:absolute; top:${topIn(2.5)}; right:${rightIn(0.4)}; text-align:center; border-bottom:1px solid #dc2626; min-width:2in; padding-bottom:2px; font-size:9pt; color:#dc2626;">SIGNATURE</div>
-    <div style="position:absolute; top:${topIn(1.3)}; left:50%; transform:translateX(-50%); text-align:center; font-size:12pt; color:#6b7280; font-family:Arial,sans-serif;">ALIGNMENT TEST<br/><span style="font-size:9pt;">Compare positions with your check stock</span></div>
-  ` : `
-    ${printSettings.payer_name ? `<div style="position:absolute; top:${topIn(0.25)}; left:${leftIn(0.4)}; font-size:11pt; font-weight:bold;">${printSettings.payer_name}</div>` : ''}
-    ${printSettings.payer_address_line1 ? `<div style="position:absolute; top:${topIn(0.5)}; left:${leftIn(0.4)}; font-size:9pt;">${printSettings.payer_address_line1}</div>` : ''}
-    ${printSettings.payer_address_line2 ? `<div style="position:absolute; top:${topIn(0.7)}; left:${leftIn(0.4)}; font-size:9pt;">${printSettings.payer_address_line2}</div>` : ''}
-    <div style="position:absolute; top:${topIn(0.25)}; right:${rightIn(0.4)}; font-size:12pt; font-weight:bold;">${check.check_number}</div>
-    <div style="position:absolute; top:${topIn(0.55)}; right:${rightIn(0.4)}; font-size:10pt;"><span style="color:#666;font-size:8pt;margin-right:4px;">DATE</span> ${date}</div>
-    <div style="position:absolute; top:${topIn(1.1)}; left:${leftIn(0.4)}; right:${rightIn(2.0)}; font-size:9pt;"><span style="color:#666;font-size:7pt;margin-right:4px;">PAY TO THE ORDER OF</span> <span style="font-weight:500;font-size:11pt;">${check.payee_name}</span></div>
-    <div style="position:absolute; top:${topIn(1.05)}; right:${rightIn(0.4)}; border:1.5px solid #333; padding:2px 8px; font-size:11pt; font-weight:bold;">${formattedAmount}</div>
-    <div style="position:absolute; top:${topIn(1.5)}; left:${leftIn(0.4)}; right:${rightIn(1.0)}; font-size:9pt; border-bottom:1px solid #999; padding-bottom:2px;">${amountInWords} <span style="color:#666;font-size:7pt;margin-left:4px;">DOLLARS</span></div>
-    <div style="position:absolute; top:${topIn(2.6)}; left:${leftIn(0.4)}; width:3.5in; font-size:9pt;"><span style="color:#666;font-size:7pt;margin-right:4px;">MEMO</span> <span style="border-bottom:1px solid #999;padding-bottom:1px;">${check.memo || ''}</span></div>
-    <div style="position:absolute; top:${topIn(2.4)}; right:${rightIn(0.4)}; text-align:center;">
-      ${signatureImg}
-      <div style="border-top:1px solid #999; padding-top:2px; font-size:7pt; color:#666; min-width:2in;">AUTHORIZED SIGNATURE</div>
-    </div>
-  `;
+  let checkHtml: string;
+
+  if (testMode) {
+    // Legacy test mode with hardcoded offsets
+    function topInLegacy(fieldTop: number) { return `${sectionTopIn + fieldTop + offsetY}in`; }
+    function leftInLegacy(fieldLeft: number) { return `${fieldLeft + offsetX}in`; }
+    function rightInLegacy(fieldRight: number) { return `${fieldRight - offsetX}in`; }
+
+    checkHtml = `
+      <div style="position:absolute; top:${topInLegacy(0.25)}; left:${leftInLegacy(0.4)}; font-size:11pt; color:#dc2626; font-weight:600;">PAYER NAME</div>
+      <div style="position:absolute; top:${topInLegacy(0.25)}; right:${rightInLegacy(0.4)}; font-size:11pt; color:#dc2626; font-weight:600;">CHECK #</div>
+      <div style="position:absolute; top:${topInLegacy(0.45)}; right:${rightInLegacy(0.4)}; font-size:10pt; color:#dc2626;">DATE ______________</div>
+      <div style="position:absolute; top:${topInLegacy(1.1)}; left:${leftInLegacy(0.4)}; font-size:10pt; color:#dc2626;">PAY TO THE ORDER OF ___________________________________________</div>
+      <div style="position:absolute; top:${topInLegacy(1.05)}; right:${rightInLegacy(0.4)}; font-size:10pt; color:#dc2626; border:1px solid #dc2626; padding:2px 6px;">$AMOUNT</div>
+      <div style="position:absolute; top:${topInLegacy(1.5)}; left:${leftInLegacy(0.4)}; right:${rightInLegacy(1.0)}; font-size:10pt; color:#dc2626;">AMOUNT IN WORDS _________________________________________________ DOLLARS</div>
+      <div style="position:absolute; top:${topInLegacy(2.6)}; left:${leftInLegacy(0.4)}; font-size:10pt; color:#dc2626;">MEMO ________________________</div>
+      <div style="position:absolute; top:${topInLegacy(2.5)}; right:${rightInLegacy(0.4)}; text-align:center; border-bottom:1px solid #dc2626; min-width:2in; padding-bottom:2px; font-size:9pt; color:#dc2626;">SIGNATURE</div>
+      <div style="position:absolute; top:${topInLegacy(1.3)}; left:50%; transform:translateX(-50%); text-align:center; font-size:12pt; color:#6b7280; font-family:Arial,sans-serif;">ALIGNMENT TEST<br/><span style="font-size:9pt;">Compare positions with your check stock</span></div>
+    `;
+  } else if (fieldPositions) {
+    // New per-field positioning system
+    const fp = fieldPositions;
+    function fpTop(fieldTop: number) { return `${sectionTopIn + fieldTop}in`; }
+    function fpLeft(fieldLeft: number) { return `${fieldLeft}in`; }
+
+    const payToLine = fp.payTo.showLine ? 'border-bottom:1px solid #999;padding-bottom:1px;' : '';
+    const dateLine = fp.date.showLine ? 'border-bottom:1px solid #999;padding-bottom:1px;' : '';
+    const amountWordsLine = fp.amountWords.showLine ? 'border-bottom:1px solid #999;padding-bottom:2px;' : '';
+    const memoLine = fp.memo.showLine ? 'border-bottom:1px solid #999;padding-bottom:1px;' : '';
+    const sigLine = fp.signatureLine.showLine ? 'border-top:1px solid #999;' : '';
+
+    checkHtml = `
+      ${printSettings.payer_name ? `<div style="position:absolute; top:${fpTop(fp.payerName.top)}; left:${fpLeft(fp.payerName.left)}; font-size:11pt; font-weight:bold;">${printSettings.payer_name}</div>` : ''}
+      ${printSettings.payer_address_line1 ? `<div style="position:absolute; top:${fpTop(fp.payerAddress1.top)}; left:${fpLeft(fp.payerAddress1.left)}; font-size:9pt;">${printSettings.payer_address_line1}</div>` : ''}
+      ${printSettings.payer_address_line2 ? `<div style="position:absolute; top:${fpTop(fp.payerAddress2.top)}; left:${fpLeft(fp.payerAddress2.left)}; font-size:9pt;">${printSettings.payer_address_line2}</div>` : ''}
+      <div style="position:absolute; top:${fpTop(fp.checkNumber.top)}; left:${fpLeft(fp.checkNumber.left)}; font-size:12pt; font-weight:bold;">${check.check_number}</div>
+      <div style="position:absolute; top:${fpTop(fp.date.top)}; left:${fpLeft(fp.date.left)}; font-size:10pt;"><span style="color:#666;font-size:8pt;margin-right:4px;">DATE</span> <span style="${dateLine}">${date}</span></div>
+      <div style="position:absolute; top:${fpTop(fp.payTo.top)}; left:${fpLeft(fp.payTo.left)}; font-size:9pt;"><span style="color:#666;font-size:7pt;margin-right:4px;">PAY TO THE ORDER OF</span> <span style="font-weight:500;font-size:11pt;${payToLine}">${check.payee_name}</span></div>
+      <div style="position:absolute; top:${fpTop(fp.amountBox.top)}; left:${fpLeft(fp.amountBox.left)}; border:1.5px solid #333; padding:2px 8px; font-size:11pt; font-weight:bold;">${formattedAmount}</div>
+      <div style="position:absolute; top:${fpTop(fp.amountWords.top)}; left:${fpLeft(fp.amountWords.left)}; font-size:9pt; ${amountWordsLine}">${amountInWords} <span style="color:#666;font-size:7pt;margin-left:4px;">DOLLARS</span></div>
+      <div style="position:absolute; top:${fpTop(fp.memo.top)}; left:${fpLeft(fp.memo.left)}; font-size:9pt;"><span style="color:#666;font-size:7pt;margin-right:4px;">MEMO</span> <span style="${memoLine}">${check.memo || ''}</span></div>
+      <div style="position:absolute; top:${fpTop(fp.signatureLine.top)}; left:${fpLeft(fp.signatureLine.left)}; text-align:center;">
+        ${signatureImg}
+        <div style="${sigLine} padding-top:2px; font-size:7pt; color:#666; min-width:2in;">AUTHORIZED SIGNATURE</div>
+      </div>
+    `;
+  } else {
+    // Legacy: global offsets
+    function topIn(fieldTop: number) { return `${sectionTopIn + fieldTop + offsetY}in`; }
+    function leftIn(fieldLeft: number) { return `${fieldLeft + offsetX}in`; }
+    function rightIn(fieldRight: number) { return `${fieldRight - offsetX}in`; }
+
+    checkHtml = `
+      ${printSettings.payer_name ? `<div style="position:absolute; top:${topIn(0.25)}; left:${leftIn(0.4)}; font-size:11pt; font-weight:bold;">${printSettings.payer_name}</div>` : ''}
+      ${printSettings.payer_address_line1 ? `<div style="position:absolute; top:${topIn(0.5)}; left:${leftIn(0.4)}; font-size:9pt;">${printSettings.payer_address_line1}</div>` : ''}
+      ${printSettings.payer_address_line2 ? `<div style="position:absolute; top:${topIn(0.7)}; left:${leftIn(0.4)}; font-size:9pt;">${printSettings.payer_address_line2}</div>` : ''}
+      <div style="position:absolute; top:${topIn(0.25)}; right:${rightIn(0.4)}; font-size:12pt; font-weight:bold;">${check.check_number}</div>
+      <div style="position:absolute; top:${topIn(0.55)}; right:${rightIn(0.4)}; font-size:10pt;"><span style="color:#666;font-size:8pt;margin-right:4px;">DATE</span> ${date}</div>
+      <div style="position:absolute; top:${topIn(1.1)}; left:${leftIn(0.4)}; right:${rightIn(2.0)}; font-size:9pt;"><span style="color:#666;font-size:7pt;margin-right:4px;">PAY TO THE ORDER OF</span> <span style="font-weight:500;font-size:11pt;">${check.payee_name}</span></div>
+      <div style="position:absolute; top:${topIn(1.05)}; right:${rightIn(0.4)}; border:1.5px solid #333; padding:2px 8px; font-size:11pt; font-weight:bold;">${formattedAmount}</div>
+      <div style="position:absolute; top:${topIn(1.5)}; left:${leftIn(0.4)}; right:${rightIn(1.0)}; font-size:9pt; border-bottom:1px solid #999; padding-bottom:2px;">${amountInWords} <span style="color:#666;font-size:7pt;margin-left:4px;">DOLLARS</span></div>
+      <div style="position:absolute; top:${topIn(2.6)}; left:${leftIn(0.4)}; width:3.5in; font-size:9pt;"><span style="color:#666;font-size:7pt;margin-right:4px;">MEMO</span> <span style="border-bottom:1px solid #999;padding-bottom:1px;">${check.memo || ''}</span></div>
+      <div style="position:absolute; top:${topIn(2.4)}; right:${rightIn(0.4)}; text-align:center;">
+        ${signatureImg}
+        <div style="border-top:1px solid #999; padding-top:2px; font-size:7pt; color:#666; min-width:2in;">AUTHORIZED SIGNATURE</div>
+      </div>
+    `;
+  }
 
   // Section divider lines
   const dividerLines = `

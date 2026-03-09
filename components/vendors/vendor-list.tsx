@@ -60,7 +60,7 @@ export function VendorList({ vendors, loading, onSelect, onWriteCheck }: VendorL
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-card-title text-text-primary-light dark:text-text-primary-dark">
-                    {v.name}
+                    {v.company || v.name}
                   </h3>
                   <Badge variant="outline" className="text-meta">
                     {v.vendor_categories?.name ?? 'General'}
@@ -94,8 +94,8 @@ export function VendorList({ vendors, loading, onSelect, onWriteCheck }: VendorL
 
                 <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
                   {v.company && (
-                    <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                      {v.company}
+                    <p className="text-meta text-text-secondary-light dark:text-text-secondary-dark">
+                      {v.name}
                     </p>
                   )}
                   {v.phone && (
