@@ -749,6 +749,7 @@ export function buildPrintHtml(params: {
   const { check, formattedAmount, amountInWords, printSettings, sectionTopIn, offsetX, offsetY, signatures, testMode, fieldPositions } = params;
 
   const date = formatDate(check.date);
+  const pageMargin = printSettings.print_margin ?? 0.4; // inches, matches Chrome default
 
   // Determine stub sections
   const stubSections = printSettings.check_position === 'top'
@@ -756,9 +757,9 @@ export function buildPrintHtml(params: {
     ? [0, 2] : [0, 1];
 
   const stubHtml = stubSections.map((section) => {
-    const stubTopIn = section * SECTION_HEIGHT_IN + 0.3;
+    const stubTopIn = section * SECTION_HEIGHT_IN + 0.3 - pageMargin;
     return `
-      <div style="position:absolute; top:${stubTopIn}in; left:0.5in; right:0.5in; font-family:Arial,sans-serif; font-size:9pt;">
+      <div style="position:absolute; top:${stubTopIn}in; left:${0.5 - pageMargin}in; right:${0.5 - pageMargin}in; font-family:Arial,sans-serif; font-size:9pt;">
         <div style="display:flex; gap:0.8in; margin-bottom:4px;">
           <div><div style="color:#999;font-size:7pt;">Check #</div><div style="font-weight:600;">${check.check_number}</div></div>
           <div><div style="color:#999;font-size:7pt;">Date</div><div>${date}</div></div>
@@ -779,9 +780,9 @@ export function buildPrintHtml(params: {
 
   if (testMode) {
     // Legacy test mode with hardcoded offsets
-    function topInLegacy(fieldTop: number) { return `${sectionTopIn + fieldTop + offsetY}in`; }
-    function leftInLegacy(fieldLeft: number) { return `${fieldLeft + offsetX}in`; }
-    function rightInLegacy(fieldRight: number) { return `${fieldRight - offsetX}in`; }
+    function topInLegacy(fieldTop: number) { return `${sectionTopIn + fieldTop + offsetY - pageMargin}in`; }
+    function leftInLegacy(fieldLeft: number) { return `${fieldLeft + offsetX - pageMargin}in`; }
+    function rightInLegacy(fieldRight: number) { return `${fieldRight - offsetX - pageMargin}in`; }
 
     checkHtml = `
       <div style="position:absolute; top:${topInLegacy(0.25)}; left:${leftInLegacy(0.4)}; font-size:11pt; color:#dc2626; font-weight:600;">PAYER NAME</div>
@@ -797,8 +798,8 @@ export function buildPrintHtml(params: {
   } else if (fieldPositions) {
     // New per-field positioning system with dynamic font sizes and visibility
     const fp = fieldPositions;
-    function fpTop(fieldTop: number) { return `${sectionTopIn + fieldTop + offsetY}in`; }
-    function fpLeft(fieldLeft: number) { return `${fieldLeft + offsetX}in`; }
+    function fpTop(fieldTop: number) { return `${sectionTopIn + fieldTop + offsetY - pageMargin}in`; }
+    function fpLeft(fieldLeft: number) { return `${fieldLeft + offsetX - pageMargin}in`; }
     function ffs(fieldId: CheckFieldId) { return fp[fieldId].fontSize ?? DEFAULT_FIELD_POSITIONS[fieldId].fontSize ?? 10; }
     function flbl(fieldId: CheckFieldId) { return Math.max(Math.round(ffs(fieldId) * 0.7), 6); }
     function isVis(fieldId: CheckFieldId) { return fp[fieldId].visible !== false; }
@@ -847,9 +848,9 @@ export function buildPrintHtml(params: {
     checkHtml = parts.join('\n');
   } else {
     // Legacy: global offsets
-    function topIn(fieldTop: number) { return `${sectionTopIn + fieldTop + offsetY}in`; }
-    function leftIn(fieldLeft: number) { return `${fieldLeft + offsetX}in`; }
-    function rightIn(fieldRight: number) { return `${fieldRight - offsetX}in`; }
+    function topIn(fieldTop: number) { return `${sectionTopIn + fieldTop + offsetY - pageMargin}in`; }
+    function leftIn(fieldLeft: number) { return `${fieldLeft + offsetX - pageMargin}in`; }
+    function rightIn(fieldRight: number) { return `${fieldRight - offsetX - pageMargin}in`; }
 
     checkHtml = `
       ${printSettings.payer_name ? `<div style="position:absolute; top:${topIn(0.25)}; left:${leftIn(0.4)}; font-size:11pt; font-weight:bold;">${printSettings.payer_name}</div>` : ''}
@@ -868,11 +869,13 @@ export function buildPrintHtml(params: {
     `;
   }
 
-  // Section divider lines
+  // Section divider lines (offset by page margin since body starts inside margin)
   const dividerLines = `
-    <div style="position:absolute; top:${SECTION_HEIGHT_IN}in; left:0; right:0; border-top:1px dashed #ccc;"></div>
-    <div style="position:absolute; top:${SECTION_HEIGHT_IN * 2}in; left:0; right:0; border-top:1px dashed #ccc;"></div>
+    <div style="position:absolute; top:${SECTION_HEIGHT_IN - pageMargin}in; left:0; right:0; border-top:1px dashed #ccc;"></div>
+    <div style="position:absolute; top:${SECTION_HEIGHT_IN * 2 - pageMargin}in; left:0; right:0; border-top:1px dashed #ccc;"></div>
   `;
+
+  const pm = pageMargin;
 
   return `<!DOCTYPE html>
 <html>
@@ -881,16 +884,16 @@ export function buildPrintHtml(params: {
   <style>
     @page {
       size: letter;
-      margin: 0;
+      margin: ${pm}in;
     }
     html, body {
       margin: 0;
       padding: 0;
-      width: 8.5in;
-      height: 11in;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
+      width: ${8.5 - pm * 2}in;
+      height: ${11 - pm * 2}in;
       position: relative;
       font-family: Georgia, "Times New Roman", serif;
       color: #000;
@@ -901,39 +904,15 @@ export function buildPrintHtml(params: {
       html, body {
         margin: 0 !important;
         padding: 0 !important;
-        width: 8.5in !important;
-        height: 11in !important;
       }
-      /* Hide browser header/footer */
       @page {
         size: letter;
-        margin: 0;
+        margin: ${pm}in;
       }
-    }
-    /* Print instructions banner (hidden during print) */
-    .print-instructions {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      background: #fef3c7;
-      border-bottom: 2px solid #f59e0b;
-      padding: 8px 16px;
-      font-family: system-ui, sans-serif;
-      font-size: 13px;
-      color: #92400e;
-      z-index: 9999;
-      text-align: center;
-    }
-    @media print {
-      .print-instructions { display: none !important; }
     }
   </style>
 </head>
 <body>
-  <div class="print-instructions">
-    <strong>Important:</strong> Set Margins to &quot;None&quot; and Scale to &quot;100%&quot; in your print dialog for accurate alignment.
-  </div>
   ${dividerLines}
   ${checkHtml}
   ${!testMode ? stubHtml : ''}

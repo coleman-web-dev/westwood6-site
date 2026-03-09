@@ -8,7 +8,7 @@ import { Label } from '@/components/shared/ui/label';
 import { Switch } from '@/components/shared/ui/switch';
 import {
   Printer, Loader2, Move, Upload, Trash2, RotateCcw, Image as ImageIcon,
-  Eye, EyeOff, Minus, Plus, Info,
+  Eye, EyeOff, Minus, Plus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -41,6 +41,7 @@ const CHECK_SECTION_HEIGHT = SECTION_HEIGHT_IN; // ~3.667"
 const PPI = 96; // CSS pixels per inch (standard)
 const NATIVE_WIDTH = CHECK_WIDTH_IN * PPI; // 816px (8.5" at 96 DPI)
 const NATIVE_HEIGHT = Math.round(CHECK_SECTION_HEIGHT * PPI); // ~352px
+const DEFAULT_PRINT_MARGIN = 0.4; // inches, matches Chrome's default page margin
 
 const ALL_FIELD_IDS: CheckFieldId[] = [
   'payerName', 'payerAddress1', 'payerAddress2',
@@ -157,6 +158,7 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [bgImageUrl, setBgImageUrl] = useState<string | null>(null);
+  const [bgRenderedUrl, setBgRenderedUrl] = useState<string | null>(null); // data URL for rendered PDF
   const [bgIsPdf, setBgIsPdf] = useState(false);
   const [uploadingBg, setUploadingBg] = useState(false);
   const [containerWidth, setContainerWidth] = useState(NATIVE_WIDTH);
@@ -174,6 +176,9 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
   // Canvas scale: ratio between container display size and native canvas size
   const canvasScale = containerWidth / NATIVE_WIDTH;
 
+  // Derived print margin
+  const printMargin = settings.print_margin ?? DEFAULT_PRINT_MARGIN;
+
   // ── ResizeObserver for container width ───────────────────────────────
 
   useEffect(() => {
@@ -185,6 +190,50 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
+
+  // ── Render PDF to image when loaded ─────────────────────────────────
+
+  useEffect(() => {
+    if (!bgImageUrl || !bgIsPdf) {
+      setBgRenderedUrl(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function renderPdf() {
+      try {
+        const pdfjsLib = await import('pdfjs-dist');
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+
+        const response = await fetch(bgImageUrl!);
+        const arrayBuffer = await response.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const page = await pdf.getPage(1);
+
+        // Render at 2x for crisp display
+        const scale = 2;
+        const viewport = page.getViewport({ scale });
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext('2d')!;
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await page.render({ canvasContext: ctx, viewport } as any).promise;
+
+        if (!cancelled) {
+          setBgRenderedUrl(canvas.toDataURL('image/png'));
+        }
+      } catch (err) {
+        console.error('Failed to render PDF:', err);
+      }
+    }
+
+    renderPdf();
+
+    return () => { cancelled = true; };
+  }, [bgImageUrl, bgIsPdf]);
 
   // ── Load settings ──────────────────────────────────────────────────
 
@@ -464,6 +513,7 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
     await updateCheckPrintSettings(communityId, updatedSettings);
     setSettings(updatedSettings);
     setBgImageUrl(null);
+    setBgRenderedUrl(null);
     setBgIsPdf(false);
     toast.success('Background image removed.');
   }
@@ -567,13 +617,6 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
           </div>
         </div>
 
-        {/* Print instructions hint */}
-        <div className="flex items-start gap-2 mb-3 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
-          <Info className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-          <span className="text-meta text-amber-800 dark:text-amber-300">
-            When printing, set Margins to &quot;None&quot; and Scale to &quot;100%&quot; in the print dialog for accurate alignment.
-          </span>
-        </div>
 
         {/* ─── Drag Canvas (check section only, transform-scaled) ── */}
         <div
@@ -600,7 +643,7 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
               color: '#000',
             }}
           >
-            {/* Background image (images only; PDFs show a placeholder) */}
+            {/* Background image (regular image or PDF rendered to image) */}
             {bgImageUrl && !bgIsPdf && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -610,13 +653,59 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
                 style={{ opacity: 0.35 }}
               />
             )}
-            {bgImageUrl && bgIsPdf && (
-              <embed
-                src={`${bgImageUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
-                type="application/pdf"
+            {bgIsPdf && bgRenderedUrl && (() => {
+              // Show only the relevant section of the full-page PDF render
+              const sectionIdx = settings.check_position === 'top' ? 0
+                : settings.check_position === 'middle' ? 1 : 2;
+              const fullPageHeight = NATIVE_WIDTH * (11 / 8.5); // maintain letter aspect
+              const sectionTop = -(sectionIdx * (fullPageHeight / 3));
+              return (
+                <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ opacity: 0.4 }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={bgRenderedUrl}
+                    alt="Check stock (PDF)"
+                    style={{
+                      width: `${NATIVE_WIDTH}px`,
+                      height: `${fullPageHeight}px`,
+                      position: 'absolute',
+                      top: `${sectionTop}px`,
+                      left: 0,
+                      objectFit: 'fill',
+                    }}
+                  />
+                </div>
+              );
+            })()}
+
+            {/* Margin guides (shaded no-print zone) */}
+            {printMargin > 0 && (
+              <svg
                 className="absolute inset-0 pointer-events-none"
-                style={{ width: '100%', height: '100%', opacity: 0.35 }}
-              />
+                width={NATIVE_WIDTH}
+                height={NATIVE_HEIGHT}
+                style={{ zIndex: 1 }}
+              >
+                {/* Top margin */}
+                <rect x={0} y={0} width={NATIVE_WIDTH} height={printMargin * PPI}
+                  fill="rgba(239,68,68,0.06)" />
+                {/* Bottom margin */}
+                <rect x={0} y={NATIVE_HEIGHT - printMargin * PPI} width={NATIVE_WIDTH} height={printMargin * PPI}
+                  fill="rgba(239,68,68,0.06)" />
+                {/* Left margin */}
+                <rect x={0} y={printMargin * PPI} width={printMargin * PPI} height={NATIVE_HEIGHT - printMargin * PPI * 2}
+                  fill="rgba(239,68,68,0.06)" />
+                {/* Right margin */}
+                <rect x={NATIVE_WIDTH - printMargin * PPI} y={printMargin * PPI} width={printMargin * PPI} height={NATIVE_HEIGHT - printMargin * PPI * 2}
+                  fill="rgba(239,68,68,0.06)" />
+                {/* Dashed inner boundary */}
+                <rect
+                  x={printMargin * PPI} y={printMargin * PPI}
+                  width={NATIVE_WIDTH - printMargin * PPI * 2}
+                  height={NATIVE_HEIGHT - printMargin * PPI * 2}
+                  fill="none" stroke="rgba(239,68,68,0.2)" strokeWidth="1" strokeDasharray="4 3"
+                />
+              </svg>
             )}
 
             {/* Grid dots */}
@@ -819,42 +908,29 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
           </div>
         </div>
 
-        {/* Printer Offset */}
+        {/* Page Margin */}
         <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding space-y-3">
           <h3 className="text-section-title text-text-primary-light dark:text-text-primary-dark">
-            Printer Offset
+            Page Margin
           </h3>
           <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-            Compensate for your printer&apos;s margins. Use small adjustments (+/- 0.05&quot;) to fine-tune.
+            Matches your browser&apos;s print margin. The shaded area in the editor shows the non-printable zone.
           </p>
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Label className="text-meta w-20 shrink-0">Horizontal</Label>
-              <Input
-                type="number"
-                step={0.05}
-                min={-1}
-                max={1}
-                value={settings.offset_x || 0}
-                onChange={(e) => setSettings((prev) => ({ ...prev, offset_x: parseFloat(e.target.value) || 0 }))}
-                className="h-7 w-20 text-meta text-center"
-              />
-              <span className="text-meta text-text-muted-light dark:text-text-muted-dark">&quot;</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Label className="text-meta w-20 shrink-0">Vertical</Label>
-              <Input
-                type="number"
-                step={0.05}
-                min={-1}
-                max={1}
-                value={settings.offset_y || 0}
-                onChange={(e) => setSettings((prev) => ({ ...prev, offset_y: parseFloat(e.target.value) || 0 }))}
-                className="h-7 w-20 text-meta text-center"
-              />
-              <span className="text-meta text-text-muted-light dark:text-text-muted-dark">&quot;</span>
-            </div>
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              step={0.05}
+              min={0}
+              max={1}
+              value={settings.print_margin ?? DEFAULT_PRINT_MARGIN}
+              onChange={(e) => setSettings((prev) => ({ ...prev, print_margin: parseFloat(e.target.value) || 0 }))}
+              className="h-7 w-20 text-meta text-center"
+            />
+            <span className="text-meta text-text-muted-light dark:text-text-muted-dark">inches</span>
           </div>
+          <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+            Set to 0 if you select &quot;None&quot; for margins in the print dialog.
+          </p>
         </div>
 
         {/* Payer Information */}

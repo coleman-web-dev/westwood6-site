@@ -116,6 +116,8 @@ export interface CheckPrintSettings {
   field_positions?: Record<CheckFieldId, CheckFieldLayout>;
   /** Supabase storage path for uploaded blank check image (editor background) */
   check_stock_image?: string;
+  /** Page margin in inches used in print output (default 0.4, matches Chrome default) */
+  print_margin?: number;
 }
 
 // ─── Form Types ─────────────────────────────────────────────────────
