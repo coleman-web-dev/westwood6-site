@@ -13,7 +13,7 @@ System variables (auto-filled from the reservation system, do NOT create questio
 - {{reservation_date}} - The date of the reservation (formatted like "March 15, 2026")
 - {{start_time}} - The start time of the reservation (formatted like "2:00 PM")
 - {{end_time}} - The end time of the reservation (formatted like "11:59 PM")
-- {{fee}} - The reservation/rental fee amount (formatted like "$250.00")
+- {{fee}} - The rental fee amount (formatted like "$250.00")
 - {{deposit}} - The security deposit amount (formatted like "$500.00")
 - {{guest_count}} - The number of expected guests
 - {{purpose}} - The purpose/reason for the reservation
