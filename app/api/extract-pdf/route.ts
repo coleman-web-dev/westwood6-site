@@ -1,19 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-// Pre-load the worker module so pdfjs-dist finds it on globalThis.
-// This avoids filesystem path issues on Vercel's serverless environment.
-// pdfjs-dist checks globalThis.pdfjsWorker.WorkerMessageHandler before
-// trying to spawn a Web Worker, making this the correct server-side approach.
-async function ensureWorkerLoaded() {
-  if (!(globalThis as Record<string, unknown>).pdfjsWorker) {
-    const worker = await import('pdfjs-dist/legacy/build/pdf.worker.mjs');
-    (globalThis as Record<string, unknown>).pdfjsWorker = worker;
-  }
-}
+import { extractText } from 'unpdf';
 
 /**
  * POST /api/extract-pdf
- * Extracts text from an uploaded PDF file server-side using pdfjs-dist legacy build.
+ * Extracts text from an uploaded PDF file server-side.
+ * Uses unpdf (serverless-friendly, no worker/DOM dependencies).
  * Accepts multipart form data with a "file" field.
  * Returns { text, pageCount } on success.
  */
@@ -39,29 +30,12 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const data = new Uint8Array(arrayBuffer);
 
-    // Load the worker module into globalThis so pdfjs-dist uses it directly
-    await ensureWorkerLoaded();
-
-    // Use legacy build which works in Node.js without DOM/canvas
-    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
-
-    const pdf = await pdfjsLib.getDocument({ data, useSystemFonts: true }).promise;
-
-    let fullText = '';
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      const pageText = (content.items as Array<{ str?: string }>)
-        .map((item: { str?: string }) => item.str ?? '')
-        .join(' ');
-      fullText += pageText + '\n\n';
-    }
-
-    const trimmed = fullText.trim();
+    const result = await extractText(data);
+    const trimmed = result.text?.join('\n\n').trim() ?? '';
 
     return NextResponse.json({
       text: trimmed,
-      pageCount: pdf.numPages,
+      pageCount: result.totalPages,
     });
   } catch (err) {
     console.error('PDF extraction error:', err);
