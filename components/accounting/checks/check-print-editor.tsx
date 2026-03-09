@@ -213,18 +213,8 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
       try {
         const pdfjsLib = await import('pdfjs-dist');
 
-        // Load worker as blob to avoid CORS issues with CDN-hosted workers
-        const workerUrl = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
-        try {
-          const workerResponse = await fetch(workerUrl);
-          if (workerResponse.ok) {
-            const workerBlob = await workerResponse.blob();
-            pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(workerBlob);
-          }
-        } catch {
-          // Fall back to direct URL (will use main thread if worker fails)
-          pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-        }
+        // Use local worker from public/ (copied from node_modules at build time)
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
         const response = await fetch(bgImageUrl!);
         if (!response.ok) throw new Error(`Failed to fetch image: ${response.status}`);
