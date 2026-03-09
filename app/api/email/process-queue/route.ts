@@ -83,11 +83,17 @@ export async function POST(req: NextRequest) {
   let failed = 0;
 
   for (const item of queueItems as EmailQueueItem[]) {
-    // Mark as sending
-    await supabase
+    // Mark as sending (atomically claim this item to prevent duplicate sends)
+    const { data: claimed } = await supabase
       .from('email_queue')
       .update({ status: 'sending', attempts: item.attempts + 1 })
-      .eq('id', item.id);
+      .eq('id', item.id)
+      .eq('status', 'queued')
+      .select('id')
+      .maybeSingle();
+
+    // If another process already claimed this item, skip it
+    if (!claimed) continue;
 
     try {
       // Render template
@@ -103,9 +109,13 @@ export async function POST(req: NextRequest) {
         .from('communities')
         .select('name, theme')
         .eq('id', item.community_id)
-        .single();
+        .maybeSingle();
 
-      const emailSettings = (community?.theme as Record<string, unknown>)?.email_settings as Record<string, string> | undefined;
+      if (!community) {
+        throw new Error(`Community not found: ${item.community_id}`);
+      }
+
+      const emailSettings = (community.theme as Record<string, unknown>)?.email_settings as Record<string, string> | undefined;
       const fromName = emailSettings?.from_name || community?.name || 'DuesIQ';
       const fromAddress = process.env.EMAIL_FROM_ADDRESS || 'notifications@duesiq.com';
       const from = `${fromName} <${fromAddress}>`;

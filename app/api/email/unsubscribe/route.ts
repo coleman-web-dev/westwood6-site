@@ -11,6 +11,9 @@ const VALID_CATEGORIES: EmailCategory[] = [
   'voting_notice',
   'reservation_update',
   'weekly_digest',
+  'violation_notice',
+  'insurance_reminder_email',
+  'event',
 ];
 
 /**

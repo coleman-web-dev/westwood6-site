@@ -329,8 +329,11 @@ export function ReservationDialog({
 
       if (agreementError) {
         console.error('Agreement insert error:', agreementError);
-        // Reservation was created but agreement failed. Don't block.
-        toast.warning('Reservation created, but the agreement could not be saved. Please contact the board.');
+        // Agreement failed: delete the reservation to maintain consistency
+        await supabase.from('reservations').delete().eq('id', reservationData.id);
+        setSubmitting(false);
+        toast.error('Failed to save the signed agreement. Reservation was not created. Please try again.');
+        return;
       } else {
         // Notify board members about the signed agreement
         const resolved = getResolvedMember();

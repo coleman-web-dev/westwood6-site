@@ -108,7 +108,8 @@ export function CreateJournalEntryDialog({
 
   const totalDebit = lines.reduce((sum, l) => sum + (parseFloat(l.debit) || 0), 0);
   const totalCredit = lines.reduce((sum, l) => sum + (parseFloat(l.credit) || 0), 0);
-  const isBalanced = Math.abs(totalDebit - totalCredit) < 0.001 && totalDebit > 0;
+  // Use 1-cent tolerance to handle floating point precision issues
+  const isBalanced = Math.abs(totalDebit - totalCredit) < 0.01 && totalDebit > 0;
 
   async function handleSubmit() {
     if (!description.trim()) {

@@ -140,10 +140,16 @@ export async function applyWalletToInvoiceBatch(
         invoiceUpdate.paid_at = new Date().toISOString();
       }
 
-      await supabase
+      const { error: invUpdateError } = await supabase
         .from('invoices')
         .update(invoiceUpdate)
         .eq('id', inv.id);
+
+      // If invoice update failed, skip deducting from balance
+      if (invUpdateError) {
+        console.error(`Failed to apply wallet to invoice ${inv.id}:`, invUpdateError);
+        continue;
+      }
 
       // Insert wallet transaction
       await supabase.from('wallet_transactions').insert({

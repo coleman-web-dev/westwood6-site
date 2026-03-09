@@ -155,6 +155,11 @@ export function VendorDocumentsSection({
   }
 
   async function handleDelete(doc: VendorDocument) {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${doc.title}"? This cannot be undone.`
+    );
+    if (!confirmed) return;
+
     setDeleting(doc.id);
     const supabase = createClient();
 

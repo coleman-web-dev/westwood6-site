@@ -35,7 +35,12 @@ export async function middleware(request: NextRequest) {
   }
 
   // Dev bypass: skip auth in development when cookie is set
-  if (process.env.NODE_ENV === 'development' && request.cookies.get('dev-bypass')?.value === '1') {
+  // Double-check VERCEL_ENV to prevent accidental activation in production
+  if (
+    process.env.NODE_ENV === 'development' &&
+    process.env.VERCEL_ENV !== 'production' &&
+    request.cookies.get('dev-bypass')?.value === '1'
+  ) {
     return NextResponse.next();
   }
 

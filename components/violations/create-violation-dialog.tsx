@@ -54,13 +54,18 @@ export function CreateViolationDialog({
       return;
     }
 
+    if (!member) {
+      toast.error('You must be logged in to report a violation.');
+      return;
+    }
+
     setSaving(true);
     const supabase = createClient();
 
     const { error } = await supabase.from('violations').insert({
       community_id: communityId,
       unit_id: unitId,
-      reported_by: member?.id || null,
+      reported_by: member.id,
       category,
       title: title.trim(),
       description: description.trim() || null,

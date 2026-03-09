@@ -42,11 +42,11 @@ export function convertToRgba({
     const hex = color.slice(1);
     let r: number, g: number, b: number;
 
-    if (hex.length === 3) {
+    if (hex.length === 3 && /^[0-9a-fA-F]{3}$/.test(hex)) {
       r = parseInt(hex[0] + hex[0], 16);
       g = parseInt(hex[1] + hex[1], 16);
       b = parseInt(hex[2] + hex[2], 16);
-    } else if (hex.length === 6) {
+    } else if (hex.length === 6 && /^[0-9a-fA-F]{6}$/.test(hex)) {
       r = parseInt(hex.slice(0, 2), 16);
       g = parseInt(hex.slice(2, 4), 16);
       b = parseInt(hex.slice(4, 6), 16);

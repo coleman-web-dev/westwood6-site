@@ -58,6 +58,19 @@ export async function POST(req: NextRequest) {
           break;
         }
 
+        // Idempotency check: skip if this session was already processed
+        const { data: existingPayment } = await supabase
+          .from('payments')
+          .select('id')
+          .eq('stripe_session_id', session.id)
+          .limit(1)
+          .maybeSingle();
+
+        if (existingPayment) {
+          console.log('Checkout session already processed, skipping:', session.id);
+          break;
+        }
+
         // Look up the invoice
         const { data: invoice, error: invoiceError } = await supabase
           .from('invoices')
@@ -174,6 +187,19 @@ export async function POST(req: NextRequest) {
         // Only process subscription invoices (not one-off)
         const subDetails = stripeInvoice.parent?.subscription_details;
         if (!subDetails?.subscription) break;
+
+        // Idempotency check: skip if this Stripe invoice was already processed
+        const { data: existingSubPayment } = await supabase
+          .from('payments')
+          .select('id')
+          .eq('stripe_payment_intent', stripeInvoice.id)
+          .limit(1)
+          .maybeSingle();
+
+        if (existingSubPayment) {
+          console.log('Stripe invoice already processed, skipping:', stripeInvoice.id);
+          break;
+        }
 
         const subscriptionId = typeof subDetails.subscription === 'string'
           ? subDetails.subscription

@@ -29,7 +29,7 @@ export async function queueEmail(params: QueueEmailParams) {
       .select('enabled')
       .eq('member_id', params.recipientMemberId)
       .eq('category', params.category)
-      .single();
+      .maybeSingle();
 
     if (pref && !pref.enabled) {
       return null; // Member opted out

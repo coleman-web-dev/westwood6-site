@@ -66,13 +66,21 @@ export function UploadDocumentDialog({
       return;
     }
 
+    // Enforce 50 MB file size limit
+    const MAX_FILE_SIZE = 50 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error('File is too large. Maximum size is 50 MB.');
+      return;
+    }
+
     if (!member) return;
 
     setSubmitting(true);
     const supabase = createClient();
 
-    // Upload to Supabase Storage
-    const filePath = `${community.id}/${Date.now()}_${file.name}`;
+    // Sanitize filename to prevent path traversal
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-').replace(/-+/g, '-');
+    const filePath = `${community.id}/${Date.now()}_${safeName}`;
 
     const { error: uploadError } = await supabase.storage
       .from('hoa-documents')

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
@@ -35,6 +36,7 @@ const BALLOT_NOTIFICATION_TYPES: NotificationType[] = [
 ];
 
 export function NotificationBell() {
+  const router = useRouter();
   const { member, community } = useCommunity();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -100,7 +102,7 @@ export function NotificationBell() {
     // Navigate to voting page for ballot notifications
     if (BALLOT_NOTIFICATION_TYPES.includes(n.type)) {
       setOpen(false);
-      window.location.href = `/${community.slug}/voting`;
+      router.push(`/${community.slug}/voting`);
     }
   }
 

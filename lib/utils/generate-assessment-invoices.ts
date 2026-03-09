@@ -27,24 +27,24 @@ export function getSpecialAssessmentPeriods(
   if (installments <= 0) return [];
 
   if (installments === 1) {
-    const d = new Date(startDate + 'T00:00:00');
+    const d = new Date(startDate + 'T00:00:00Z');
     return [{
       label: 'Lump Sum',
-      dueDate: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+      dueDate: `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`,
     }];
   }
 
   const periods: Period[] = [];
-  const cursor = new Date(startDate + 'T00:00:00');
+  const cursor = new Date(startDate + 'T00:00:00Z');
 
   for (let i = 0; i < installments; i++) {
-    const y = cursor.getFullYear();
-    const m = cursor.getMonth();
+    const y = cursor.getUTCFullYear();
+    const m = cursor.getUTCMonth();
     periods.push({
       label: `Installment ${i + 1} of ${installments}`,
-      dueDate: `${y}-${String(m + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`,
+      dueDate: `${y}-${String(m + 1).padStart(2, '0')}-${String(cursor.getUTCDate()).padStart(2, '0')}`,
     });
-    cursor.setMonth(cursor.getMonth() + 1);
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1);
   }
 
   return periods;
@@ -59,8 +59,8 @@ export function getPeriods(
   fiscalStart: string,
   fiscalEnd: string
 ): Period[] {
-  const start = new Date(fiscalStart + 'T00:00:00');
-  const end = new Date(fiscalEnd + 'T00:00:00');
+  const start = new Date(fiscalStart + 'T00:00:00Z');
+  const end = new Date(fiscalEnd + 'T00:00:00Z');
   const periods: Period[] = [];
 
   const monthNames = [
@@ -71,47 +71,47 @@ export function getPeriods(
   if (frequency === 'monthly') {
     const cursor = new Date(start);
     while (cursor <= end) {
-      const y = cursor.getFullYear();
-      const m = cursor.getMonth();
+      const y = cursor.getUTCFullYear();
+      const m = cursor.getUTCMonth();
       periods.push({
         label: `${monthNames[m]} ${y}`,
-        dueDate: `${y}-${String(m + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`,
+        dueDate: `${y}-${String(m + 1).padStart(2, '0')}-${String(cursor.getUTCDate()).padStart(2, '0')}`,
       });
-      cursor.setMonth(cursor.getMonth() + 1);
+      cursor.setUTCMonth(cursor.getUTCMonth() + 1);
     }
   } else if (frequency === 'quarterly') {
     const cursor = new Date(start);
     let q = 1;
     while (cursor <= end) {
-      const y = cursor.getFullYear();
-      const m = cursor.getMonth();
+      const y = cursor.getUTCFullYear();
+      const m = cursor.getUTCMonth();
       periods.push({
         label: `Q${q} ${y}`,
-        dueDate: `${y}-${String(m + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`,
+        dueDate: `${y}-${String(m + 1).padStart(2, '0')}-${String(cursor.getUTCDate()).padStart(2, '0')}`,
       });
-      cursor.setMonth(cursor.getMonth() + 3);
+      cursor.setUTCMonth(cursor.getUTCMonth() + 3);
       q++;
     }
   } else if (frequency === 'semi_annual') {
     const cursor = new Date(start);
     let h = 1;
     while (cursor <= end) {
-      const y = cursor.getFullYear();
-      const m = cursor.getMonth();
+      const y = cursor.getUTCFullYear();
+      const m = cursor.getUTCMonth();
       periods.push({
         label: `H${h} ${y}`,
-        dueDate: `${y}-${String(m + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`,
+        dueDate: `${y}-${String(m + 1).padStart(2, '0')}-${String(cursor.getUTCDate()).padStart(2, '0')}`,
       });
-      cursor.setMonth(cursor.getMonth() + 6);
+      cursor.setUTCMonth(cursor.getUTCMonth() + 6);
       h++;
     }
   } else {
     // annual
-    const y = start.getFullYear();
-    const m = start.getMonth();
+    const y = start.getUTCFullYear();
+    const m = start.getUTCMonth();
     periods.push({
       label: `${y}`,
-      dueDate: `${y}-${String(m + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`,
+      dueDate: `${y}-${String(m + 1).padStart(2, '0')}-${String(start.getUTCDate()).padStart(2, '0')}`,
     });
   }
 

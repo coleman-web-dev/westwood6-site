@@ -289,8 +289,8 @@ export function CreateEventDialog({
           if (result.success) {
             toast.success('Event notification emails queued.');
           }
-        }).catch(() => {
-          // Silently fail, event was created successfully
+        }).catch((err) => {
+          console.error('Failed to queue event notification emails:', err);
         });
       }
     }

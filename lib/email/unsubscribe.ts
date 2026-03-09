@@ -1,16 +1,26 @@
-import { createHmac } from 'crypto';
+import { createHmac, timingSafeEqual } from 'crypto';
 
-const SECRET = process.env.UNSUBSCRIBE_SECRET || 'default-unsubscribe-secret';
+function getSecret(): string {
+  const secret = process.env.UNSUBSCRIBE_SECRET;
+  if (!secret) {
+    throw new Error('UNSUBSCRIBE_SECRET environment variable is not set');
+  }
+  return secret;
+}
 
 export function generateUnsubscribeToken(memberId: string, category: string): string {
-  const hmac = createHmac('sha256', SECRET);
+  const hmac = createHmac('sha256', getSecret());
   hmac.update(`${memberId}:${category}`);
   return hmac.digest('base64url');
 }
 
 export function verifyUnsubscribeToken(token: string, memberId: string, category: string): boolean {
   const expected = generateUnsubscribeToken(memberId, category);
-  return token === expected;
+  // Use timing-safe comparison to prevent timing attacks
+  const tokenBuf = Buffer.from(token);
+  const expectedBuf = Buffer.from(expected);
+  if (tokenBuf.length !== expectedBuf.length) return false;
+  return timingSafeEqual(tokenBuf, expectedBuf);
 }
 
 export function buildUnsubscribeUrl(memberId: string, category: string, communitySlug: string): string {

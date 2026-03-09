@@ -67,15 +67,6 @@ export function DepositReturnDialog({
 
     // 2. If wallet method, credit the household wallet
     if (method === 'wallet') {
-      // Fetch current wallet balance
-      const { data: wallet } = await supabase
-        .from('unit_wallets')
-        .select('balance')
-        .eq('unit_id', reservation.unit_id)
-        .single();
-
-      const currentBalance = wallet?.balance ?? 0;
-
       // Insert wallet transaction
       const { error: txError } = await supabase.from('wallet_transactions').insert({
         unit_id: reservation.unit_id,
@@ -96,17 +87,30 @@ export function DepositReturnDialog({
         return;
       }
 
-      // Update wallet balance
-      const { error: walletError } = await supabase
-        .from('unit_wallets')
-        .update({
-          balance: currentBalance + reservation.deposit_amount,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('unit_id', reservation.unit_id);
+      // Atomically increment wallet balance to avoid race conditions
+      const { error: walletError } = await supabase.rpc('increment_wallet_balance', {
+        p_unit_id: reservation.unit_id,
+        p_community_id: community.id,
+        p_amount: reservation.deposit_amount,
+      });
 
       if (walletError) {
-        toast.error('Transaction recorded but balance update failed. Please check the wallet.');
+        // Fallback: try direct update with current balance
+        const { data: wallet } = await supabase
+          .from('unit_wallets')
+          .select('balance')
+          .eq('unit_id', reservation.unit_id)
+          .single();
+
+        const currentBalance = wallet?.balance ?? 0;
+        await supabase
+          .from('unit_wallets')
+          .upsert({
+            unit_id: reservation.unit_id,
+            community_id: community.id,
+            balance: currentBalance + reservation.deposit_amount,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'unit_id' });
       }
     }
 

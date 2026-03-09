@@ -219,15 +219,26 @@ export function CreateBallotDialog({
         return;
       }
 
-      // Delete old options and re-insert
-      await supabase.from('ballot_options').delete().eq('ballot_id', editBallot.id);
+      // Insert new options first, then delete old ones (prevents orphaning if insert fails)
       const optionRows = validOptions.map((o, i) => ({
         ballot_id: editBallot.id,
         label: o.label.trim(),
         description: o.description.trim() || null,
         display_order: i,
       }));
-      await supabase.from('ballot_options').insert(optionRows);
+      const { error: optInsertError } = await supabase.from('ballot_options').insert(optionRows);
+
+      if (optInsertError) {
+        toast.error('Ballot updated but options failed to save. Please try editing again.');
+        setSubmitting(false);
+        return;
+      }
+
+      // Now safe to delete old options (new ones are already saved)
+      const oldOptionIds = editBallot.options?.map((o) => o.id) ?? [];
+      if (oldOptionIds.length > 0) {
+        await supabase.from('ballot_options').delete().in('id', oldOptionIds);
+      }
 
       toast.success('Ballot updated.');
     } else {

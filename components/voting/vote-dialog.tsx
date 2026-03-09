@@ -43,11 +43,14 @@ export function VoteDialog({ open, onOpenChange, ballot, onVoted }: VoteDialogPr
     const supabase = createClient();
     async function loadOptions() {
       setLoading(true);
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('ballot_options')
         .select('*')
         .eq('ballot_id', ballot.id)
         .order('display_order');
+      if (error) {
+        toast.error('Failed to load ballot options. Please try again.');
+      }
       setOptions((data as BallotOption[]) ?? []);
       setLoading(false);
     }

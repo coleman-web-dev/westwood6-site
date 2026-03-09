@@ -39,9 +39,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!billingDay || billingDay < 1 || billingDay > 28) {
+    if (!billingDay || !Number.isInteger(billingDay) || billingDay < 1 || billingDay > 28) {
       return NextResponse.json(
-        { error: 'billingDay must be between 1 and 28' },
+        { error: 'billingDay must be an integer between 1 and 28' },
         { status: 400 }
       );
     }
