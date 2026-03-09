@@ -14,6 +14,8 @@ import { toast } from 'sonner';
 import {
   getCheckPrintSettings,
   updateCheckPrintSettings,
+  uploadCheckStockImage,
+  removeCheckStockImage,
 } from '@/lib/actions/check-actions';
 import {
   CHECK_WIDTH_IN,
@@ -409,19 +411,25 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
     }
 
     setUploadingBg(true);
-    const supabase = createClient();
-    const ext = file.name.split('.').pop() || 'png';
-    const filePath = `${communityId}/check-stock/blank-check.${ext}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from('hoa-documents')
-      .upload(filePath, file, { upsert: true });
+    // Convert file to base64 for server action
+    const arrayBuffer = await file.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    const base64 = btoa(binary);
 
-    if (uploadError) {
-      toast.error('Failed to upload image.');
+    const result = await uploadCheckStockImage(communityId, base64, file.name, file.type);
+
+    if (!result.success || !result.filePath) {
+      toast.error(result.error || 'Failed to upload image.');
       setUploadingBg(false);
       return;
     }
+
+    const filePath = result.filePath;
 
     // Save path to settings
     const updatedSettings: CheckPrintSettings = {
@@ -433,19 +441,20 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
     setSettings(updatedSettings);
 
     // Get signed URL for display
+    const supabase = createClient();
     const { data: urlData } = await supabase.storage
       .from('hoa-documents')
       .createSignedUrl(filePath, 3600);
     setBgImageUrl(urlData?.signedUrl || null);
+    const ext = file.name.split('.').pop() || 'png';
     setBgIsPdf(ext.toLowerCase() === 'pdf');
     setUploadingBg(false);
     toast.success('Check stock image uploaded.');
   }
 
   async function handleRemoveBg() {
-    const supabase = createClient();
     if (settings.check_stock_image) {
-      await supabase.storage.from('hoa-documents').remove([settings.check_stock_image]);
+      await removeCheckStockImage(communityId, settings.check_stock_image);
     }
     const updatedSettings: CheckPrintSettings = {
       ...settings,

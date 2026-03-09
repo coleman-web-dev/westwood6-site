@@ -604,6 +604,53 @@ export async function deleteSignature(communityId: string, memberId: string) {
   }
 }
 
+/** Upload a check stock image (uses admin client to bypass storage RLS) */
+export async function uploadCheckStockImage(
+  communityId: string,
+  fileBase64: string,
+  fileName: string,
+  contentType: string,
+) {
+  try {
+    await requirePermission(communityId, 'checks', 'read');
+    const admin = createAdminClient();
+
+    const ext = fileName.split('.').pop() || 'png';
+    const filePath = `${communityId}/check-stock/blank-check.${ext}`;
+
+    // Convert base64 back to buffer
+    const buffer = Buffer.from(fileBase64, 'base64');
+
+    const { error: uploadError } = await admin.storage
+      .from('hoa-documents')
+      .upload(filePath, buffer, { upsert: true, contentType });
+
+    if (uploadError) {
+      console.error('Check stock upload error:', uploadError);
+      return { success: false, error: uploadError.message };
+    }
+
+    return { success: true, filePath };
+  } catch (error) {
+    console.error('Failed to upload check stock:', error);
+    return { success: false, error: 'Failed to upload check stock image' };
+  }
+}
+
+/** Remove a check stock image (uses admin client to bypass storage RLS) */
+export async function removeCheckStockImage(communityId: string, filePath: string) {
+  try {
+    await requirePermission(communityId, 'checks', 'read');
+    const admin = createAdminClient();
+
+    await admin.storage.from('hoa-documents').remove([filePath]);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to remove check stock:', error);
+    return { success: false, error: 'Failed to remove check stock image' };
+  }
+}
+
 /** Get all checks for a community with details */
 export async function getChecks(
   communityId: string,
