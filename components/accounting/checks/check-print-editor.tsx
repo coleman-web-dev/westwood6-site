@@ -611,19 +611,12 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
               />
             )}
             {bgImageUrl && bgIsPdf && (
-              <div
-                className="absolute inset-0 flex items-center justify-center pointer-events-none"
-                style={{ opacity: 0.2 }}
-              >
-                <div className="text-center" style={{ fontFamily: 'system-ui, sans-serif' }}>
-                  <div style={{ fontSize: '14pt', color: '#666' }}>
-                    PDF Background Loaded
-                  </div>
-                  <div style={{ fontSize: '9pt', color: '#999', marginTop: '4px' }}>
-                    Use Print Test to verify alignment
-                  </div>
-                </div>
-              </div>
+              <embed
+                src={`${bgImageUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+                type="application/pdf"
+                className="absolute inset-0 pointer-events-none"
+                style={{ width: '100%', height: '100%', opacity: 0.35 }}
+              />
             )}
 
             {/* Grid dots */}
