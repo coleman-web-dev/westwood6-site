@@ -138,6 +138,7 @@ export default function VendorsPage() {
         vendors={filtered}
         loading={loading}
         onSelect={setSelectedVendor}
+        onWriteCheck={canWrite('vendors') ? (v) => setCheckVendor(v) : undefined}
       />
 
       <CreateVendorDialog

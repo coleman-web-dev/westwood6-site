@@ -1,16 +1,18 @@
 'use client';
 
 import { Badge } from '@/components/shared/ui/badge';
-import { AlertTriangle, CheckCircle } from 'lucide-react';
+import { Button } from '@/components/shared/ui/button';
+import { AlertTriangle, CheckCircle, Printer } from 'lucide-react';
 import type { Vendor } from '@/lib/types/database';
 
 interface VendorListProps {
   vendors: Vendor[];
   loading: boolean;
   onSelect: (v: Vendor) => void;
+  onWriteCheck?: (v: Vendor) => void;
 }
 
-export function VendorList({ vendors, loading, onSelect }: VendorListProps) {
+export function VendorList({ vendors, loading, onSelect, onWriteCheck }: VendorListProps) {
   if (loading) {
     return (
       <div className="space-y-4">
@@ -111,6 +113,20 @@ export function VendorList({ vendors, loading, onSelect }: VendorListProps) {
                   </p>
                 </div>
               </div>
+              {onWriteCheck && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="shrink-0 text-text-muted-light dark:text-text-muted-dark hover:text-text-primary-light dark:hover:text-text-primary-dark"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onWriteCheck(v);
+                  }}
+                  title="Write check"
+                >
+                  <Printer className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </button>
         );
