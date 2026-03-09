@@ -62,7 +62,7 @@ export function VendorDetailDialog({
   const [uploadingW9, setUploadingW9] = useState(false);
   const w9InputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<VendorStatus>('active');
-  const [defaultExpenseAccountId, setDefaultExpenseAccountId] = useState('');
+  const [defaultExpenseAccountId, setDefaultExpenseAccountId] = useState('_none');
   const [addressLine1, setAddressLine1] = useState('');
   const [addressLine2, setAddressLine2] = useState('');
   const [city, setCity] = useState('');
@@ -86,7 +86,7 @@ export function VendorDetailDialog({
       setW9OnFile(vendor.w9_on_file);
       setW9Path(vendor.w9_document_path ?? '');
       setStatus(vendor.status);
-      setDefaultExpenseAccountId(vendor.default_expense_account_id ?? '');
+      setDefaultExpenseAccountId(vendor.default_expense_account_id ?? '_none');
       setAddressLine1(vendor.address_line1 ?? '');
       setAddressLine2(vendor.address_line2 ?? '');
       setCity(vendor.city ?? '');
@@ -125,7 +125,7 @@ export function VendorDetailDialog({
         tax_id: taxId.trim() || null,
         notes: notes.trim() || null,
         status,
-        default_expense_account_id: defaultExpenseAccountId || null,
+        default_expense_account_id: defaultExpenseAccountId === '_none' ? null : defaultExpenseAccountId || null,
         address_line1: addressLine1.trim() || null,
         address_line2: addressLine2.trim() || null,
         city: city.trim() || null,
@@ -356,7 +356,7 @@ export function VendorDetailDialog({
                   <SelectValue placeholder="None" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="_none">None</SelectItem>
                   {expenseAccounts.map((acct) => (
                     <SelectItem key={acct.id} value={acct.id}>
                       {acct.code} - {acct.name}
