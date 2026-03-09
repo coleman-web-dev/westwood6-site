@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import path from 'path';
-import { pathToFileURL } from 'url';
+
+// Pre-load the worker module so pdfjs-dist finds it on globalThis.
+// This avoids filesystem path issues on Vercel's serverless environment.
+// pdfjs-dist checks globalThis.pdfjsWorker.WorkerMessageHandler before
+// trying to spawn a Web Worker, making this the correct server-side approach.
+async function ensureWorkerLoaded() {
+  if (!(globalThis as Record<string, unknown>).pdfjsWorker) {
+    const worker = await import('pdfjs-dist/legacy/build/pdf.worker.mjs');
+    (globalThis as Record<string, unknown>).pdfjsWorker = worker;
+  }
+}
 
 /**
  * POST /api/extract-pdf
@@ -30,16 +39,11 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const data = new Uint8Array(arrayBuffer);
 
+    // Load the worker module into globalThis so pdfjs-dist uses it directly
+    await ensureWorkerLoaded();
+
     // Use legacy build which works in Node.js without DOM/canvas
     const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
-
-    // Point workerSrc to the legacy worker file for the fake worker fallback.
-    // In Node.js, pdfjs-dist dynamically imports this file for main-thread processing.
-    const workerPath = path.join(
-      process.cwd(),
-      'node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs',
-    );
-    pdfjsLib.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).href;
 
     const pdf = await pdfjsLib.getDocument({ data, useSystemFonts: true }).promise;
 
