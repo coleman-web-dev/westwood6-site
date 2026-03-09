@@ -637,13 +637,13 @@ export function ReservationDialog({
               <div className="rounded-inner-card bg-surface-light-2 dark:bg-surface-dark-2 p-3 space-y-1">
                 {fee > 0 && (
                   <div className="flex justify-between text-body">
-                    <span className="text-text-secondary-light dark:text-text-secondary-dark">Reservation fee</span>
+                    <span className="text-text-secondary-light dark:text-text-secondary-dark">Rental fee</span>
                     <span className="tabular-nums text-text-primary-light dark:text-text-primary-dark">${fee.toFixed(2)}</span>
                   </div>
                 )}
                 {deposit > 0 && (
                   <div className="flex justify-between text-body">
-                    <span className="text-text-secondary-light dark:text-text-secondary-dark">Refundable deposit</span>
+                    <span className="text-text-secondary-light dark:text-text-secondary-dark">Security deposit (refundable)</span>
                     <span className="tabular-nums text-text-primary-light dark:text-text-primary-dark">${deposit.toFixed(2)}</span>
                   </div>
                 )}

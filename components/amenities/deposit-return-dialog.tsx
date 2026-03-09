@@ -130,9 +130,9 @@ export function DepositReturnDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Return Deposit</DialogTitle>
+          <DialogTitle>Return Security Deposit</DialogTitle>
           <DialogDescription>
-            Choose how to return the deposit for this reservation.
+            Choose how to return the security deposit for this reservation.
           </DialogDescription>
         </DialogHeader>
 
@@ -140,7 +140,7 @@ export function DepositReturnDialog({
           {/* Summary */}
           <div className="rounded-inner-card bg-surface-light-2 dark:bg-surface-dark-2 p-3 space-y-1">
             <div className="flex justify-between text-body">
-              <span className="text-text-secondary-light dark:text-text-secondary-dark">Deposit amount</span>
+              <span className="text-text-secondary-light dark:text-text-secondary-dark">Security deposit</span>
               <span className="tabular-nums text-text-primary-light dark:text-text-primary-dark font-medium">${depositDollars}</span>
             </div>
             <div className="flex justify-between text-body">
@@ -190,7 +190,7 @@ export function DepositReturnDialog({
                 <div>
                   <p className="text-label text-text-primary-light dark:text-text-primary-dark">Write a check</p>
                   <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                    Return the deposit by check. No wallet transaction recorded.
+                    Return the security deposit by check. No wallet transaction recorded.
                   </p>
                 </div>
               </label>
@@ -203,7 +203,7 @@ export function DepositReturnDialog({
             <Button variant="outline">Cancel</Button>
           </DialogClose>
           <Button onClick={handleSubmit} disabled={submitting}>
-            {submitting ? 'Processing...' : 'Return Deposit'}
+            {submitting ? 'Processing...' : 'Return Security Deposit'}
           </Button>
         </DialogFooter>
       </DialogContent>

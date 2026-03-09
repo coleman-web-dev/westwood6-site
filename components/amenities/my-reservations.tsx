@@ -116,11 +116,11 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
       .eq('id', reservationId);
 
     if (error) {
-      toast.error('Failed to update deposit.');
+      toast.error('Failed to update security deposit.');
       return;
     }
 
-    toast.success('Deposit marked as paid.');
+    toast.success('Security deposit marked as paid.');
     setReservations((prev) =>
       prev.map((r) =>
         r.id === reservationId ? { ...r, deposit_paid: true, deposit_paid_at: new Date().toISOString() } : r
@@ -208,10 +208,10 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
                     {r.deposit_paid
                       ? r.deposit_refunded
                         ? r.deposit_return_method === 'wallet'
-                          ? '(deposit → wallet)'
-                          : '(deposit refunded)'
-                        : '(deposit paid)'
-                      : `(deposit: $${(r.deposit_amount / 100).toFixed(2)})`}
+                          ? '(security deposit → wallet)'
+                          : '(security deposit refunded)'
+                        : '(security deposit paid)'
+                      : `(security deposit: $${(r.deposit_amount / 100).toFixed(2)})`}
                   </span>
                 )}
               </p>
@@ -235,7 +235,7 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
                   size="sm"
                   onClick={() => handleDepositPaid(r.id)}
                 >
-                  Mark Deposit Paid
+                  Mark Security Deposit Paid
                 </Button>
               )}
               {isBoard && r.deposit_amount > 0 && r.deposit_paid && !r.deposit_refunded && (
@@ -244,7 +244,7 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
                   size="sm"
                   onClick={() => setReturningReservation(r)}
                 >
-                  Return Deposit
+                  Return Security Deposit
                 </Button>
               )}
 

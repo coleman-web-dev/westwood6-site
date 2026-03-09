@@ -680,7 +680,7 @@ export function AmenityDialog({
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-                      Fee ($)
+                      Rental Fee ($)
                     </label>
                     <Input
                       type="number"
@@ -693,7 +693,7 @@ export function AmenityDialog({
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-                      Deposit ($)
+                      Security Deposit ($)
                     </label>
                     <Input
                       type="number"
@@ -714,7 +714,7 @@ export function AmenityDialog({
                         Requires payment
                       </p>
                       <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                        Collect fee before confirming reservation
+                        Collect rental fee before confirming reservation
                       </p>
                     </div>
                     <Switch checked={requiresPayment} onCheckedChange={(v) => { touch(); setRequiresPayment(v); }} />
