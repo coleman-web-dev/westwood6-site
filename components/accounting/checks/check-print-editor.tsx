@@ -8,6 +8,7 @@ import { Label } from '@/components/shared/ui/label';
 import { Switch } from '@/components/shared/ui/switch';
 import {
   Printer, Loader2, Move, Upload, Trash2, RotateCcw, Image as ImageIcon,
+  Eye, EyeOff, Minus, Plus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -35,6 +36,9 @@ import type {
 
 const GRID_SNAP = 0.05; // inches
 const CHECK_SECTION_HEIGHT = SECTION_HEIGHT_IN; // ~3.667"
+const PPI = 96; // CSS pixels per inch (standard)
+const NATIVE_WIDTH = CHECK_WIDTH_IN * PPI; // 816px (8.5" at 96 DPI)
+const NATIVE_HEIGHT = Math.round(CHECK_SECTION_HEIGHT * PPI); // ~352px
 
 const ALL_FIELD_IDS: CheckFieldId[] = [
   'payerName', 'payerAddress1', 'payerAddress2',
@@ -72,7 +76,7 @@ const PREVIEW_CHECK: CheckWithDetails = {
   bank_account: { code: '1000', name: 'Operating Account' },
 };
 
-// ─── Helper: snap to grid ────────────────────────────────────────────
+// ─── Helpers ────────────────────────────────────────────────────────
 
 function snap(value: number): number {
   return Math.round(value / GRID_SNAP) * GRID_SNAP;
@@ -119,22 +123,6 @@ function getFieldContent(
 
 // ─── Field style helpers ─────────────────────────────────────────────
 
-function getFieldFontSize(fieldId: CheckFieldId): string {
-  switch (fieldId) {
-    case 'payerName': return '11px';
-    case 'payerAddress1':
-    case 'payerAddress2': return '9px';
-    case 'checkNumber': return '12px';
-    case 'date':
-    case 'payTo': return '10px';
-    case 'amountBox': return '11px';
-    case 'amountWords':
-    case 'memo': return '9px';
-    case 'signatureLine': return '7px';
-    default: return '10px';
-  }
-}
-
 function getFieldFontWeight(fieldId: CheckFieldId): number {
   switch (fieldId) {
     case 'payerName':
@@ -169,8 +157,9 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
   const [bgImageUrl, setBgImageUrl] = useState<string | null>(null);
   const [bgIsPdf, setBgIsPdf] = useState(false);
   const [uploadingBg, setUploadingBg] = useState(false);
+  const [containerWidth, setContainerWidth] = useState(NATIVE_WIDTH);
 
-  const canvasRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const printFrameRef = useRef<HTMLIFrameElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<{
@@ -181,6 +170,21 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
     startTop: number;
   } | null>(null);
 
+  // Canvas scale: ratio between container display size and native canvas size
+  const canvasScale = containerWidth / NATIVE_WIDTH;
+
+  // ── ResizeObserver for container width ───────────────────────────────
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      setContainerWidth(entries[0].contentRect.width);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   // ── Load settings ──────────────────────────────────────────────────
 
   useEffect(() => {
@@ -188,22 +192,27 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
       const data = await getCheckPrintSettings(communityId);
       setSettings(data);
 
-      // Initialize field positions
+      // Initialize field positions with defaults merged in
       if (data.field_positions) {
-        setFieldPositions(data.field_positions);
+        const merged = {} as Record<CheckFieldId, CheckFieldLayout>;
+        for (const key of ALL_FIELD_IDS) {
+          merged[key] = {
+            ...DEFAULT_FIELD_POSITIONS[key],
+            ...(data.field_positions[key] || {}),
+          };
+        }
+        setFieldPositions(merged);
       } else {
         // Migrate from legacy global offsets
         const ox = data.offset_x || 0;
         const oy = data.offset_y || 0;
-        const migrated = { ...DEFAULT_FIELD_POSITIONS };
-        if (ox !== 0 || oy !== 0) {
-          for (const key of ALL_FIELD_IDS) {
-            migrated[key] = {
-              ...migrated[key],
-              top: roundTo2(migrated[key].top + oy),
-              left: roundTo2(migrated[key].left + ox),
-            };
-          }
+        const migrated = {} as Record<CheckFieldId, CheckFieldLayout>;
+        for (const key of ALL_FIELD_IDS) {
+          migrated[key] = {
+            ...DEFAULT_FIELD_POSITIONS[key],
+            top: roundTo2(DEFAULT_FIELD_POSITIONS[key].top + oy),
+            left: roundTo2(DEFAULT_FIELD_POSITIONS[key].left + ox),
+          };
         }
         setFieldPositions(migrated);
       }
@@ -223,12 +232,11 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
     load();
   }, [communityId]);
 
-  // ── Pixels-per-inch scale factor ───────────────────────────────────
+  // ── Pixels-per-inch scale factor for mouse tracking ─────────────────
 
   const getScale = useCallback((): number => {
-    if (!canvasRef.current) return 100;
-    return canvasRef.current.clientWidth / CHECK_WIDTH_IN;
-  }, []);
+    return containerWidth / CHECK_WIDTH_IN;
+  }, [containerWidth]);
 
   // ── Drag handlers ─────────────────────────────────────────────────
 
@@ -461,7 +469,7 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
     toast.success('Layout reset to defaults.');
   }
 
-  // ── Field position update (manual input) ───────────────────────────
+  // ── Field property updates ─────────────────────────────────────────
 
   function updateFieldPos(fieldId: CheckFieldId, key: 'left' | 'top', value: number) {
     setFieldPositions((prev) => ({
@@ -479,6 +487,29 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
       [fieldId]: {
         ...prev[fieldId],
         showLine: !prev[fieldId].showLine,
+      },
+    }));
+  }
+
+  function updateFieldFontSize(fieldId: CheckFieldId, delta: number) {
+    setFieldPositions((prev) => {
+      const currentSize = prev[fieldId].fontSize ?? DEFAULT_FIELD_POSITIONS[fieldId].fontSize ?? 10;
+      return {
+        ...prev,
+        [fieldId]: {
+          ...prev[fieldId],
+          fontSize: Math.min(24, Math.max(6, currentSize + delta)),
+        },
+      };
+    });
+  }
+
+  function toggleFieldVisible(fieldId: CheckFieldId) {
+    setFieldPositions((prev) => ({
+      ...prev,
+      [fieldId]: {
+        ...prev[fieldId],
+        visible: prev[fieldId].visible === false ? true : false,
       },
     }));
   }
@@ -530,9 +561,9 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
           </div>
         </div>
 
-        {/* ─── Drag Canvas (check section only) ───────────────────── */}
+        {/* ─── Drag Canvas (check section only, transform-scaled) ── */}
         <div
-          ref={canvasRef}
+          ref={containerRef}
           className="relative bg-white border border-gray-300 rounded-inner-card overflow-hidden mx-auto select-none"
           style={{
             width: '100%',
@@ -541,18 +572,22 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
           }}
           onClick={() => setSelectedField(null)}
         >
-          {/* Background image / PDF */}
-          {bgImageUrl && (
-            bgIsPdf ? (
-              <object
-                data={bgImageUrl}
-                type="application/pdf"
-                className="absolute inset-0 w-full h-full pointer-events-none"
-                style={{ opacity: 0.35 }}
-              >
-                <p className="text-meta text-center p-4">PDF preview not supported in this browser</p>
-              </object>
-            ) : (
+          {/* Inner canvas at native resolution, CSS-scaled to fit */}
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: `${NATIVE_WIDTH}px`,
+              height: `${NATIVE_HEIGHT}px`,
+              transform: `scale(${canvasScale})`,
+              transformOrigin: 'top left',
+              fontFamily: 'Georgia, "Times New Roman", serif',
+              color: '#000',
+            }}
+          >
+            {/* Background image (images only; PDFs show a placeholder) */}
+            {bgImageUrl && !bgIsPdf && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={bgImageUrl}
@@ -560,76 +595,94 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
                 className="absolute inset-0 w-full h-full object-fill pointer-events-none"
                 style={{ opacity: 0.35 }}
               />
-            )
-          )}
-
-          {/* Grid dots */}
-          <svg
-            className="absolute inset-0 w-full h-full pointer-events-none"
-            style={{ opacity: 0.15 }}
-          >
-            <defs>
-              <pattern
-                id="grid-dots"
-                width={`${(GRID_SNAP / CHECK_WIDTH_IN) * 100}%`}
-                height={`${(GRID_SNAP / CHECK_SECTION_HEIGHT) * 100}%`}
-                patternUnits="objectBoundingBox"
-              >
-                <circle cx="50%" cy="50%" r="0.5" fill="#666" />
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#grid-dots)" />
-          </svg>
-
-          {/* Draggable fields */}
-          {ALL_FIELD_IDS.map((fieldId) => {
-            const pos = fieldPositions[fieldId];
-            const content = getFieldContent(fieldId, check, formattedAmount, amountInWords, settings);
-            const isSelected = selectedField === fieldId;
-            const leftPct = (pos.left / CHECK_WIDTH_IN) * 100;
-            const topPct = (pos.top / CHECK_SECTION_HEIGHT) * 100;
-
-            return (
+            )}
+            {bgImageUrl && bgIsPdf && (
               <div
-                key={fieldId}
-                className={`absolute cursor-grab active:cursor-grabbing transition-shadow ${
-                  isSelected
-                    ? 'ring-2 ring-blue-500 ring-offset-1 z-20'
-                    : 'hover:ring-1 hover:ring-blue-300 z-10'
-                }`}
-                style={{
-                  left: `${leftPct}%`,
-                  top: `${topPct}%`,
-                  fontFamily: 'Georgia, "Times New Roman", serif',
-                  fontSize: getFieldFontSize(fieldId),
-                  fontWeight: getFieldFontWeight(fieldId),
-                  color: '#000',
-                  whiteSpace: 'nowrap',
-                  padding: fieldId === 'amountBox' ? '1px 4px' : '1px 2px',
-                  border: fieldId === 'amountBox' ? '1px solid #333' : 'none',
-                  borderBottom: (pos.showLine && fieldId !== 'amountBox' && fieldId !== 'signatureLine')
-                    ? '1px solid #999' : 'none',
-                  borderTop: (pos.showLine && fieldId === 'signatureLine')
-                    ? '1px solid #999' : 'none',
-                  borderRadius: '2px',
-                  background: isSelected ? 'rgba(59,130,246,0.06)' : 'transparent',
-                }}
-                onMouseDown={(e) => handleMouseDown(e, fieldId)}
-                onTouchStart={(e) => handleTouchStart(e, fieldId)}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedField(fieldId);
-                }}
+                className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                style={{ opacity: 0.2 }}
               >
-                {content.label && (
-                  <span style={{ color: '#666', fontSize: '7px', marginRight: '4px' }}>
-                    {content.label}
-                  </span>
-                )}
-                {content.value}
+                <div className="text-center" style={{ fontFamily: 'system-ui, sans-serif' }}>
+                  <div style={{ fontSize: '14pt', color: '#666' }}>
+                    PDF Background Loaded
+                  </div>
+                  <div style={{ fontSize: '9pt', color: '#999', marginTop: '4px' }}>
+                    Use Print Test to verify alignment
+                  </div>
+                </div>
               </div>
-            );
-          })}
+            )}
+
+            {/* Grid dots */}
+            <svg
+              className="absolute inset-0 pointer-events-none"
+              style={{ opacity: 0.15 }}
+              width={NATIVE_WIDTH}
+              height={NATIVE_HEIGHT}
+            >
+              <defs>
+                <pattern
+                  id="grid-dots"
+                  width={GRID_SNAP * PPI}
+                  height={GRID_SNAP * PPI}
+                  patternUnits="userSpaceOnUse"
+                >
+                  <circle cx={GRID_SNAP * PPI / 2} cy={GRID_SNAP * PPI / 2} r="0.5" fill="#666" />
+                </pattern>
+              </defs>
+              <rect width={NATIVE_WIDTH} height={NATIVE_HEIGHT} fill="url(#grid-dots)" />
+            </svg>
+
+            {/* Draggable fields */}
+            {ALL_FIELD_IDS.map((fieldId) => {
+              const pos = fieldPositions[fieldId];
+              const content = getFieldContent(fieldId, check, formattedAmount, amountInWords, settings);
+              const isSelected = selectedField === fieldId;
+              const isHidden = pos.visible === false;
+              const fontSize = pos.fontSize ?? DEFAULT_FIELD_POSITIONS[fieldId].fontSize ?? 10;
+              const labelFontSize = Math.max(Math.round(fontSize * 0.7), 6);
+
+              return (
+                <div
+                  key={fieldId}
+                  className={`absolute transition-shadow ${
+                    isSelected
+                      ? 'ring-2 ring-blue-500 ring-offset-1 z-20'
+                      : 'hover:ring-1 hover:ring-blue-300 z-10'
+                  }`}
+                  style={{
+                    left: `${pos.left * PPI}px`,
+                    top: `${pos.top * PPI}px`,
+                    fontSize: `${fontSize}pt`,
+                    fontWeight: getFieldFontWeight(fieldId),
+                    whiteSpace: 'nowrap',
+                    padding: fieldId === 'amountBox' ? '1px 4px' : '1px 2px',
+                    border: fieldId === 'amountBox' ? '1px solid #333' : 'none',
+                    borderBottom: (pos.showLine && fieldId !== 'amountBox' && fieldId !== 'signatureLine')
+                      ? '1px solid #999' : 'none',
+                    borderTop: (pos.showLine && fieldId === 'signatureLine')
+                      ? '1px solid #999' : 'none',
+                    borderRadius: '2px',
+                    background: isSelected ? 'rgba(59,130,246,0.06)' : 'transparent',
+                    opacity: isHidden ? 0.25 : 1,
+                    cursor: 'grab',
+                  }}
+                  onMouseDown={(e) => handleMouseDown(e, fieldId)}
+                  onTouchStart={(e) => handleTouchStart(e, fieldId)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedField(fieldId);
+                  }}
+                >
+                  {content.label && (
+                    <span style={{ color: '#666', fontSize: `${labelFontSize}pt`, marginRight: '4px' }}>
+                      {content.label}
+                    </span>
+                  )}
+                  {content.value}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -645,6 +698,27 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
             </Button>
           </div>
           <div className="flex flex-wrap items-center gap-4">
+            {/* Visibility toggle */}
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                className={`h-7 w-7 p-0 ${fieldPositions[selectedField].visible === false ? 'text-red-500' : 'text-green-600'}`}
+                onClick={() => toggleFieldVisible(selectedField)}
+                title={fieldPositions[selectedField].visible === false ? 'Show field' : 'Hide field'}
+              >
+                {fieldPositions[selectedField].visible === false ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </Button>
+              <Label className="text-meta shrink-0">
+                {fieldPositions[selectedField].visible === false ? 'Hidden' : 'Visible'}
+              </Label>
+            </div>
+
+            {/* Show Line toggle */}
             <div className="flex items-center gap-2">
               <Label className="text-meta shrink-0">Show Line</Label>
               <Switch
@@ -652,6 +726,35 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
                 onCheckedChange={() => toggleFieldLine(selectedField)}
               />
             </div>
+
+            {/* Font Size +/- */}
+            <div className="flex items-center gap-1.5">
+              <Label className="text-meta shrink-0">Size</Label>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 w-7 p-0"
+                onClick={() => updateFieldFontSize(selectedField, -1)}
+                disabled={(fieldPositions[selectedField].fontSize ?? DEFAULT_FIELD_POSITIONS[selectedField].fontSize ?? 10) <= 6}
+              >
+                <Minus className="h-3 w-3" />
+              </Button>
+              <span className="text-meta w-8 text-center font-mono">
+                {fieldPositions[selectedField].fontSize ?? DEFAULT_FIELD_POSITIONS[selectedField].fontSize ?? 10}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 w-7 p-0"
+                onClick={() => updateFieldFontSize(selectedField, 1)}
+                disabled={(fieldPositions[selectedField].fontSize ?? DEFAULT_FIELD_POSITIONS[selectedField].fontSize ?? 10) >= 24}
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+              <span className="text-meta text-text-muted-light dark:text-text-muted-dark">pt</span>
+            </div>
+
+            {/* X coordinate */}
             <div className="flex items-center gap-2">
               <Label className="text-meta shrink-0">X</Label>
               <Input
@@ -665,6 +768,8 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
               />
               <span className="text-meta text-text-muted-light dark:text-text-muted-dark">&quot;</span>
             </div>
+
+            {/* Y coordinate */}
             <div className="flex items-center gap-2">
               <Label className="text-meta shrink-0">Y</Label>
               <Input
@@ -749,7 +854,7 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
             Check Stock Image
           </h3>
           <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-            Upload a scan of your blank check as a positioning reference.
+            Upload a scan of your blank check as a positioning reference. PNG or JPG recommended for best preview.
           </p>
 
           {bgImageUrl ? (

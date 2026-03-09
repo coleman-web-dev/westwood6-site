@@ -89,6 +89,8 @@ export interface CheckFieldLayout {
   top: number;        // inches from top of check section
   left: number;       // inches from left edge of page
   showLine: boolean;  // whether to render underline/border for this field
+  fontSize?: number;  // font size in pt (defaults vary by field type)
+  visible?: boolean;  // whether to include when printing (default true)
 }
 
 export type CheckFieldId =
