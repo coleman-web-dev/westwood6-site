@@ -38,10 +38,16 @@ import type {
 
 const GRID_SNAP = 0.05; // inches
 const CHECK_SECTION_HEIGHT = SECTION_HEIGHT_IN; // ~3.667"
+const PAGE_HEIGHT_IN = 11; // full letter page
 const PPI = 96; // CSS pixels per inch (standard)
 const NATIVE_WIDTH = CHECK_WIDTH_IN * PPI; // 816px (8.5" at 96 DPI)
-const NATIVE_HEIGHT = Math.round(CHECK_SECTION_HEIGHT * PPI); // ~352px
+const NATIVE_HEIGHT = Math.round(PAGE_HEIGHT_IN * PPI); // 1056px (full page)
+const SECTION_HEIGHT_PX = Math.round(CHECK_SECTION_HEIGHT * PPI); // ~352px per section
 const DEFAULT_PRINT_MARGIN = 0.4; // inches, matches Chrome's default page margin
+
+function getSectionTopIn(pos: CheckPosition): number {
+  return pos === 'top' ? 0 : pos === 'middle' ? SECTION_HEIGHT_IN : SECTION_HEIGHT_IN * 2;
+}
 
 const ALL_FIELD_IDS: CheckFieldId[] = [
   'payerName', 'payerAddress1', 'payerAddress2',
@@ -624,7 +630,7 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
           className="relative bg-white border border-gray-300 rounded-inner-card overflow-hidden mx-auto select-none"
           style={{
             width: '100%',
-            aspectRatio: `${CHECK_WIDTH_IN} / ${CHECK_SECTION_HEIGHT}`,
+            aspectRatio: `${CHECK_WIDTH_IN} / ${PAGE_HEIGHT_IN}`,
             cursor: 'default',
           }}
           onClick={() => setSelectedField(null)}
@@ -653,30 +659,20 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
                 style={{ opacity: 0.35 }}
               />
             )}
-            {bgIsPdf && bgRenderedUrl && (() => {
-              // Show only the relevant section of the full-page PDF render
-              const sectionIdx = settings.check_position === 'top' ? 0
-                : settings.check_position === 'middle' ? 1 : 2;
-              const fullPageHeight = NATIVE_WIDTH * (11 / 8.5); // maintain letter aspect
-              const sectionTop = -(sectionIdx * (fullPageHeight / 3));
-              return (
-                <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ opacity: 0.4 }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={bgRenderedUrl}
-                    alt="Check stock (PDF)"
-                    style={{
-                      width: `${NATIVE_WIDTH}px`,
-                      height: `${fullPageHeight}px`,
-                      position: 'absolute',
-                      top: `${sectionTop}px`,
-                      left: 0,
-                      objectFit: 'fill',
-                    }}
-                  />
-                </div>
-              );
-            })()}
+            {bgIsPdf && bgRenderedUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={bgRenderedUrl}
+                alt="Check stock (PDF)"
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  width: `${NATIVE_WIDTH}px`,
+                  height: `${NATIVE_HEIGHT}px`,
+                  objectFit: 'fill',
+                  opacity: 0.4,
+                }}
+              />
+            )}
 
             {/* Margin guides (shaded no-print zone) */}
             {printMargin > 0 && (
@@ -708,12 +704,49 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
               </svg>
             )}
 
-            {/* Grid dots */}
+            {/* Section divider lines */}
+            <div style={{ position: 'absolute', left: 0, right: 0, top: `${SECTION_HEIGHT_PX}px`, height: '1px',
+              borderTop: '1px dashed rgba(0,0,0,0.15)', pointerEvents: 'none', zIndex: 3 }} />
+            <div style={{ position: 'absolute', left: 0, right: 0, top: `${SECTION_HEIGHT_PX * 2}px`, height: '1px',
+              borderTop: '1px dashed rgba(0,0,0,0.15)', pointerEvents: 'none', zIndex: 3 }} />
+
+            {/* Stub section overlays (dimmed) */}
+            {([0, 1, 2] as const).map((idx) => {
+              const sectionPos = idx === 0 ? 'top' : idx === 1 ? 'middle' : 'bottom';
+              if (sectionPos === settings.check_position) return null;
+              return (
+                <div key={idx} style={{
+                  position: 'absolute',
+                  left: 0, width: `${NATIVE_WIDTH}px`,
+                  top: `${idx * SECTION_HEIGHT_PX}px`,
+                  height: `${SECTION_HEIGHT_PX}px`,
+                  background: 'rgba(0,0,0,0.04)',
+                  pointerEvents: 'none',
+                  zIndex: 2,
+                }}>
+                  <span style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+                    color: 'rgba(0,0,0,0.15)', fontSize: '14px', fontWeight: 600, fontFamily: 'system-ui, sans-serif' }}>STUB</span>
+                </div>
+              );
+            })}
+
+            {/* Active section label */}
+            <div style={{ position: 'absolute', right: 8,
+              top: `${getSectionTopIn(settings.check_position) * PPI + 4}px`,
+              color: 'rgba(34,197,94,0.4)', fontSize: '11px', fontWeight: 600, zIndex: 3,
+              pointerEvents: 'none', fontFamily: 'system-ui, sans-serif' }}>CHECK</div>
+
+            {/* Grid dots (check section only) */}
             <svg
-              className="absolute inset-0 pointer-events-none"
-              style={{ opacity: 0.15 }}
+              className="pointer-events-none"
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: `${getSectionTopIn(settings.check_position) * PPI}px`,
+                opacity: 0.15,
+              }}
               width={NATIVE_WIDTH}
-              height={NATIVE_HEIGHT}
+              height={SECTION_HEIGHT_PX}
             >
               <defs>
                 <pattern
@@ -725,7 +758,7 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
                   <circle cx={GRID_SNAP * PPI / 2} cy={GRID_SNAP * PPI / 2} r="0.5" fill="#666" />
                 </pattern>
               </defs>
-              <rect width={NATIVE_WIDTH} height={NATIVE_HEIGHT} fill="url(#grid-dots)" />
+              <rect width={NATIVE_WIDTH} height={SECTION_HEIGHT_PX} fill="url(#grid-dots)" />
             </svg>
 
             {/* Draggable fields */}
@@ -747,7 +780,7 @@ export function CheckPrintEditor({ communityId }: CheckPrintEditorProps) {
                   }`}
                   style={{
                     left: `${pos.left * PPI}px`,
-                    top: `${pos.top * PPI}px`,
+                    top: `${(getSectionTopIn(settings.check_position) + pos.top) * PPI}px`,
                     fontSize: `${fontSize}pt`,
                     fontWeight: getFieldFontWeight(fieldId),
                     whiteSpace: 'nowrap',
