@@ -35,6 +35,7 @@ export default function HouseholdPage() {
 
   // Board: all units + selected unit
   const [allUnits, setAllUnits] = useState<Unit[]>([]);
+  const [unitMembersMap, setUnitMembersMap] = useState<Map<string, string[]>>(new Map());
   const [selectedUnitId, setSelectedUnitId] = useState<string>(unitParam || unit?.id || '');
   const [selectedUnit, setSelectedUnit] = useState<Unit | undefined>(unit ?? undefined);
   const [comboOpen, setComboOpen] = useState(false);
@@ -60,15 +61,32 @@ export default function HouseholdPage() {
 
     const supabase = createClient();
     async function loadUnits() {
-      const { data } = await supabase
-        .from('units')
-        .select('*')
-        .eq('community_id', community.id)
-        .eq('status', 'active')
-        .order('unit_number', { ascending: true });
+      const [{ data }, { data: membersData }] = await Promise.all([
+        supabase
+          .from('units')
+          .select('*')
+          .eq('community_id', community.id)
+          .eq('status', 'active')
+          .order('unit_number', { ascending: true }),
+        supabase
+          .from('members')
+          .select('unit_id, first_name, last_name')
+          .eq('community_id', community.id)
+          .eq('is_approved', true),
+      ]);
 
       const units = (data as Unit[]) ?? [];
       setAllUnits(units);
+
+      // Build unit → member names map for search
+      const namesMap = new Map<string, string[]>();
+      (membersData ?? []).forEach((m: { unit_id: string | null; first_name: string; last_name: string }) => {
+        if (!m.unit_id) return;
+        const names = namesMap.get(m.unit_id) || [];
+        names.push(`${m.first_name} ${m.last_name}`);
+        namesMap.set(m.unit_id, names);
+      });
+      setUnitMembersMap(namesMap);
 
       // If URL param exists and matches a unit, use it
       if (unitParam) {
@@ -212,10 +230,12 @@ export default function HouseholdPage() {
                 <CommandGroup>
                   {allUnits.map((u) => {
                     const label = `Unit ${u.unit_number}${u.address ? ` - ${u.address}` : ''}`;
+                    const memberNames = unitMembersMap.get(u.id) ?? [];
+                    const searchValue = `${label} ${memberNames.join(' ')}`;
                     return (
                       <CommandItem
                         key={u.id}
-                        value={label}
+                        value={searchValue}
                         onSelect={() => {
                           selectUnit(u.id);
                           setComboOpen(false);
@@ -227,7 +247,14 @@ export default function HouseholdPage() {
                             selectedUnitId === u.id ? 'opacity-100' : 'opacity-0',
                           )}
                         />
-                        {label}
+                        <div className="min-w-0">
+                          <div className="truncate">{label}</div>
+                          {memberNames.length > 0 && (
+                            <div className="text-meta text-text-muted-light dark:text-text-muted-dark truncate">
+                              {memberNames.join(', ')}
+                            </div>
+                          )}
+                        </div>
                       </CommandItem>
                     );
                   })}

@@ -23,10 +23,10 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
-import { Upload, FileText, CheckCircle, DollarSign, Printer } from 'lucide-react';
+import { Upload, FileText, CheckCircle, DollarSign, Printer, ShieldCheck } from 'lucide-react';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { VendorDocumentsSection } from '@/components/vendors/vendor-documents-section';
-import type { Vendor, VendorCategoryRow, VendorStatus } from '@/lib/types/database';
+import type { Vendor, VendorCategoryRow, VendorDocument, VendorStatus } from '@/lib/types/database';
 import type { Account } from '@/lib/types/accounting';
 
 interface VendorDetailDialogProps {
@@ -63,6 +63,9 @@ export function VendorDetailDialog({
   const [w9Path, setW9Path] = useState('');
   const [uploadingW9, setUploadingW9] = useState(false);
   const w9InputRef = useRef<HTMLInputElement>(null);
+  const [insuranceDoc, setInsuranceDoc] = useState<VendorDocument | null>(null);
+  const [uploadingInsurance, setUploadingInsurance] = useState(false);
+  const insuranceInputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<VendorStatus>('active');
   const [defaultExpenseAccountId, setDefaultExpenseAccountId] = useState('_none');
   const [addressLine1, setAddressLine1] = useState('');
@@ -95,7 +98,7 @@ export function VendorDetailDialog({
       setState(vendor.state ?? '');
       setZip(vendor.zip ?? '');
 
-      // Fetch expense accounts
+      // Fetch expense accounts and latest insurance doc
       const supabase = createClient();
       supabase
         .from('accounts')
@@ -105,6 +108,15 @@ export function VendorDetailDialog({
         .eq('is_active', true)
         .order('code')
         .then(({ data }) => setExpenseAccounts((data as Account[]) || []));
+
+      supabase
+        .from('vendor_documents')
+        .select('*')
+        .eq('vendor_id', vendor.id)
+        .eq('document_type', 'insurance_cert')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .then(({ data }) => setInsuranceDoc((data?.[0] as VendorDocument) ?? null));
     }
   }, [vendor]);
 
@@ -198,6 +210,61 @@ export function VendorDetailDialog({
     }
   }
 
+  async function handleInsuranceUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !vendor) return;
+    setUploadingInsurance(true);
+    const supabase = createClient();
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-').replace(/-+/g, '-');
+    const path = `${vendor.community_id}/vendor-docs/${vendor.id}/${Date.now()}_${safeName}`;
+    const { error: uploadError } = await supabase.storage
+      .from('hoa-documents')
+      .upload(path, file, { upsert: false });
+    if (uploadError) {
+      toast.error('Failed to upload file.');
+      setUploadingInsurance(false);
+      if (insuranceInputRef.current) insuranceInputRef.current.value = '';
+      return;
+    }
+    const { data: docData, error: insertError } = await supabase
+      .from('vendor_documents')
+      .insert({
+        vendor_id: vendor.id,
+        community_id: vendor.community_id,
+        document_type: 'insurance_cert' as const,
+        title: 'Insurance Certificate',
+        file_path: path,
+        file_size: file.size,
+        uploaded_by: member?.id ?? '',
+      })
+      .select('*')
+      .single();
+    if (insertError) {
+      toast.error('Failed to save document record.');
+      setUploadingInsurance(false);
+      if (insuranceInputRef.current) insuranceInputRef.current.value = '';
+      return;
+    }
+    setInsuranceDoc(docData as VendorDocument);
+    toast.success('Insurance certificate uploaded.');
+    setUploadingInsurance(false);
+    if (insuranceInputRef.current) insuranceInputRef.current.value = '';
+    onUpdated();
+  }
+
+  async function handleInsuranceDownload() {
+    if (!insuranceDoc) return;
+    const supabase = createClient();
+    const { data } = await supabase.storage
+      .from('hoa-documents')
+      .createSignedUrl(insuranceDoc.file_path, 60);
+    if (data?.signedUrl) {
+      window.open(data.signedUrl, '_blank');
+    } else {
+      toast.error('Failed to generate download link.');
+    }
+  }
+
   if (!vendor) return null;
 
   return (
@@ -282,6 +349,48 @@ export function VendorDetailDialog({
                 Insurance expiry
               </Label>
               <Input type="date" value={insuranceExpiry} onChange={(e) => setInsuranceExpiry(e.target.value)} />
+            </div>
+          </div>
+
+          {/* Insurance Certificate Upload */}
+          <div className="space-y-1.5">
+            <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+              Insurance Certificate
+            </Label>
+            <div className="flex items-center gap-3">
+              {insuranceDoc ? (
+                <Badge variant="outline" className="text-meta text-green-600 dark:text-green-400 gap-1">
+                  <ShieldCheck className="h-3 w-3" />
+                  On file
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-meta text-yellow-600 dark:text-yellow-400">
+                  No certificate
+                </Badge>
+              )}
+              {insuranceDoc && (
+                <Button type="button" variant="ghost" size="sm" onClick={handleInsuranceDownload}>
+                  <FileText className="h-3.5 w-3.5 mr-1" />
+                  View
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={uploadingInsurance}
+                onClick={() => insuranceInputRef.current?.click()}
+              >
+                <Upload className="h-3.5 w-3.5 mr-1" />
+                {uploadingInsurance ? 'Uploading...' : insuranceDoc ? 'Replace' : 'Upload'}
+              </Button>
+              <input
+                ref={insuranceInputRef}
+                type="file"
+                accept="application/pdf,image/*"
+                className="hidden"
+                onChange={handleInsuranceUpload}
+              />
             </div>
           </div>
 
