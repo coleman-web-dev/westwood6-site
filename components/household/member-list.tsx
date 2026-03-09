@@ -74,40 +74,9 @@ export function MemberList({
     onMemberRemoved();
   }
 
-  if (loading) {
-    return (
-      <div className="space-y-3">
-        {[1, 2, 3].map((i) => (
-          <div
-            key={i}
-            className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding"
-          >
-            <div className="flex items-center gap-4">
-              <Skeleton className="h-10 w-10 rounded-full" />
-              <div className="flex-1 space-y-2">
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-3 w-48" />
-              </div>
-              <Skeleton className="h-6 w-16 rounded-full" />
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (members.length === 0) {
-    return (
-      <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding text-center">
-        <p className="text-body text-text-muted-light dark:text-text-muted-dark">
-          No household members found.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-3">
+      {/* Header: always visible so Add Member is always accessible */}
       <div className="flex items-center justify-between">
         <h2 className="text-card-title text-text-primary-light dark:text-text-primary-dark">
           Members ({members.length})
@@ -120,6 +89,31 @@ export function MemberList({
         )}
       </div>
 
+      {loading ? (
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding"
+            >
+              <div className="flex items-center gap-4">
+                <Skeleton className="h-10 w-10 rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-48" />
+                </div>
+                <Skeleton className="h-6 w-16 rounded-full" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : members.length === 0 ? (
+        <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding text-center">
+          <p className="text-body text-text-muted-light dark:text-text-muted-dark">
+            No household members found.
+          </p>
+        </div>
+      ) : (
       <div className="space-y-2">
         {members.map((m) => {
           const isSelf = m.id === currentMemberId;
@@ -209,6 +203,7 @@ export function MemberList({
           );
         })}
       </div>
+      )}
     </div>
   );
 }

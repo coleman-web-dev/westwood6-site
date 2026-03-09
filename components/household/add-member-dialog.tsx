@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
+import { sendWelcomeInvites } from '@/lib/actions/email-actions';
 import { Button } from '@/components/shared/ui/button';
 import { Input } from '@/components/shared/ui/input';
 import { Label } from '@/components/shared/ui/label';
+import { Checkbox } from '@/components/shared/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -40,7 +42,13 @@ export function AddMemberDialog({ open, onOpenChange, onSuccess, unitOverride }:
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState<MemberRole>('member');
+  const [sendInvite, setSendInvite] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Auto-check "send invite" when email is entered
+  useEffect(() => {
+    setSendInvite(!!email.trim());
+  }, [email]);
 
   function resetForm() {
     setFirstName('');
@@ -48,6 +56,7 @@ export function AddMemberDialog({ open, onOpenChange, onSuccess, unitOverride }:
     setEmail('');
     setPhone('');
     setRole('member');
+    setSendInvite(false);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -91,6 +100,23 @@ export function AddMemberDialog({ open, onOpenChange, onSuccess, unitOverride }:
     }
 
     toast.success(`${trimmedFirst} ${trimmedLast} has been added to your household.`);
+
+    // Send invite email if requested
+    if (sendInvite && email.trim()) {
+      const trimmedEmail = email.trim();
+      const result = await sendWelcomeInvites(
+        community.id,
+        community.slug,
+        community.name,
+        [{ email: trimmedEmail, name: `${trimmedFirst} ${trimmedLast}` }],
+      );
+      if (result.success) {
+        toast.success(`Invite email queued for ${trimmedEmail}`);
+      } else {
+        toast.error('Member added, but failed to send invite email.');
+      }
+    }
+
     resetForm();
     onOpenChange(false);
     onSuccess();
@@ -142,6 +168,24 @@ export function AddMemberDialog({ open, onOpenChange, onSuccess, unitOverride }:
               placeholder="email@example.com"
               disabled={submitting}
             />
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="send-invite"
+                checked={sendInvite}
+                onCheckedChange={(checked) => setSendInvite(checked === true)}
+                disabled={!email.trim() || submitting}
+              />
+              <label
+                htmlFor="send-invite"
+                className={`text-meta cursor-pointer select-none ${
+                  email.trim()
+                    ? 'text-text-secondary-light dark:text-text-secondary-dark'
+                    : 'text-text-muted-light dark:text-text-muted-dark'
+                }`}
+              >
+                Send invite email with login link
+              </label>
+            </div>
           </div>
 
           <div className="space-y-2">

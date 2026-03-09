@@ -1,31 +1,43 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { MemberList } from '@/components/household/member-list';
 import { AddMemberDialog } from '@/components/household/add-member-dialog';
 import { MoveOutDialog } from '@/components/household/move-out-dialog';
 import { SignedAgreementsSection } from '@/components/household/signed-agreements-section';
-import { Home, FileSignature } from 'lucide-react';
+import { Home, FileSignature, Check, ChevronsUpDown } from 'lucide-react';
 import { Button } from '@/components/shared/ui/button';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/shared/ui/popover';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/shared/ui/select';
+  Command,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+} from '@/components/shared/ui/command';
+import { cn } from '@/lib/utils';
 import type { Member, Unit } from '@/lib/types/database';
 
 export default function HouseholdPage() {
   const { community, member, unit, householdMembers, isHeadOfHousehold, isBoard } =
     useCommunity();
 
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Read unit from URL param (board only)
+  const unitParam = searchParams.get('unit');
+
   // Board: all units + selected unit
   const [allUnits, setAllUnits] = useState<Unit[]>([]);
-  const [selectedUnitId, setSelectedUnitId] = useState<string>(unit?.id ?? '');
+  const [selectedUnitId, setSelectedUnitId] = useState<string>(unitParam || unit?.id || '');
   const [selectedUnit, setSelectedUnit] = useState<Unit | undefined>(unit ?? undefined);
+  const [comboOpen, setComboOpen] = useState(false);
 
   const [members, setMembers] = useState<Member[]>(householdMembers);
   const [loading, setLoading] = useState(false);
@@ -33,6 +45,14 @@ export default function HouseholdPage() {
   const [moveOutOpen, setMoveOutOpen] = useState(false);
 
   const canManage = isHeadOfHousehold || isBoard;
+
+  // Persist unit selection to URL
+  function selectUnit(unitId: string) {
+    setSelectedUnitId(unitId);
+    if (isBoard) {
+      router.replace(`${pathname}?unit=${unitId}`, { scroll: false });
+    }
+  }
 
   // Fetch all units for board
   useEffect(() => {
@@ -50,14 +70,25 @@ export default function HouseholdPage() {
       const units = (data as Unit[]) ?? [];
       setAllUnits(units);
 
-      // Default to first unit if no unit from context
+      // If URL param exists and matches a unit, use it
+      if (unitParam) {
+        const found = units.find((u) => u.id === unitParam);
+        if (found) {
+          setSelectedUnitId(unitParam);
+          setSelectedUnit(found);
+          return;
+        }
+      }
+
+      // Default to context unit or first unit
       if (!selectedUnitId && units.length > 0) {
-        setSelectedUnitId(units[0].id);
-        setSelectedUnit(units[0]);
+        const fallback = unit?.id || units[0].id;
+        selectUnit(fallback);
       }
     }
     loadUnits();
-  }, [isBoard, community.id, selectedUnitId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isBoard, community.id]);
 
   // Update selectedUnit when selection changes
   useEffect(() => {
@@ -155,23 +186,56 @@ export default function HouseholdPage() {
         )}
       </div>
 
-      {/* Board: unit selector */}
+      {/* Board: searchable unit selector */}
       {isBoard && allUnits.length > 0 && (
-        <div className="max-w-xs">
-          <Select value={selectedUnitId} onValueChange={setSelectedUnitId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select a unit" />
-            </SelectTrigger>
-            <SelectContent>
-              {allUnits.map((u) => (
-                <SelectItem key={u.id} value={u.id}>
-                  Unit {u.unit_number}
-                  {u.address ? ` - ${u.address}` : ''}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <Popover open={comboOpen} onOpenChange={setComboOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={comboOpen}
+              className="w-full max-w-md justify-between font-normal"
+            >
+              <span className="truncate">
+                {selectedUnit
+                  ? `Unit ${selectedUnit.unit_number}${selectedUnit.address ? ` - ${selectedUnit.address}` : ''}`
+                  : 'Select a unit'}
+              </span>
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+            <Command>
+              <CommandInput placeholder="Search units..." />
+              <CommandList>
+                <CommandEmpty>No units found.</CommandEmpty>
+                <CommandGroup>
+                  {allUnits.map((u) => {
+                    const label = `Unit ${u.unit_number}${u.address ? ` - ${u.address}` : ''}`;
+                    return (
+                      <CommandItem
+                        key={u.id}
+                        value={label}
+                        onSelect={() => {
+                          selectUnit(u.id);
+                          setComboOpen(false);
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            'mr-2 h-4 w-4',
+                            selectedUnitId === u.id ? 'opacity-100' : 'opacity-0',
+                          )}
+                        />
+                        {label}
+                      </CommandItem>
+                    );
+                  })}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
       )}
 
       {/* Unit info card */}
