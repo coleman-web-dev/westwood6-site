@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
-import { Upload, FileText, CheckCircle, DollarSign } from 'lucide-react';
+import { Upload, FileText, CheckCircle, DollarSign, Printer } from 'lucide-react';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { VendorDocumentsSection } from '@/components/vendors/vendor-documents-section';
 import type { Vendor, VendorCategoryRow, VendorStatus } from '@/lib/types/database';
@@ -36,6 +36,7 @@ interface VendorDetailDialogProps {
   onOpenChange: (open: boolean) => void;
   onUpdated: () => void;
   onRecordPayment?: (vendor: Vendor) => void;
+  onWriteCheck?: (vendor: Vendor) => void;
 }
 
 export function VendorDetailDialog({
@@ -45,6 +46,7 @@ export function VendorDetailDialog({
   onOpenChange,
   onUpdated,
   onRecordPayment,
+  onWriteCheck,
 }: VendorDetailDialogProps) {
   const { isBoard, member } = useCommunity();
   const [name, setName] = useState('');
@@ -416,16 +418,29 @@ export function VendorDetailDialog({
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
-          {onRecordPayment && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => { onOpenChange(false); onRecordPayment(vendor); }}
-              className="mr-auto"
-            >
-              <DollarSign className="h-4 w-4 mr-1" />
-              Record Payment
-            </Button>
+          {(onWriteCheck || onRecordPayment) && (
+            <div className="flex items-center gap-2 mr-auto">
+              {onWriteCheck && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => { onOpenChange(false); onWriteCheck(vendor); }}
+                >
+                  <Printer className="h-4 w-4 mr-1" />
+                  Write Check
+                </Button>
+              )}
+              {onRecordPayment && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => { onOpenChange(false); onRecordPayment(vendor); }}
+                >
+                  <DollarSign className="h-4 w-4 mr-1" />
+                  Record Payment
+                </Button>
+              )}
+            </div>
           )}
           <DialogClose asChild>
             <Button variant="outline">Cancel</Button>

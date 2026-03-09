@@ -11,6 +11,7 @@ import { VendorDetailDialog } from '@/components/vendors/vendor-detail-dialog';
 import { RecordVendorPaymentDialog } from '@/components/vendors/record-vendor-payment-dialog';
 import { VendorCategoryManager } from '@/components/vendors/vendor-category-manager';
 import { ImportVendorsDialog } from '@/components/vendors/import-vendors-dialog';
+import { WriteCheckDialog } from '@/components/accounting/checks/write-check-dialog';
 import { useVendorCategories } from '@/lib/hooks/use-vendor-categories';
 import type { Vendor } from '@/lib/types/database';
 
@@ -25,6 +26,7 @@ export default function VendorsPage() {
   const [importOpen, setImportOpen] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [paymentVendor, setPaymentVendor] = useState<Vendor | null>(null);
+  const [checkVendor, setCheckVendor] = useState<Vendor | null>(null);
 
   const fetchVendors = useCallback(async () => {
     const supabase = createClient();
@@ -153,6 +155,7 @@ export default function VendorsPage() {
         onOpenChange={(open) => { if (!open) setSelectedVendor(null); }}
         onUpdated={fetchVendors}
         onRecordPayment={(v) => setPaymentVendor(v)}
+        onWriteCheck={(v) => setCheckVendor(v)}
       />
 
       <VendorCategoryManager
@@ -178,6 +181,14 @@ export default function VendorsPage() {
         communityId={community.id}
         memberId={member?.id}
         onRecorded={fetchVendors}
+      />
+
+      <WriteCheckDialog
+        communityId={community.id}
+        open={checkVendor !== null}
+        onOpenChange={(open) => { if (!open) setCheckVendor(null); }}
+        onCheckCreated={fetchVendors}
+        preselectedVendorId={checkVendor?.id}
       />
     </div>
   );

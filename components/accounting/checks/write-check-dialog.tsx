@@ -45,6 +45,8 @@ interface WriteCheckDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCheckCreated: () => void;
+  /** Pre-select a vendor when opening from the vendor detail view */
+  preselectedVendorId?: string | null;
 }
 
 export function WriteCheckDialog({
@@ -52,6 +54,7 @@ export function WriteCheckDialog({
   open,
   onOpenChange,
   onCheckCreated,
+  preselectedVendorId,
 }: WriteCheckDialogProps) {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [expenseAccounts, setExpenseAccounts] = useState<Account[]>([]);
@@ -121,6 +124,14 @@ export function WriteCheckDialog({
 
     fetchData();
   }, [open, communityId]);
+
+  // When preselectedVendorId is provided, auto-select that vendor
+  useEffect(() => {
+    if (open && preselectedVendorId && vendors.length > 0) {
+      setSelectedVendorId(preselectedVendorId);
+      setIsCustomPayee(false);
+    }
+  }, [open, preselectedVendorId, vendors]);
 
   // When vendor selected, auto-fill expense category
   useEffect(() => {
