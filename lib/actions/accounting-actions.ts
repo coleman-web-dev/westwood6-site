@@ -656,3 +656,17 @@ export async function getAccountTransactions(
 
   return { transactions, total };
 }
+
+// ─── Chart of Accounts (all accounts including inactive) ─────────
+
+export async function getAllAccounts(communityId: string) {
+  const admin = createAdminClient();
+
+  const { data: accounts } = await admin
+    .from('accounts')
+    .select('*')
+    .eq('community_id', communityId)
+    .order('display_order');
+
+  return (accounts as import('@/lib/types/accounting').Account[]) || [];
+}

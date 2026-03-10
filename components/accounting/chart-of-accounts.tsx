@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { getAllAccounts } from '@/lib/actions/accounting-actions';
 import { Button } from '@/components/shared/ui/button';
 import { Badge } from '@/components/shared/ui/badge';
 import { Info, Plus } from 'lucide-react';
@@ -69,14 +69,8 @@ export function ChartOfAccounts({ communityId }: ChartOfAccountsProps) {
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
 
   const fetchAccounts = useCallback(async () => {
-    const supabase = createClient();
-    const { data } = await supabase
-      .from('accounts')
-      .select('*')
-      .eq('community_id', communityId)
-      .order('display_order');
-
-    setAccounts((data as Account[]) || []);
+    const data = await getAllAccounts(communityId);
+    setAccounts(data);
     setLoading(false);
   }, [communityId]);
 
