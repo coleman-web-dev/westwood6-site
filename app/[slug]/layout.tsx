@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { CommunityProvider } from '@/lib/providers/community-provider';
 import type { Community, Member, Unit } from '@/lib/types/database';
 
@@ -89,6 +90,41 @@ export default async function CommunityLayout({ children, params }: Props) {
 
     member = memberResult.data as Member | null;
 
+    // Super admin auto-provisioning: if user has no member record in this
+    // community but is a super_admin in ANY community, create one so they
+    // get full access everywhere.
+    if (!member) {
+      const adminClient = createAdminClient();
+      const { data: superAdminRecord } = await adminClient
+        .from('members')
+        .select('id, first_name, last_name, email')
+        .eq('user_id', user.id)
+        .eq('system_role', 'super_admin')
+        .eq('is_approved', true)
+        .limit(1)
+        .maybeSingle();
+
+      if (superAdminRecord) {
+        const { data: newMember } = await adminClient
+          .from('members')
+          .insert({
+            community_id: community.id,
+            user_id: user.id,
+            first_name: superAdminRecord.first_name,
+            last_name: superAdminRecord.last_name,
+            email: superAdminRecord.email,
+            member_role: 'owner',
+            system_role: 'super_admin',
+            is_approved: true,
+            show_in_directory: false,
+          })
+          .select('*')
+          .single();
+
+        member = newMember as Member | null;
+      }
+    }
+
     // Extract user's communities for the switcher
     if (allMembershipsResult.data) {
       userCommunities = allMembershipsResult.data
@@ -98,6 +134,11 @@ export default async function CommunityLayout({ children, params }: Props) {
           return rest;
         })
         .filter(Boolean) as { id: string; slug: string; name: string }[];
+    }
+
+    // If super_admin was just auto-provisioned, ensure current community is in the switcher
+    if (member && !userCommunities.some((c) => c.id === community.id)) {
+      userCommunities.push({ id: community.id, slug: community.slug, name: community.name });
     }
 
     if (member?.unit_id) {
