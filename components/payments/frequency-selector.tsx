@@ -26,7 +26,7 @@ interface FrequencySelectorProps {
 }
 
 export function FrequencySelector({ onFrequencyChanged }: FrequencySelectorProps) {
-  const { community, unit, isBoard, isHeadOfHousehold, member } = useCommunity();
+  const { community, unit, isBoard, canManageHousehold } = useCommunity();
   const [saving, setSaving] = useState(false);
 
   const paymentSettings = community.theme?.payment_settings;
@@ -36,8 +36,8 @@ export function FrequencySelector({ onFrequencyChanged }: FrequencySelectorProps
   // Only show if flexible frequency is enabled
   if (!allowFlexible) return null;
 
-  // Only head of household, owners, or board can change
-  const canChange = isBoard || isHeadOfHousehold || member?.member_role === 'owner';
+  // Only owner/member roles or board can change (not tenant/minor)
+  const canChange = isBoard || canManageHousehold;
   if (!canChange || !unit) return null;
 
   const currentFrequency = unit.payment_frequency ?? defaultFreq;

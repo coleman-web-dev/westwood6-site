@@ -23,7 +23,7 @@ import { cn } from '@/lib/utils';
 import type { Member, Unit } from '@/lib/types/database';
 
 export default function HouseholdPage() {
-  const { community, member, unit, householdMembers, isHeadOfHousehold, isBoard } =
+  const { community, member, unit, householdMembers, isHeadOfHousehold, canManageHousehold, isBoard } =
     useCommunity();
 
   const router = useRouter();
@@ -45,7 +45,7 @@ export default function HouseholdPage() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [moveOutOpen, setMoveOutOpen] = useState(false);
 
-  const canManage = isHeadOfHousehold || isBoard;
+  const canManage = canManageHousehold || isBoard;
 
   // Back navigation support (e.g., from amenities reservation approval)
   const backParam = searchParams.get('back');

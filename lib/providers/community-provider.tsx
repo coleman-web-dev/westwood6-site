@@ -27,6 +27,8 @@ interface CommunityContextValue {
   isSuperAdmin: boolean;
   actualIsBoard: boolean;
   isHeadOfHousehold: boolean;
+  /** true for owner/member roles (not tenant/minor) — can view/manage household data */
+  canManageHousehold: boolean;
   visibleCards: DashboardCardId[];
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
@@ -99,6 +101,7 @@ export function CommunityProvider({
       isManager: viewMode === 'admin' ? (systemRole === 'manager' || systemRole === 'super_admin') : false,
       isSuperAdmin: viewMode === 'admin' ? systemRole === 'super_admin' : false,
       isHeadOfHousehold: member?.member_role === 'owner' && member?.parent_member_id === null,
+      canManageHousehold: member?.member_role === 'owner' || member?.member_role === 'member',
       visibleCards,
       viewMode,
       setViewMode,
