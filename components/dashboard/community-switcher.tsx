@@ -4,15 +4,16 @@ import { useState } from 'react';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/shared/ui/popover';
 import { CreateCommunityDialog } from '@/components/settings/create-community-dialog';
-import { ChevronsUpDown, Check, Plus } from 'lucide-react';
+import { ChevronDown, Check, Plus } from 'lucide-react';
 
 export function CommunitySwitcher() {
-  const { community, userCommunities, hasMultipleCommunities, isSuperAdmin } = useCommunity();
+  const { community, member, userCommunities, hasMultipleCommunities } = useCommunity();
+  const isActuallySuperAdmin = member?.system_role === 'super_admin';
   const [open, setOpen] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   // Show switcher if multiple communities OR if super admin (for the Add action)
-  if (!hasMultipleCommunities && !isSuperAdmin) return null;
+  if (!hasMultipleCommunities && !isActuallySuperAdmin) return null;
 
   return (
     <>
@@ -22,7 +23,7 @@ export function CommunitySwitcher() {
             className="flex items-center gap-1.5 h-8 pl-2.5 pr-2 rounded-pill bg-surface-light-2 dark:bg-surface-dark-2 border border-stroke-light dark:border-stroke-dark text-meta font-medium text-text-primary-light dark:text-text-primary-dark hover:bg-surface-light dark:hover:bg-surface-dark-2/80 focus:outline-none focus:ring-2 focus:ring-secondary-400/30 transition-all cursor-pointer"
           >
             <span className="max-w-[120px] truncate">{community.name}</span>
-            <ChevronsUpDown className="w-3.5 h-3.5 shrink-0 text-text-muted-light dark:text-text-muted-dark" />
+            <ChevronDown className="w-3.5 h-3.5 shrink-0 text-text-muted-light dark:text-text-muted-dark" />
           </button>
         </PopoverTrigger>
         <PopoverContent
@@ -50,7 +51,7 @@ export function CommunitySwitcher() {
               </button>
             ))}
 
-            {isSuperAdmin && (
+            {isActuallySuperAdmin && (
               <>
                 <div className="h-px bg-stroke-light dark:bg-stroke-dark my-1" />
                 <button
