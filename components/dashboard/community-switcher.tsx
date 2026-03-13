@@ -22,13 +22,13 @@ export function CommunitySwitcher() {
           <button
             className="flex items-center gap-1.5 h-8 pl-2.5 pr-2 rounded-pill bg-surface-light-2 dark:bg-surface-dark-2 border border-stroke-light dark:border-stroke-dark text-meta font-medium text-text-primary-light dark:text-text-primary-dark hover:bg-surface-light dark:hover:bg-surface-dark-2/80 focus:outline-none focus:ring-2 focus:ring-secondary-400/30 transition-all cursor-pointer"
           >
-            <span className="max-w-[120px] truncate">{community.name}</span>
+            <span className="whitespace-nowrap">{community.name}</span>
             <ChevronDown className="w-3.5 h-3.5 shrink-0 text-text-muted-light dark:text-text-muted-dark" />
           </button>
         </PopoverTrigger>
         <PopoverContent
           align="end"
-          className="w-56 p-1 bg-surface-light dark:bg-surface-dark border-stroke-light dark:border-stroke-dark rounded-inner-card"
+          className="w-fit min-w-56 p-1 bg-surface-light dark:bg-surface-dark border-stroke-light dark:border-stroke-dark rounded-inner-card"
         >
           <div className="flex flex-col">
             {userCommunities.map((c) => (
