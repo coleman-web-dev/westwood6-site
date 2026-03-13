@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
@@ -17,6 +17,12 @@ export default function LoginPage() {
   );
 }
 
+type CommunityOption = {
+  id: string;
+  slug: string;
+  name: string;
+};
+
 function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -32,9 +38,23 @@ function LoginForm() {
   const [mfaCode, setMfaCode] = useState('');
   const [mfaVerifying, setMfaVerifying] = useState(false);
 
+  // Community picker state
+  const [showCommunityPicker, setShowCommunityPicker] = useState(false);
+  const [communities, setCommunities] = useState<CommunityOption[]>([]);
+  const [selectedCommunity, setSelectedCommunity] = useState('');
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect');
+  const selectCommunity = searchParams.get('select_community');
+
+  // Handle redirect from OAuth callback when user has multiple communities
+  useEffect(() => {
+    if (selectCommunity === '1') {
+      completeLogin();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectCommunity]);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -134,24 +154,49 @@ function LoginForm() {
     if (user) {
       logLoginAttempt(email, true, user.id);
 
-      const { data: member } = await supabase
+      // Fetch ALL approved memberships
+      const { data: memberRows } = await supabase
         .from('members')
         .select('community_id')
         .eq('user_id', user.id)
-        .eq('is_approved', true)
-        .single();
+        .eq('is_approved', true);
 
-      if (member?.community_id) {
+      if (!memberRows || memberRows.length === 0) {
+        setError(
+          'Your account is pending approval. You will be notified when access is granted.',
+        );
+        setLoading(false);
+        return;
+      }
+
+      // Single community: redirect directly
+      if (memberRows.length === 1) {
         const { data: community } = await supabase
           .from('communities')
           .select('slug')
-          .eq('id', member.community_id)
+          .eq('id', memberRows[0].community_id)
           .single();
 
         if (community?.slug) {
           router.push(redirect || `/${community.slug}/dashboard`);
           return;
         }
+      }
+
+      // Multiple communities: show picker
+      const communityIds = memberRows.map((m) => m.community_id);
+      const { data: communityList } = await supabase
+        .from('communities')
+        .select('id, slug, name')
+        .in('id', communityIds)
+        .order('name');
+
+      if (communityList && communityList.length > 0) {
+        setCommunities(communityList);
+        setSelectedCommunity(communityList[0].slug);
+        setShowCommunityPicker(true);
+        setLoading(false);
+        return;
       }
     }
 
@@ -171,6 +216,57 @@ function LoginForm() {
     } else {
       setError(result.error || 'Failed to send setup link');
     }
+  }
+
+  // State: Community picker (multi-community user)
+  if (showCommunityPicker) {
+    return (
+      <div className="rounded-panel p-card-padding bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark surface-elevation">
+        <div className="text-center mb-6">
+          <h1 className="text-page-title text-text-primary-light dark:text-text-primary-dark">
+            Select Community
+          </h1>
+          <p className="text-body text-text-muted-light dark:text-text-muted-dark mt-2">
+            Choose which community to manage.
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label
+              htmlFor="community-select"
+              className="text-label text-text-secondary-light dark:text-text-secondary-dark block mb-1.5"
+            >
+              Community
+            </label>
+            <select
+              id="community-select"
+              value={selectedCommunity}
+              onChange={(e) => setSelectedCommunity(e.target.value)}
+              className="w-full h-10 px-3 rounded-pill bg-surface-light-2 dark:bg-surface-dark-2 border border-stroke-light dark:border-stroke-dark text-body text-text-primary-light dark:text-text-primary-dark focus:outline-none focus:ring-2 focus:ring-secondary-400/30 transition-all appearance-none"
+            >
+              {communities.map((c) => (
+                <option key={c.id} value={c.slug}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            type="button"
+            onClick={() =>
+              router.push(
+                redirect || `/${selectedCommunity}/dashboard`,
+              )
+            }
+            className="w-full h-10 rounded-pill bg-secondary-400 text-label font-semibold text-primary-900 hover:bg-secondary-300 active:bg-secondary-500 focus:outline-none focus:ring-2 focus:ring-secondary-300/40 transition-all shadow-lg shadow-secondary-400/20"
+          >
+            Continue
+          </button>
+        </div>
+      </div>
+    );
   }
 
   // State: MFA verification required

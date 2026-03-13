@@ -22,23 +22,25 @@ export async function GET(request: Request) {
       } = await supabase.auth.getUser();
 
       if (user) {
-        const { data: member } = await supabase
+        const { data: memberRows } = await supabase
           .from('members')
           .select('community_id')
           .eq('user_id', user.id)
-          .eq('is_approved', true)
-          .single();
+          .eq('is_approved', true);
 
-        if (member?.community_id) {
+        if (memberRows && memberRows.length === 1) {
           const { data: community } = await supabase
             .from('communities')
             .select('slug')
-            .eq('id', member.community_id)
+            .eq('id', memberRows[0].community_id)
             .single();
 
           if (community?.slug) {
             return NextResponse.redirect(`${origin}/${community.slug}`);
           }
+        } else if (memberRows && memberRows.length > 1) {
+          // Multiple communities: redirect to login with community picker
+          return NextResponse.redirect(`${origin}/login?select_community=1`);
         }
       }
 

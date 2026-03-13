@@ -56,7 +56,7 @@ export default async function CommunityLayout({ children, params }: Props) {
     } as Unit;
 
     return (
-      <CommunityProvider initialData={{ community: community as Community, member: mockMember, unit: mockUnit, householdMembers: [mockMember] }}>
+      <CommunityProvider initialData={{ community: community as Community, member: mockMember, unit: mockUnit, householdMembers: [mockMember], userCommunities: [{ id: community.id, slug: community.slug, name: community.name }] }}>
         {children}
       </CommunityProvider>
     );
@@ -66,17 +66,33 @@ export default async function CommunityLayout({ children, params }: Props) {
   let member: Member | null = null;
   let unit: Unit | null = null;
   let householdMembers: Member[] = [];
+  let userCommunities: { id: string; slug: string; name: string }[] = [];
 
   if (user) {
-    const { data: memberData } = await supabase
-      .from('members')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('community_id', community.id)
-      .eq('is_approved', true)
-      .single();
+    // Fetch current community member + all user's communities in parallel
+    const [memberResult, allMembershipsResult] = await Promise.all([
+      supabase
+        .from('members')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('community_id', community.id)
+        .eq('is_approved', true)
+        .single(),
+      supabase
+        .from('members')
+        .select('community_id, communities(id, slug, name)')
+        .eq('user_id', user.id)
+        .eq('is_approved', true),
+    ]);
 
-    member = memberData as Member | null;
+    member = memberResult.data as Member | null;
+
+    // Extract user's communities for the switcher
+    if (allMembershipsResult.data) {
+      userCommunities = allMembershipsResult.data
+        .map((m: { communities: { id: string; slug: string; name: string } | null }) => m.communities)
+        .filter(Boolean) as { id: string; slug: string; name: string }[];
+    }
 
     if (member?.unit_id) {
       const [unitResult, householdResult] = await Promise.all([
@@ -95,6 +111,7 @@ export default async function CommunityLayout({ children, params }: Props) {
         member,
         unit,
         householdMembers,
+        userCommunities,
       }}
     >
       {children}

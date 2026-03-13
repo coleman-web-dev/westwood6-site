@@ -92,23 +92,24 @@ export default async function HomePage() {
   } = await supabase.auth.getUser();
 
   if (user) {
-    const { data: member } = await supabase
+    const { data: memberRows } = await supabase
       .from('members')
       .select('community_id')
       .eq('user_id', user.id)
-      .eq('is_approved', true)
-      .single();
+      .eq('is_approved', true);
 
-    if (member?.community_id) {
+    if (memberRows && memberRows.length === 1) {
       const { data: community } = await supabase
         .from('communities')
         .select('slug')
-        .eq('id', member.community_id)
+        .eq('id', memberRows[0].community_id)
         .single();
 
       if (community?.slug) {
         redirect(`/${community.slug}/dashboard`);
       }
+    } else if (memberRows && memberRows.length > 1) {
+      redirect('/login?select_community=1');
     }
   }
 

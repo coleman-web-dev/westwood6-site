@@ -15,6 +15,8 @@ type ViewMode = 'admin' | 'personal';
 
 const VIEW_MODE_KEY = 'duesiq_view_mode';
 
+type UserCommunity = { id: string; slug: string; name: string };
+
 interface CommunityContextValue {
   community: Community;
   member: Member | null;
@@ -33,6 +35,9 @@ interface CommunityContextValue {
   hasPermission: (key: PermissionKey, level: 'read' | 'write') => boolean;
   canRead: (key: PermissionKey) => boolean;
   canWrite: (key: PermissionKey) => boolean;
+  // Multi-community support
+  userCommunities: UserCommunity[];
+  hasMultipleCommunities: boolean;
 }
 
 const CommunityContext = createContext<CommunityContextValue | null>(null);
@@ -42,6 +47,7 @@ interface InitialData {
   member: Member | null;
   unit: Unit | null;
   householdMembers: Member[];
+  userCommunities: UserCommunity[];
 }
 
 export function CommunityProvider({
@@ -51,7 +57,7 @@ export function CommunityProvider({
   initialData: InitialData;
   children: React.ReactNode;
 }) {
-  const { community, member, unit, householdMembers } = initialData;
+  const { community, member, unit, householdMembers, userCommunities } = initialData;
   const [viewMode, setViewModeState] = useState<ViewMode>('admin');
 
   // Initialize from localStorage on mount
@@ -102,9 +108,12 @@ export function CommunityProvider({
         checkPermission(activePermissions, key, level),
       canRead: (key: PermissionKey) => checkPermission(activePermissions, key, 'read'),
       canWrite: (key: PermissionKey) => checkPermission(activePermissions, key, 'write'),
+      // Multi-community support
+      userCommunities,
+      hasMultipleCommunities: userCommunities.length > 1,
     };
 
-  }, [community, member, unit, householdMembers, viewMode]);
+  }, [community, member, unit, householdMembers, viewMode, userCommunities]);
 
   return (
     <CommunityContext.Provider value={value}>
