@@ -49,7 +49,7 @@ interface AppSidebarProps {
 export function AppSidebar({ open, onClose }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { community, isHeadOfHousehold, isBoard, actualIsBoard, canRead } = useCommunity();
+  const { community, unit, isHeadOfHousehold, isBoard, actualIsBoard, canRead } = useCommunity();
 
   const onboardingComplete = !!community.theme?.onboarding?.completed_at;
   const basePath = `/${community.slug}`;
@@ -175,7 +175,7 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
             label="Reports"
           />
         )}
-        {isHeadOfHousehold && (
+        {(isHeadOfHousehold || !!unit) && (
           <NavItem
             icon={Users}
             href={`${basePath}/household`}
