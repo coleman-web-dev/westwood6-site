@@ -21,7 +21,8 @@ interface MyReservationsProps {
 type ReservationWithAmenity = Reservation & {
   amenities: { name: string };
   units: { unit_number: string };
-  signed_agreements: { id: string; post_event_completed: boolean }[] | null;
+  // PostgREST returns object (not array) due to UNIQUE(reservation_id) constraint
+  signed_agreements: { id: string; post_event_completed: boolean } | null;
 };
 
 const STATUS_BADGE: Record<ReservationStatus, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
@@ -266,7 +267,7 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
   }
 
   async function handleInspect(reservation: ReservationWithAmenity) {
-    if (!reservation.signed_agreements?.length) return;
+    if (!reservation.signed_agreements) return;
     setLoadingInspect(reservation.id);
     const supabase = createClient();
     const { data } = await supabase
@@ -478,9 +479,9 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
               )}
 
               {/* View signed agreement + inspection */}
-              {r.signed_agreements && r.signed_agreements.length > 0 && (
+              {r.signed_agreements && (
                 <>
-                  {isBoard && !isFuture(new Date(r.start_datetime)) && r.signed_agreements.some((a) => !a.post_event_completed) && (
+                  {isBoard && !isFuture(new Date(r.start_datetime)) && !r.signed_agreements.post_event_completed && (
                     <>
                       <Badge variant="outline" className="text-[10px] border-amber-400/50 text-amber-600 dark:text-amber-400">
                         <ClipboardCheck className="h-3 w-3 mr-0.5" />

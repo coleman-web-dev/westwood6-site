@@ -8,6 +8,9 @@ import { MemberList } from '@/components/household/member-list';
 import { AddMemberDialog } from '@/components/household/add-member-dialog';
 import { MoveOutDialog } from '@/components/household/move-out-dialog';
 import { SignedAgreementsSection } from '@/components/household/signed-agreements-section';
+import { HouseholdFinancialSummary } from '@/components/household/household-financial-summary';
+import { HouseholdVotingHistory } from '@/components/household/household-voting-history';
+import { HouseholdPaymentHistory } from '@/components/household/household-payment-history';
 import { Home, FileSignature, Check, ChevronsUpDown, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/shared/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/shared/ui/popover';
@@ -300,27 +303,44 @@ export default function HouseholdPage() {
         </div>
       )}
 
-      {/* Member list */}
-      <MemberList
-        members={members}
-        loading={loading}
-        canManage={canManage}
-        currentMemberId={member?.id ?? ''}
-        onAddClick={() => setAddDialogOpen(true)}
-        onMemberRemoved={handleMemberRemoved}
-      />
+      {/* Two-column layout */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Left column: Members + Agreements */}
+        <div className="space-y-6">
+          <MemberList
+            members={members}
+            loading={loading}
+            canManage={canManage}
+            currentMemberId={member?.id ?? ''}
+            onAddClick={() => setAddDialogOpen(true)}
+            onMemberRemoved={handleMemberRemoved}
+          />
 
-      {/* Signed agreements */}
-      {activeUnit && (
-        <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding space-y-3">
-          <div className="flex items-center gap-2">
-            <FileSignature className="h-5 w-5 text-secondary-500" />
-            <h2 className="text-card-title text-text-primary-light dark:text-text-primary-dark">
-              Signed Agreements
-            </h2>
-          </div>
-          <SignedAgreementsSection unitId={activeUnit.id} />
+          {activeUnit && (
+            <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding space-y-3">
+              <div className="flex items-center gap-2">
+                <FileSignature className="h-5 w-5 text-secondary-500" />
+                <h2 className="text-card-title text-text-primary-light dark:text-text-primary-dark">
+                  Signed Agreements
+                </h2>
+              </div>
+              <SignedAgreementsSection unitId={activeUnit.id} />
+            </div>
+          )}
         </div>
+
+        {/* Right column: Financial + Voting */}
+        {activeUnit && (
+          <div className="space-y-6">
+            <HouseholdFinancialSummary unitId={activeUnit.id} communityId={community.id} />
+            <HouseholdVotingHistory unitId={activeUnit.id} communityId={community.id} />
+          </div>
+        )}
+      </div>
+
+      {/* Payment history (full width) */}
+      {activeUnit && (
+        <HouseholdPaymentHistory unitId={activeUnit.id} communityId={community.id} />
       )}
 
       {/* Add member dialog */}

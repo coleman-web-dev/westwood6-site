@@ -152,6 +152,16 @@ export interface Member {
   created_at: string;
 }
 
+export interface MemberNote {
+  id: string;
+  member_id: string;
+  community_id: string;
+  note: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface SignupRequest {
   id: string;
   community_id: string;

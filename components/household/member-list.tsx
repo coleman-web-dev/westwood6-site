@@ -18,7 +18,9 @@ import {
   AlertDialogTrigger,
 } from '@/components/shared/ui/alert-dialog';
 import { toast } from 'sonner';
-import { Eye, EyeOff, Trash2, UserPlus } from 'lucide-react';
+import { Eye, EyeOff, Trash2, UserPlus, StickyNote } from 'lucide-react';
+import { format } from 'date-fns';
+import { MemberNotesDialog } from '@/components/household/member-notes-dialog';
 import type { Member, MemberRole } from '@/lib/types/database';
 
 const ROLE_BADGE_VARIANT: Record<MemberRole, 'secondary' | 'outline' | 'default'> = {
@@ -52,7 +54,9 @@ export function MemberList({
   onAddClick,
   onMemberRemoved,
 }: MemberListProps) {
+  const { isBoard } = useCommunity();
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [notesForMember, setNotesForMember] = useState<{ id: string; name: string } | null>(null);
 
   async function handleRemove(memberId: string) {
     setRemovingId(memberId);
@@ -150,17 +154,29 @@ export function MemberList({
                     {m.phone && <span>{m.phone}</span>}
                   </div>
 
-                  <div className="flex items-center gap-1 text-meta text-text-muted-light dark:text-text-muted-dark">
-                    {m.show_in_directory ? (
-                      <>
-                        <Eye className="h-3 w-3" />
-                        <span>Visible in directory</span>
-                      </>
-                    ) : (
-                      <>
-                        <EyeOff className="h-3 w-3" />
-                        <span>Hidden from directory</span>
-                      </>
+                  <div className="flex items-center gap-3 flex-wrap text-meta text-text-muted-light dark:text-text-muted-dark">
+                    <span className="flex items-center gap-1">
+                      {m.show_in_directory ? (
+                        <>
+                          <Eye className="h-3 w-3" />
+                          Visible in directory
+                        </>
+                      ) : (
+                        <>
+                          <EyeOff className="h-3 w-3" />
+                          Hidden from directory
+                        </>
+                      )}
+                    </span>
+                    <span>Joined {format(new Date(m.created_at), 'MMM d, yyyy')}</span>
+                    {isBoard && (
+                      <button
+                        onClick={() => setNotesForMember({ id: m.id, name: `${m.first_name} ${m.last_name}` })}
+                        className="inline-flex items-center gap-1 text-secondary-500 hover:text-secondary-600 dark:hover:text-secondary-400"
+                      >
+                        <StickyNote className="h-3 w-3" />
+                        Notes
+                      </button>
                     )}
                   </div>
                 </div>
@@ -203,6 +219,16 @@ export function MemberList({
           );
         })}
       </div>
+      )}
+
+      {/* Member notes dialog (board-only) */}
+      {notesForMember && (
+        <MemberNotesDialog
+          open={!!notesForMember}
+          onOpenChange={(open) => { if (!open) setNotesForMember(null); }}
+          memberId={notesForMember.id}
+          memberName={notesForMember.name}
+        />
       )}
     </div>
   );
