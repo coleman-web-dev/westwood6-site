@@ -1,19 +1,30 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
-import { Search, Download } from 'lucide-react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { Search } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
-import { Button } from '@/components/shared/ui/button';
 import { MemberCard } from '@/components/directory/member-card';
-import { downloadCsv } from '@/lib/utils/export-csv';
-import type { Member } from '@/lib/types/database';
+import { ExportCsvButton } from '@/components/documents/export-csv-button';
+import type { CsvColumn } from '@/lib/utils/export-csv';
+import type { Member, DocumentFolder } from '@/lib/types/database';
 
 type DirectoryMember = Member & { unit: { unit_number: string } | null };
 
+const memberColumns: CsvColumn<DirectoryMember>[] = [
+  { header: 'First Name', value: (m) => m.first_name },
+  { header: 'Last Name', value: (m) => m.last_name },
+  { header: 'Role', value: (m) => m.member_role },
+  { header: 'System Role', value: (m) => m.system_role },
+  { header: 'Unit Number', value: (m) => m.unit?.unit_number ?? '' },
+  { header: 'Email', value: (m) => m.email },
+  { header: 'Phone', value: (m) => m.phone },
+];
+
 export default function DirectoryPage() {
-  const { community, isBoard } = useCommunity();
+  const { community, member, isBoard } = useCommunity();
   const [members, setMembers] = useState<DirectoryMember[]>([]);
+  const [folders, setFolders] = useState<DocumentFolder[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
@@ -47,6 +58,21 @@ export default function DirectoryPage() {
     fetchMembers();
   }, [community.id, isBoard, canView]);
 
+  const fetchFolders = useCallback(async () => {
+    if (!isBoard) return;
+    const supabase = createClient();
+    const { data } = await supabase
+      .from('document_folders')
+      .select('*')
+      .eq('community_id', community.id)
+      .order('name', { ascending: true });
+    setFolders((data as DocumentFolder[]) ?? []);
+  }, [community.id, isBoard]);
+
+  useEffect(() => {
+    fetchFolders();
+  }, [fetchFolders]);
+
   const filtered = useMemo(() => {
     if (!search.trim()) return members;
     const q = search.toLowerCase();
@@ -67,18 +93,6 @@ export default function DirectoryPage() {
     );
   }
 
-  function handleExportMembers() {
-    downloadCsv('member-directory.csv', members, [
-      { header: 'First Name', value: (m) => m.first_name },
-      { header: 'Last Name', value: (m) => m.last_name },
-      { header: 'Role', value: (m) => m.member_role },
-      { header: 'System Role', value: (m) => m.system_role },
-      { header: 'Unit Number', value: (m) => m.unit?.unit_number ?? '' },
-      { header: 'Email', value: (m) => m.email },
-      { header: 'Phone', value: (m) => m.phone },
-    ]);
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -86,11 +100,17 @@ export default function DirectoryPage() {
         <h1 className="text-page-title text-text-primary-light dark:text-text-primary-dark">
           Directory
         </h1>
-        {isBoard && members.length > 0 && (
-          <Button variant="outline" size="sm" onClick={handleExportMembers}>
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
-          </Button>
+        {isBoard && members.length > 0 && member && (
+          <ExportCsvButton
+            filename="member-directory.csv"
+            getData={() => members}
+            columns={memberColumns}
+            saveConfig={{
+              communityId: community.id,
+              memberId: member.id,
+              folders,
+            }}
+          />
         )}
       </div>
 

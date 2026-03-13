@@ -178,11 +178,20 @@ export interface Announcement {
   created_at: string;
 }
 
+export interface DocumentFolder {
+  id: string;
+  community_id: string;
+  name: string;
+  created_by: string;
+  created_at: string;
+}
+
 export interface Document {
   id: string;
   community_id: string;
   title: string;
   category: DocCategory;
+  folder_id: string | null;
   file_path: string;
   file_size: number | null;
   is_public: boolean;

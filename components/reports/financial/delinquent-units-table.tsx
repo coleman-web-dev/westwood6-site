@@ -1,8 +1,6 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Download } from 'lucide-react';
-import { Button } from '@/components/shared/ui/button';
 import {
   Table,
   TableBody,
@@ -11,13 +9,19 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/shared/ui/table';
-import { downloadCsv } from '@/lib/utils/export-csv';
-import type { Invoice, Unit, Member } from '@/lib/types/database';
+import { ExportCsvButton } from '@/components/documents/export-csv-button';
+import type { CsvColumn } from '@/lib/utils/export-csv';
+import type { Invoice, Unit, Member, DocumentFolder } from '@/lib/types/database';
 
 interface DelinquentUnitsTableProps {
   invoices: Invoice[];
   units: Unit[];
   members: Member[];
+  saveConfig?: {
+    communityId: string;
+    memberId: string;
+    folders: DocumentFolder[];
+  };
 }
 
 interface DelinquentUnit {
@@ -34,7 +38,17 @@ function formatDollars(cents: number): string {
   return (cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
 }
 
-export function DelinquentUnitsTable({ invoices, units, members }: DelinquentUnitsTableProps) {
+const delinquentColumns: CsvColumn<DelinquentUnit>[] = [
+  { header: 'Unit Number', value: (d) => d.unitNumber },
+  { header: 'Owner Name', value: (d) => d.ownerName },
+  { header: 'Email', value: (d) => d.email },
+  { header: 'Phone', value: (d) => d.phone },
+  { header: 'Invoice Count', value: (d) => d.invoiceCount },
+  { header: 'Amount Owed', value: (d) => (d.amountOwed / 100).toFixed(2) },
+  { header: 'Oldest Due Date', value: (d) => d.oldestDueDate },
+];
+
+export function DelinquentUnitsTable({ invoices, units, members, saveConfig }: DelinquentUnitsTableProps) {
   const delinquents = useMemo(() => {
     const overdueInvoices = invoices.filter(
       (inv) => inv.status === 'overdue' || inv.status === 'partial'
@@ -73,18 +87,6 @@ export function DelinquentUnitsTable({ invoices, units, members }: DelinquentUni
     return Array.from(unitMap.values()).sort((a, b) => b.amountOwed - a.amountOwed);
   }, [invoices, units, members]);
 
-  function handleExportDelinquents() {
-    downloadCsv('delinquent-units.csv', delinquents, [
-      { header: 'Unit Number', value: (d) => d.unitNumber },
-      { header: 'Owner Name', value: (d) => d.ownerName },
-      { header: 'Email', value: (d) => d.email },
-      { header: 'Phone', value: (d) => d.phone },
-      { header: 'Invoice Count', value: (d) => d.invoiceCount },
-      { header: 'Amount Owed', value: (d) => (d.amountOwed / 100).toFixed(2) },
-      { header: 'Oldest Due Date', value: (d) => d.oldestDueDate },
-    ]);
-  }
-
   return (
     <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding">
       <div className="flex items-center justify-between mb-4">
@@ -92,10 +94,14 @@ export function DelinquentUnitsTable({ invoices, units, members }: DelinquentUni
           Delinquent Units
         </h3>
         {delinquents.length > 0 && (
-          <Button variant="ghost" size="sm" onClick={handleExportDelinquents}>
-            <Download className="h-4 w-4 mr-1" />
-            Export
-          </Button>
+          <ExportCsvButton
+            filename="delinquent-units.csv"
+            getData={() => delinquents}
+            columns={delinquentColumns}
+            label="Export"
+            variant="ghost"
+            saveConfig={saveConfig}
+          />
         )}
       </div>
       {delinquents.length === 0 ? (

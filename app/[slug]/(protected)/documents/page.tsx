@@ -9,8 +9,9 @@ import { Button } from '@/components/shared/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/shared/ui/tabs';
 import { DocumentList } from '@/components/documents/document-list';
 import { UploadDocumentDialog } from '@/components/documents/upload-document-dialog';
+import { FolderSidebar } from '@/components/documents/folder-sidebar';
 import { SignedAgreementViewer } from '@/components/amenities/signed-agreement-viewer';
-import type { Document, SignedAgreement } from '@/lib/types/database';
+import type { Document, DocumentFolder, SignedAgreement } from '@/lib/types/database';
 
 interface AgreementRow extends SignedAgreement {
   amenities?: { name: string };
@@ -29,9 +30,11 @@ const CATEGORY_TABS: { value: string; label: string }[] = [
 export default function DocumentsPage() {
   const { community, isBoard, canRead, canWrite } = useCommunity();
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [folders, setFolders] = useState<DocumentFolder[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
+  const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
 
   // Signed agreements state (for board/admin)
   const [agreements, setAgreements] = useState<AgreementRow[]>([]);
@@ -49,6 +52,18 @@ export default function DocumentsPage() {
 
     setDocuments((data as Document[]) ?? []);
     setLoading(false);
+  }, [community.id]);
+
+  const fetchFolders = useCallback(async () => {
+    const supabase = createClient();
+
+    const { data } = await supabase
+      .from('document_folders')
+      .select('*')
+      .eq('community_id', community.id)
+      .order('name', { ascending: true });
+
+    setFolders((data as DocumentFolder[]) ?? []);
   }, [community.id]);
 
   const canReadDocuments = canRead('documents');
@@ -72,16 +87,19 @@ export default function DocumentsPage() {
 
   useEffect(() => {
     fetchDocuments();
+    fetchFolders();
     fetchAgreements();
-  }, [fetchDocuments, fetchAgreements]);
+  }, [fetchDocuments, fetchFolders, fetchAgreements]);
 
-  function handleUploadSuccess() {
+  function handleRefresh() {
     fetchDocuments();
+    fetchFolders();
   }
 
-  function handleDeleted() {
-    fetchDocuments();
-  }
+  // Filter by folder, then by category tab
+  const folderFiltered = activeFolderId
+    ? documents.filter((d) => d.folder_id === activeFolderId)
+    : documents;
 
   return (
     <div className="space-y-6">
@@ -97,45 +115,68 @@ export default function DocumentsPage() {
         )}
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="flex-wrap">
-          {CATEGORY_TABS.map((tab) => (
-            <TabsTrigger key={tab.value} value={tab.value}>
-              {tab.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Folder sidebar */}
+        <div className="lg:w-56 shrink-0">
+          <div className="lg:sticky lg:top-20">
+            <h2 className="text-label text-text-secondary-light dark:text-text-secondary-dark mb-2 px-1">
+              Folders
+            </h2>
+            <FolderSidebar
+              folders={folders}
+              documents={documents}
+              activeFolderId={activeFolderId}
+              onSelectFolder={setActiveFolderId}
+              onFolderChanged={handleRefresh}
+            />
+          </div>
+        </div>
 
-        {CATEGORY_TABS.map((tab) => (
-          <TabsContent key={tab.value} value={tab.value}>
-            <div className="space-y-6">
-              <DocumentList
-                documents={
-                  tab.value === 'all'
-                    ? documents
-                    : documents.filter((doc) => doc.category === tab.value)
-                }
-                loading={loading}
-                onDeleted={handleDeleted}
-              />
+        {/* Document list with category tabs */}
+        <div className="flex-1 min-w-0">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="flex-wrap">
+              {CATEGORY_TABS.map((tab) => (
+                <TabsTrigger key={tab.value} value={tab.value}>
+                  {tab.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
 
-              {/* Signed agreements section (board only, on "all" and "forms" tabs) */}
-              {canReadDocuments && (tab.value === 'all' || tab.value === 'forms') && (
-                <SignedAgreementsDocSection
-                  agreements={agreements}
-                  loading={agreementsLoading}
-                  onView={(reservationId) => setViewingReservationId(reservationId)}
-                />
-              )}
-            </div>
-          </TabsContent>
-        ))}
-      </Tabs>
+            {CATEGORY_TABS.map((tab) => (
+              <TabsContent key={tab.value} value={tab.value}>
+                <div className="space-y-6">
+                  <DocumentList
+                    documents={
+                      tab.value === 'all'
+                        ? folderFiltered
+                        : folderFiltered.filter((doc) => doc.category === tab.value)
+                    }
+                    loading={loading}
+                    onDeleted={handleRefresh}
+                    folders={folders}
+                  />
+
+                  {/* Signed agreements section (board only, on "all" and "forms" tabs) */}
+                  {canReadDocuments && (tab.value === 'all' || tab.value === 'forms') && (
+                    <SignedAgreementsDocSection
+                      agreements={agreements}
+                      loading={agreementsLoading}
+                      onView={(reservationId) => setViewingReservationId(reservationId)}
+                    />
+                  )}
+                </div>
+              </TabsContent>
+            ))}
+          </Tabs>
+        </div>
+      </div>
 
       <UploadDocumentDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        onSuccess={handleUploadSuccess}
+        onSuccess={handleRefresh}
+        folders={folders}
       />
 
       {/* Agreement viewer */}

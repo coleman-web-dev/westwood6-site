@@ -23,12 +23,13 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
-import type { DocCategory } from '@/lib/types/database';
+import type { DocCategory, DocumentFolder } from '@/lib/types/database';
 
 interface UploadDocumentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  folders?: DocumentFolder[];
 }
 
 const ACCEPTED_FILE_TYPES =
@@ -38,16 +39,19 @@ export function UploadDocumentDialog({
   open,
   onOpenChange,
   onSuccess,
+  folders = [],
 }: UploadDocumentDialogProps) {
   const { community, member } = useCommunity();
   const fileRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<DocCategory>('other');
+  const [folderId, setFolderId] = useState<string>('none');
   const [submitting, setSubmitting] = useState(false);
 
   function resetForm() {
     setTitle('');
     setCategory('other');
+    setFolderId('none');
     if (fileRef.current) {
       fileRef.current.value = '';
     }
@@ -97,6 +101,7 @@ export function UploadDocumentDialog({
       community_id: community.id,
       title: title.trim(),
       category,
+      folder_id: folderId === 'none' ? null : folderId,
       file_path: filePath,
       file_size: file.size,
       uploaded_by: member.id,
@@ -162,6 +167,31 @@ export function UploadDocumentDialog({
               </SelectContent>
             </Select>
           </div>
+
+          {/* Folder */}
+          {folders.length > 0 && (
+            <div className="space-y-1.5">
+              <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                Folder (optional)
+              </label>
+              <Select
+                value={folderId}
+                onValueChange={setFolderId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="No folder" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No folder</SelectItem>
+                  {folders.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>
+                      {f.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* File picker */}
           <div className="space-y-1.5">

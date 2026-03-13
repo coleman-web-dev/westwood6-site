@@ -3,11 +3,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
-import { Button } from '@/components/shared/ui/button';
-import { Download } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/shared/ui/tabs';
 import { ReportPeriodSelector, getDefaultPeriod } from '@/components/reports/report-period-selector';
-import { downloadCsv } from '@/lib/utils/export-csv';
+import { ExportCsvButton } from '@/components/documents/export-csv-button';
 import type { CsvColumn } from '@/lib/utils/export-csv';
 import { CollectionSummary } from '@/components/reports/financial/collection-summary';
 import { AgingReport } from '@/components/reports/financial/aging-report';
@@ -34,10 +32,11 @@ import type {
 } from '@/lib/types/database';
 
 export default function ReportsPage() {
-  const { community, isBoard } = useCommunity();
+  const { community, member, isBoard } = useCommunity();
   const [period, setPeriod] = useState<ReportPeriod>(getDefaultPeriod);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('financial');
+  const [folders, setFolders] = useState<import('@/lib/types/database').DocumentFolder[]>([]);
 
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -160,23 +159,44 @@ export default function ReportsPage() {
     setLoading(false);
   }, [community.id, period]);
 
+  const fetchFolders = useCallback(async () => {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from('document_folders')
+      .select('*')
+      .eq('community_id', community.id)
+      .order('name', { ascending: true });
+    setFolders((data as import('@/lib/types/database').DocumentFolder[]) ?? []);
+  }, [community.id]);
+
   useEffect(() => {
     if (isBoard) {
       fetchData();
+      fetchFolders();
     }
-  }, [fetchData, isBoard]);
+  }, [fetchData, fetchFolders, isBoard]);
 
-  function handleExportFinancial() {
-    interface UnitRow {
-      unitNumber: string;
-      ownerName: string;
-      ownerEmail: string;
-      totalBilled: number;
-      totalCollected: number;
-      outstanding: number;
-      invoiceCount: number;
-    }
+  interface UnitRow {
+    unitNumber: string;
+    ownerName: string;
+    ownerEmail: string;
+    totalBilled: number;
+    totalCollected: number;
+    outstanding: number;
+    invoiceCount: number;
+  }
 
+  const financialColumns: CsvColumn<UnitRow>[] = [
+    { header: 'Unit Number', value: (r) => r.unitNumber },
+    { header: 'Owner Name', value: (r) => r.ownerName },
+    { header: 'Owner Email', value: (r) => r.ownerEmail },
+    { header: 'Total Billed', value: (r) => (r.totalBilled / 100).toFixed(2) },
+    { header: 'Total Collected', value: (r) => (r.totalCollected / 100).toFixed(2) },
+    { header: 'Outstanding', value: (r) => (r.outstanding / 100).toFixed(2) },
+    { header: 'Invoice Count', value: (r) => r.invoiceCount },
+  ];
+
+  function getFinancialData(): UnitRow[] {
     const unitMap = new Map<string, UnitRow>();
 
     for (const unit of units) {
@@ -203,21 +223,9 @@ export default function ReportsPage() {
       row.outstanding += inv.amount - inv.amount_paid;
     }
 
-    const rows = Array.from(unitMap.values()).sort((a, b) =>
+    return Array.from(unitMap.values()).sort((a, b) =>
       a.unitNumber.localeCompare(b.unitNumber, undefined, { numeric: true })
     );
-
-    const columns: CsvColumn<UnitRow>[] = [
-      { header: 'Unit Number', value: (r) => r.unitNumber },
-      { header: 'Owner Name', value: (r) => r.ownerName },
-      { header: 'Owner Email', value: (r) => r.ownerEmail },
-      { header: 'Total Billed', value: (r) => (r.totalBilled / 100).toFixed(2) },
-      { header: 'Total Collected', value: (r) => (r.totalCollected / 100).toFixed(2) },
-      { header: 'Outstanding', value: (r) => (r.outstanding / 100).toFixed(2) },
-      { header: 'Invoice Count', value: (r) => r.invoiceCount },
-    ];
-
-    downloadCsv(`financial-summary-${period.startDate}-to-${period.endDate}.csv`, rows, columns);
   }
 
   if (!isBoard) {
@@ -243,11 +251,17 @@ export default function ReportsPage() {
             value={period}
             onChange={setPeriod}
           />
-          {!loading && (
-            <Button variant="outline" size="sm" onClick={handleExportFinancial}>
-              <Download className="h-4 w-4 mr-2" />
-              Export CSV
-            </Button>
+          {!loading && member && (
+            <ExportCsvButton
+              filename={`financial-summary-${period.startDate}-to-${period.endDate}.csv`}
+              getData={getFinancialData}
+              columns={financialColumns}
+              saveConfig={{
+                communityId: community.id,
+                memberId: member.id,
+                folders,
+              }}
+            />
           )}
         </div>
       </div>
@@ -285,7 +299,12 @@ export default function ReportsPage() {
             <AssessmentPerformance assessments={assessments} invoices={invoices} />
             <RevenueTrendChart payments={payments} />
             <AgingReport invoices={invoices} />
-            <DelinquentUnitsTable invoices={invoices} units={units} members={members} />
+            <DelinquentUnitsTable
+              invoices={invoices}
+              units={units}
+              members={members}
+              saveConfig={member ? { communityId: community.id, memberId: member.id, folders } : undefined}
+            />
           </TabsContent>
 
           <TabsContent value="community" className="space-y-grid-gap mt-4">
@@ -299,7 +318,10 @@ export default function ReportsPage() {
           </TabsContent>
 
           <TabsContent value="tax" className="space-y-grid-gap mt-4">
-            <Vendor1099Report communityId={community.id} />
+            <Vendor1099Report
+              communityId={community.id}
+              saveConfig={member ? { communityId: community.id, memberId: member.id, folders } : undefined}
+            />
           </TabsContent>
         </Tabs>
       )}

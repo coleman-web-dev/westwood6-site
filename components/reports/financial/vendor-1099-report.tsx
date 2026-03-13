@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Badge } from '@/components/shared/ui/badge';
-import { Button } from '@/components/shared/ui/button';
 import {
   Select,
   SelectContent,
@@ -11,12 +10,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/shared/ui/select';
-import { Download, AlertTriangle, CheckCircle } from 'lucide-react';
-import { downloadCsv } from '@/lib/utils/export-csv';
+import { AlertTriangle, CheckCircle } from 'lucide-react';
+import { ExportCsvButton } from '@/components/documents/export-csv-button';
 import type { CsvColumn } from '@/lib/utils/export-csv';
+import type { DocumentFolder } from '@/lib/types/database';
 
 interface Vendor1099ReportProps {
   communityId: string;
+  saveConfig?: {
+    communityId: string;
+    memberId: string;
+    folders: DocumentFolder[];
+  };
 }
 
 interface VendorPaymentRow {
@@ -31,7 +36,7 @@ interface VendorPaymentRow {
 
 const THRESHOLD_CENTS = 60000; // $600
 
-export function Vendor1099Report({ communityId }: Vendor1099ReportProps) {
+export function Vendor1099Report({ communityId, saveConfig }: Vendor1099ReportProps) {
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(currentYear.toString());
   const [rows, setRows] = useState<VendorPaymentRow[]>([]);
@@ -118,17 +123,14 @@ export function Vendor1099Report({ communityId }: Vendor1099ReportProps) {
     return '***-**-' + digits.slice(-4);
   }
 
-  function handleExport() {
-    const columns: CsvColumn<VendorPaymentRow>[] = [
-      { header: 'Vendor Name', value: (r) => r.vendorName },
-      { header: 'Company', value: (r) => r.company ?? '' },
-      { header: 'Tax ID', value: (r) => r.taxId ?? '' },
-      { header: 'W-9 On File', value: (r) => (r.w9OnFile ? 'Yes' : 'No') },
-      { header: 'Total Payments', value: (r) => (r.totalPayments / 100).toFixed(2) },
-      { header: '1099 Required', value: (r) => (r.requires1099 ? 'Yes' : 'No') },
-    ];
-    downloadCsv(`1099-vendor-report-${year}.csv`, rows, columns);
-  }
+  const vendorColumns: CsvColumn<VendorPaymentRow>[] = [
+    { header: 'Vendor Name', value: (r) => r.vendorName },
+    { header: 'Company', value: (r) => r.company ?? '' },
+    { header: 'Tax ID', value: (r) => r.taxId ?? '' },
+    { header: 'W-9 On File', value: (r) => (r.w9OnFile ? 'Yes' : 'No') },
+    { header: 'Total Payments', value: (r) => (r.totalPayments / 100).toFixed(2) },
+    { header: '1099 Required', value: (r) => (r.requires1099 ? 'Yes' : 'No') },
+  ];
 
   const totalVendors = rows.length;
   const vendorsRequiring1099 = rows.filter((r) => r.requires1099).length;
@@ -155,10 +157,13 @@ export function Vendor1099Report({ communityId }: Vendor1099ReportProps) {
           </Select>
         </div>
         {rows.length > 0 && (
-          <Button variant="outline" size="sm" onClick={handleExport}>
-            <Download className="h-4 w-4 mr-2" />
-            Export 1099 CSV
-          </Button>
+          <ExportCsvButton
+            filename={`1099-vendor-report-${year}.csv`}
+            getData={() => rows}
+            columns={vendorColumns}
+            label="Export 1099 CSV"
+            saveConfig={saveConfig}
+          />
         )}
       </div>
 
