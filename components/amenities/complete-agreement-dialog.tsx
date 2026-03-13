@@ -26,6 +26,7 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/component
 import { ScrollArea } from '@/components/shared/ui/scroll-area';
 import { ClipboardCheck, Loader2, ChevronDown, FileSignature } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 import {
   buildSystemContext,
   fillAgreementTemplateHtml,
@@ -280,20 +281,30 @@ export function CompleteAgreementDialog({
                     />
                   )}
                   {field.type === 'yes_no' && (
-                    <Select
-                      value={fieldAnswers[field.key] ?? ''}
-                      onValueChange={(v) =>
-                        setFieldAnswers((prev) => ({ ...prev, [field.key]: v }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Yes">Yes</SelectItem>
-                        <SelectItem value="No">No</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="flex gap-2">
+                      {['Yes', 'No'].map((opt) => {
+                        const selected = fieldAnswers[field.key] === opt;
+                        return (
+                          <button
+                            key={opt}
+                            type="button"
+                            onClick={() =>
+                              setFieldAnswers((prev) => ({ ...prev, [field.key]: opt }))
+                            }
+                            className={cn(
+                              'flex-1 rounded-inner-card border px-4 py-2 text-body font-medium transition-colors',
+                              selected && opt === 'Yes'
+                                ? 'border-green-500 bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-400 dark:border-green-600'
+                                : selected && opt === 'No'
+                                  ? 'border-red-500 bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400 dark:border-red-600'
+                                  : 'border-stroke-light dark:border-stroke-dark text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light-2 dark:hover:bg-surface-dark-2',
+                            )}
+                          >
+                            {opt}
+                          </button>
+                        );
+                      })}
+                    </div>
                   )}
                   {field.type === 'select' && field.options && (
                     <Select
