@@ -22,13 +22,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/shared/ui/select';
-import { ClipboardCheck, Loader2 } from 'lucide-react';
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/shared/ui/collapsible';
+import { ScrollArea } from '@/components/shared/ui/scroll-area';
+import { ClipboardCheck, Loader2, ChevronDown, FileSignature } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   buildSystemContext,
+  fillAgreementTemplateHtml,
   fillPostEventFields,
   partitionFieldsByPhase,
 } from '@/lib/utils/agreement-template';
+import { formatAgreementHtml, formatAgreementPlainText } from '@/lib/utils/format-agreement';
 import type { AgreementField, SignedAgreement, Reservation } from '@/lib/types/database';
 
 interface CompleteAgreementDialogProps {
@@ -51,9 +55,39 @@ export function CompleteAgreementDialog({
   const { community, member } = useCommunity();
   const [fieldAnswers, setFieldAnswers] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [agreementOpen, setAgreementOpen] = useState(false);
 
   const allFields = agreement.amenities?.agreement_fields ?? [];
   const { postEventFields } = partitionFieldsByPhase(allFields);
+
+  // Build formatted agreement HTML for the collapsible viewer
+  const displayHtml = (() => {
+    const template = agreement.amenities?.agreement_template;
+    const reservation = agreement.reservations;
+    if (template && reservation) {
+      const startDate = new Date(reservation.start_datetime);
+      const endDate = new Date(reservation.end_datetime);
+      const systemContext = buildSystemContext({
+        memberName: agreement.signer_name,
+        unitNumber: agreement.units?.unit_number ?? '',
+        amenityName: agreement.amenities?.name ?? '',
+        communityName: community.name,
+        communityAddress: community.address ?? '',
+        reservationDate: format(startDate, 'EEEE, MMMM d, yyyy'),
+        startTime: format(startDate, 'h:mm a'),
+        endTime: format(endDate, 'h:mm a'),
+        fee: reservation.fee_amount > 0 ? `$${(reservation.fee_amount / 100).toFixed(2)}` : '$0.00',
+        deposit: reservation.deposit_amount > 0 ? `$${(reservation.deposit_amount / 100).toFixed(2)}` : '$0.00',
+        guestCount: reservation.guest_count?.toString() ?? 'N/A',
+        purpose: reservation.purpose ?? 'N/A',
+        signingDate: format(new Date(agreement.signed_at), 'MMMM d, yyyy'),
+      });
+      const allAnswers: Record<string, string> = { ...(agreement.field_answers ?? {}) };
+      const htmlRaw = fillAgreementTemplateHtml(template, systemContext, allAnswers);
+      return formatAgreementHtml(htmlRaw);
+    }
+    return formatAgreementPlainText(agreement.filled_text);
+  })();
 
   async function handleSubmit() {
     if (!member) {
@@ -180,6 +214,25 @@ export function CompleteAgreementDialog({
               <span className="text-text-primary-light dark:text-text-primary-dark">{agreement.units?.unit_number ?? 'N/A'}</span>
             </div>
           </div>
+
+          {/* Collapsible signed agreement viewer */}
+          <Collapsible open={agreementOpen} onOpenChange={setAgreementOpen}>
+            <CollapsibleTrigger asChild>
+              <button className="flex items-center gap-2 w-full px-3 py-2 rounded-inner-card border border-stroke-light dark:border-stroke-dark text-body font-medium text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors">
+                <FileSignature className="h-4 w-4 shrink-0" />
+                <span className="flex-1 text-left">View Signed Agreement</span>
+                <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${agreementOpen ? 'rotate-180' : ''}`} />
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <ScrollArea className="h-[250px] mt-2 rounded-inner-card border border-stroke-light dark:border-stroke-dark p-3">
+                <div
+                  className="text-body text-text-primary-light dark:text-text-primary-dark leading-relaxed pr-3 [&_u]:underline [&_u]:decoration-secondary-500/60 [&_u]:underline-offset-2 [&_p]:mb-3 [&_p:last-child]:mb-0"
+                  dangerouslySetInnerHTML={{ __html: displayHtml }}
+                />
+              </ScrollArea>
+            </CollapsibleContent>
+          </Collapsible>
 
           {postEventFields.length === 0 ? (
             <div className="rounded-inner-card bg-surface-light-2 dark:bg-surface-dark-2 p-4 text-center">

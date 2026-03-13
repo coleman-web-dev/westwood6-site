@@ -8,9 +8,10 @@ import { Badge } from '@/components/shared/ui/badge';
 import { Button } from '@/components/shared/ui/button';
 import { DepositReturnDialog } from '@/components/amenities/deposit-return-dialog';
 import { SignedAgreementViewer } from '@/components/amenities/signed-agreement-viewer';
-import { FileSignature, ClipboardCheck, CheckCircle2, XCircle } from 'lucide-react';
+import { CompleteAgreementDialog } from '@/components/amenities/complete-agreement-dialog';
+import { FileSignature, ClipboardCheck, CheckCircle2, XCircle, AlertTriangle, ExternalLink, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { Reservation, ReservationStatus } from '@/lib/types/database';
+import type { AgreementField, SignedAgreement, Reservation, ReservationStatus } from '@/lib/types/database';
 
 interface MyReservationsProps {
   amenityId?: string;
@@ -37,6 +38,13 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
   const [returningReservation, setReturningReservation] = useState<ReservationWithAmenity | null>(null);
   const [unitOwnerMap, setUnitOwnerMap] = useState<Record<string, string>>({});
   const [viewingAgreementId, setViewingAgreementId] = useState<string | null>(null);
+  const [unitStandingMap, setUnitStandingMap] = useState<Record<string, boolean>>({});
+  const [inspectingAgreement, setInspectingAgreement] = useState<(SignedAgreement & {
+    amenities?: { name: string; agreement_template: string | null; agreement_fields: AgreementField[] | null };
+    reservations?: Reservation;
+    units?: { unit_number: string };
+  }) | null>(null);
+  const [loadingInspect, setLoadingInspect] = useState<string | null>(null);
 
   useEffect(() => {
     if (!unit && !isBoard) {
@@ -80,6 +88,28 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
           if (o.unit_id) ownerMap[o.unit_id] = `${o.first_name} ${o.last_name}`;
         }
         setUnitOwnerMap(ownerMap);
+
+        // Fetch financial standing for pending reservations
+        const pendingUnitIds = [...new Set(
+          ((data as ReservationWithAmenity[]) ?? [])
+            .filter((r) => r.status === 'pending')
+            .map((r) => r.unit_id)
+        )];
+
+        if (pendingUnitIds.length > 0) {
+          const { data: overdueInvoices } = await supabase
+            .from('invoices')
+            .select('unit_id')
+            .in('unit_id', pendingUnitIds)
+            .in('status', ['overdue', 'partial']);
+
+          const standingMap: Record<string, boolean> = {};
+          for (const uid of pendingUnitIds) standingMap[uid] = false;
+          for (const inv of (overdueInvoices ?? []) as { unit_id: string }[]) {
+            standingMap[inv.unit_id] = true;
+          }
+          setUnitStandingMap(standingMap);
+        }
       }
 
       setLoading(false);
@@ -202,6 +232,24 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
     }).catch(() => {});
   }
 
+  async function handleInspect(reservation: ReservationWithAmenity) {
+    if (!reservation.signed_agreements?.length) return;
+    setLoadingInspect(reservation.id);
+    const supabase = createClient();
+    const { data } = await supabase
+      .from('signed_agreements')
+      .select('*, amenities(name, agreement_template, agreement_fields), reservations(start_datetime, end_datetime, purpose, guest_count, fee_amount, deposit_amount), units(unit_number)')
+      .eq('reservation_id', reservation.id)
+      .single();
+
+    setLoadingInspect(null);
+    if (data) {
+      setInspectingAgreement(data as typeof inspectingAgreement);
+    } else {
+      toast.error('Could not load agreement for inspection.');
+    }
+  }
+
   function handleDepositReturnSuccess() {
     // Refetch reservations to get updated deposit status
     const supabase = createClient();
@@ -269,9 +317,33 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
                 <Badge variant={badge.variant}>{badge.label}</Badge>
               </div>
               {isBoard && r.units && (
-                <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                  Unit {r.units.unit_number}{unitOwnerMap[r.unit_id] ? ` - ${unitOwnerMap[r.unit_id]}` : ''}
-                </p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                    Unit {r.units.unit_number}{unitOwnerMap[r.unit_id] ? ` - ${unitOwnerMap[r.unit_id]}` : ''}
+                  </p>
+                  {r.status === 'pending' && unitStandingMap[r.unit_id] !== undefined && (
+                    unitStandingMap[r.unit_id] ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-red-600 dark:text-red-400">
+                        <AlertTriangle className="h-3 w-3" />
+                        Has Overdue Dues
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-600 dark:text-green-400">
+                        <CheckCircle2 className="h-3 w-3" />
+                        Good Standing
+                      </span>
+                    )
+                  )}
+                  {r.status === 'pending' && (
+                    <a
+                      href={`/${community.slug}/household?unit=${r.unit_id}&back=amenities`}
+                      className="inline-flex items-center gap-0.5 text-[10px] font-medium text-secondary-400 hover:text-secondary-400/80 transition-colors"
+                    >
+                      View Account
+                      <ExternalLink className="h-2.5 w-2.5" />
+                    </a>
+                  )}
+                </div>
               )}
               <p className="text-meta text-text-muted-light dark:text-text-muted-dark mt-0.5">
                 {isFullDay
@@ -351,14 +423,30 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
                 </Button>
               )}
 
-              {/* View signed agreement */}
+              {/* View signed agreement + inspection */}
               {r.signed_agreements && r.signed_agreements.length > 0 && (
                 <>
                   {isBoard && !isFuture(new Date(r.start_datetime)) && r.signed_agreements.some((a) => !a.post_event_completed) && (
-                    <Badge variant="outline" className="text-[10px] border-amber-400/50 text-amber-600 dark:text-amber-400">
-                      <ClipboardCheck className="h-3 w-3 mr-0.5" />
-                      Pending inspection
-                    </Badge>
+                    <>
+                      <Badge variant="outline" className="text-[10px] border-amber-400/50 text-amber-600 dark:text-amber-400">
+                        <ClipboardCheck className="h-3 w-3 mr-0.5" />
+                        Pending inspection
+                      </Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40"
+                        onClick={() => handleInspect(r)}
+                        disabled={loadingInspect === r.id}
+                      >
+                        {loadingInspect === r.id ? (
+                          <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                        ) : (
+                          <ClipboardCheck className="h-3.5 w-3.5 mr-1" />
+                        )}
+                        Inspect
+                      </Button>
+                    </>
                   )}
                   <Button
                     variant="ghost"
@@ -390,6 +478,16 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
           open={viewingAgreementId !== null}
           onOpenChange={(open) => { if (!open) setViewingAgreementId(null); }}
           reservationId={viewingAgreementId}
+        />
+      )}
+
+      {/* Direct inspection dialog */}
+      {inspectingAgreement && !inspectingAgreement.post_event_completed && (
+        <CompleteAgreementDialog
+          open={inspectingAgreement !== null}
+          onOpenChange={(open) => { if (!open) setInspectingAgreement(null); }}
+          agreement={inspectingAgreement}
+          onSuccess={handleDepositReturnSuccess}
         />
       )}
     </div>

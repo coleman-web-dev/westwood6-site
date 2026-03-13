@@ -8,7 +8,7 @@ import { MemberList } from '@/components/household/member-list';
 import { AddMemberDialog } from '@/components/household/add-member-dialog';
 import { MoveOutDialog } from '@/components/household/move-out-dialog';
 import { SignedAgreementsSection } from '@/components/household/signed-agreements-section';
-import { Home, FileSignature, Check, ChevronsUpDown } from 'lucide-react';
+import { Home, FileSignature, Check, ChevronsUpDown, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/shared/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/shared/ui/popover';
 import {
@@ -46,6 +46,11 @@ export default function HouseholdPage() {
   const [moveOutOpen, setMoveOutOpen] = useState(false);
 
   const canManage = isHeadOfHousehold || isBoard;
+
+  // Back navigation support (e.g., from amenities reservation approval)
+  const backParam = searchParams.get('back');
+  const backLabel = backParam === 'amenities' ? 'Back to Reservations' : null;
+  const backHref = backParam === 'amenities' ? `/${community.slug}/amenities` : null;
 
   // Persist unit selection to URL
   function selectUnit(unitId: string) {
@@ -189,6 +194,15 @@ export default function HouseholdPage() {
 
   return (
     <div className="space-y-6">
+      {backHref && (
+        <button
+          onClick={() => router.push(backHref)}
+          className="inline-flex items-center gap-1.5 text-body font-medium text-text-secondary-light dark:text-text-secondary-dark hover:text-text-primary-light dark:hover:text-text-primary-dark transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          {backLabel}
+        </button>
+      )}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-page-title text-text-primary-light dark:text-text-primary-dark">
           Household
