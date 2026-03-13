@@ -117,6 +117,7 @@ export interface Community {
     can_view_directory: boolean;
   };
   created_at: string;
+  archived_at: string | null;
 }
 
 export interface Unit {

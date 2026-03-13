@@ -10,13 +10,14 @@ import { LandingPageSettings } from '@/components/settings/landing-page-settings
 import { MfaSettings } from '@/components/settings/mfa-settings';
 import { AuditLogViewer } from '@/components/settings/audit-log-viewer';
 import { RolePermissionsManager } from '@/components/settings/role-permissions-manager';
+import { CommunitiesManager } from '@/components/settings/communities-manager';
 
 export default function SettingsPage() {
-  const { canWrite, canRead } = useCommunity();
+  const { canWrite, canRead, isSuperAdmin } = useCommunity();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab');
 
-  const validTabs = ['profile', 'security', 'community', 'landing', 'roles', 'audit'];
+  const validTabs = ['profile', 'security', 'community', 'landing', 'roles', 'audit', 'communities'];
   const defaultTab =
     tabParam && validTabs.includes(tabParam) ? tabParam : 'profile';
 
@@ -34,6 +35,7 @@ export default function SettingsPage() {
           {canRead('settings') && <TabsTrigger value="landing">Landing Page</TabsTrigger>}
           {canWrite('settings') && <TabsTrigger value="roles">Roles</TabsTrigger>}
           {canRead('settings') && <TabsTrigger value="audit">Audit Log</TabsTrigger>}
+          {isSuperAdmin && <TabsTrigger value="communities">Communities</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="profile">
@@ -68,6 +70,12 @@ export default function SettingsPage() {
         {canRead('settings') && (
           <TabsContent value="audit">
             <AuditLogViewer />
+          </TabsContent>
+        )}
+
+        {isSuperAdmin && (
+          <TabsContent value="communities">
+            <CommunitiesManager />
           </TabsContent>
         )}
       </Tabs>

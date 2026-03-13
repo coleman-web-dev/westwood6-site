@@ -4,7 +4,8 @@ import ThemeSwitch from '@/components/shared/ThemeSwitch';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { NotificationBell } from '@/components/notifications/notification-bell';
 import { ViewModeToggle } from './view-mode-toggle';
-import { SearchIcon, MailIcon, MenuIcon, ChevronsUpDown } from 'lucide-react';
+import { CommunitySwitcher } from './community-switcher';
+import { SearchIcon, MailIcon, MenuIcon } from 'lucide-react';
 import { useKBar } from '@shipixen/kbar';
 
 interface DashboardTopbarProps {
@@ -12,7 +13,7 @@ interface DashboardTopbarProps {
 }
 
 export function DashboardTopbar({ onMenuClick }: DashboardTopbarProps) {
-  const { member, actualIsBoard, community, userCommunities, hasMultipleCommunities } = useCommunity();
+  const { member, actualIsBoard } = useCommunity();
   const { query } = useKBar();
 
   const initials = [member?.first_name?.[0], member?.last_name?.[0]]
@@ -66,25 +67,8 @@ export function DashboardTopbar({ onMenuClick }: DashboardTopbarProps) {
           <SearchIcon className="w-[18px] h-[18px]" />
         </button>
 
-        {/* Community switcher (multi-community users only) */}
-        {hasMultipleCommunities && (
-          <div className="relative">
-            <select
-              value={community.slug}
-              onChange={(e) => {
-                window.location.href = `/${e.target.value}/dashboard`;
-              }}
-              className="h-8 pl-2.5 pr-7 rounded-pill bg-surface-light-2 dark:bg-surface-dark-2 border border-stroke-light dark:border-stroke-dark text-meta font-medium text-text-primary-light dark:text-text-primary-dark focus:outline-none focus:ring-2 focus:ring-secondary-400/30 transition-all appearance-none cursor-pointer"
-            >
-              {userCommunities.map((c) => (
-                <option key={c.id} value={c.slug}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            <ChevronsUpDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted-light dark:text-text-muted-dark" />
-          </div>
-        )}
+        {/* Community switcher */}
+        <CommunitySwitcher />
 
         <ThemeSwitch />
 

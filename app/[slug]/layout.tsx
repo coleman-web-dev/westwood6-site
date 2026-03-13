@@ -17,6 +17,7 @@ export default async function CommunityLayout({ children, params }: Props) {
     .from('communities')
     .select('*')
     .eq('slug', slug)
+    .is('archived_at', null)
     .single();
 
   if (!community) notFound();
@@ -80,9 +81,10 @@ export default async function CommunityLayout({ children, params }: Props) {
         .single(),
       supabase
         .from('members')
-        .select('community_id, communities(id, slug, name)')
+        .select('community_id, communities!inner(id, slug, name, archived_at)')
         .eq('user_id', user.id)
-        .eq('is_approved', true),
+        .eq('is_approved', true)
+        .is('communities.archived_at', null),
     ]);
 
     member = memberResult.data as Member | null;
@@ -90,7 +92,11 @@ export default async function CommunityLayout({ children, params }: Props) {
     // Extract user's communities for the switcher
     if (allMembershipsResult.data) {
       userCommunities = allMembershipsResult.data
-        .map((m: { communities: { id: string; slug: string; name: string } | null }) => m.communities)
+        .map((m: { communities: { id: string; slug: string; name: string; archived_at: string | null } | null }) => {
+          if (!m.communities) return null;
+          const { archived_at: _, ...rest } = m.communities;
+          return rest;
+        })
         .filter(Boolean) as { id: string; slug: string; name: string }[];
     }
 
