@@ -35,6 +35,10 @@ const BALLOT_NOTIFICATION_TYPES: NotificationType[] = [
   'ballot_created', 'ballot_opened', 'ballot_reminder', 'ballot_closed', 'ballot_results',
 ];
 
+const RESERVATION_NOTIFICATION_TYPES: NotificationType[] = [
+  'reservation_created', 'reservation_approved', 'reservation_denied',
+];
+
 export function NotificationBell() {
   const router = useRouter();
   const { member, community } = useCommunity();
@@ -97,12 +101,28 @@ export function NotificationBell() {
     if (n.type === 'agreement_signed' && n.reference_id && n.reference_type === 'reservation') {
       setOpen(false);
       setViewingReservationId(n.reference_id);
+      return;
     }
 
     // Navigate to voting page for ballot notifications
     if (BALLOT_NOTIFICATION_TYPES.includes(n.type)) {
       setOpen(false);
       router.push(`/${community.slug}/voting`);
+      return;
+    }
+
+    // Navigate to amenities page for reservation notifications
+    if (RESERVATION_NOTIFICATION_TYPES.includes(n.type) || n.reference_type === 'reservation') {
+      setOpen(false);
+      router.push(`/${community.slug}/amenities`);
+      return;
+    }
+
+    // Navigate to events page for event notifications
+    if (n.reference_type === 'event') {
+      setOpen(false);
+      router.push(`/${community.slug}/events`);
+      return;
     }
   }
 
