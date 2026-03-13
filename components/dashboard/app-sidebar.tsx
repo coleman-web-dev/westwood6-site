@@ -49,7 +49,7 @@ interface AppSidebarProps {
 export function AppSidebar({ open, onClose }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { community, isHeadOfHousehold, isBoard, actualIsBoard, canRead, userCommunities, hasMultipleCommunities } = useCommunity();
+  const { community, isHeadOfHousehold, isBoard, actualIsBoard, canRead } = useCommunity();
 
   const onboardingComplete = !!community.theme?.onboarding?.completed_at;
   const basePath = `/${community.slug}`;
@@ -99,42 +99,6 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
           DuesIQ
         </span>
       </Link>
-
-      {/* Community switcher (only for multi-community users) */}
-      {hasMultipleCommunities && (
-        <div className="px-3 opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200 hidden lg:block">
-          <select
-            value={community.slug}
-            onChange={(e) => {
-              window.location.href = `/${e.target.value}/dashboard`;
-            }}
-            className="w-full h-7 px-2 rounded-inner-card bg-surface-light-2 dark:bg-surface-dark-2 border border-stroke-light dark:border-stroke-dark text-meta text-text-secondary-light dark:text-text-secondary-dark focus:outline-none focus:ring-1 focus:ring-secondary-400/30 transition-all appearance-none truncate"
-          >
-            {userCommunities.map((c) => (
-              <option key={c.id} value={c.slug}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-      {hasMultipleCommunities && (
-        <div className="px-3 lg:hidden">
-          <select
-            value={community.slug}
-            onChange={(e) => {
-              window.location.href = `/${e.target.value}/dashboard`;
-            }}
-            className="w-full h-7 px-2 rounded-inner-card bg-surface-light-2 dark:bg-surface-dark-2 border border-stroke-light dark:border-stroke-dark text-meta text-text-secondary-light dark:text-text-secondary-dark focus:outline-none focus:ring-1 focus:ring-secondary-400/30 transition-all appearance-none truncate"
-          >
-            {userCommunities.map((c) => (
-              <option key={c.id} value={c.slug}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
 
       {/* Nav items */}
       <nav className="flex-1 min-h-0 flex flex-col gap-1 px-3 overflow-y-auto">
