@@ -73,17 +73,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Check board membership
+    // Check board membership (limit+maybeSingle to handle multi-community members)
     const { data: memberData } = await supabase
       .from("members")
       .select("system_role")
       .eq("user_id", user.id)
-      .single();
+      .in("system_role", ["board", "manager", "super_admin"])
+      .eq("is_approved", true)
+      .limit(1)
+      .maybeSingle();
 
-    if (
-      !memberData ||
-      !["board", "manager", "super_admin"].includes(memberData.system_role)
-    ) {
+    if (!memberData) {
       return new Response(
         JSON.stringify({ error: "Only board members can use this feature" }),
         {
