@@ -10,7 +10,8 @@ import { WeeklyDigestEmail } from '@/lib/email/templates/weekly-digest';
 import { ViolationNoticeEmail } from '@/lib/email/templates/violation-notice';
 import { EventNotificationEmail } from '@/lib/email/templates/event-notification';
 import { ReservationBoardNotificationEmail } from '@/lib/email/templates/reservation-board-notification';
-import type { EmailQueueItem } from '@/lib/types/database';
+import { resolveSender } from '@/lib/email/resolve-sender';
+import type { EmailQueueItem, EmailSettings } from '@/lib/types/database';
 
 const BATCH_SIZE = 10;
 const MAX_ATTEMPTS = 3;
@@ -118,10 +119,14 @@ export async function POST(req: NextRequest) {
         throw new Error(`Community not found: ${item.community_id}`);
       }
 
-      const emailSettings = (community.theme as Record<string, unknown>)?.email_settings as Record<string, string> | undefined;
-      const fromName = emailSettings?.from_name || community?.name || 'DuesIQ';
-      const fromAddress = process.env.EMAIL_FROM_ADDRESS || 'notifications@duesiq.com';
-      const from = `${fromName} <${fromAddress}>`;
+      const emailSettings = (community.theme as Record<string, unknown>)?.email_settings as EmailSettings | undefined;
+
+      // Resolve sender based on community's email configuration
+      const { from, replyTo } = await resolveSender(
+        item.community_id,
+        community.name,
+        emailSettings,
+      );
 
       // Send via Resend
       const { data: sendResult, error: sendError } = await resend.emails.send({
@@ -129,7 +134,7 @@ export async function POST(req: NextRequest) {
         to: item.recipient_email,
         subject: item.subject,
         html,
-        ...(emailSettings?.reply_to ? { reply_to: emailSettings.reply_to } : {}),
+        ...(replyTo ? { reply_to: replyTo } : {}),
       });
 
       if (sendError) {

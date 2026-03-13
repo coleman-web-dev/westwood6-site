@@ -9,7 +9,7 @@ import { ExportCsvButton } from '@/components/documents/export-csv-button';
 import type { CsvColumn } from '@/lib/utils/export-csv';
 import type { Member, DocumentFolder } from '@/lib/types/database';
 
-type DirectoryMember = Member & { unit: { unit_number: string } | null };
+type DirectoryMember = Member & { unit: { unit_number: string; address: string | null } | null };
 
 const memberColumns: CsvColumn<DirectoryMember>[] = [
   { header: 'First Name', value: (m) => m.first_name },
@@ -17,6 +17,7 @@ const memberColumns: CsvColumn<DirectoryMember>[] = [
   { header: 'Role', value: (m) => m.member_role },
   { header: 'System Role', value: (m) => m.system_role },
   { header: 'Unit Number', value: (m) => m.unit?.unit_number ?? '' },
+  { header: 'Address', value: (m) => m.unit?.address ?? '' },
   { header: 'Email', value: (m) => m.email },
   { header: 'Phone', value: (m) => m.phone },
 ];
@@ -41,7 +42,7 @@ export default function DirectoryPage() {
 
       let query = supabase
         .from('members')
-        .select('*, unit:units(unit_number)')
+        .select('*, unit:units(unit_number, address)')
         .eq('community_id', community.id)
         .eq('is_approved', true)
         .order('last_name', { ascending: true });

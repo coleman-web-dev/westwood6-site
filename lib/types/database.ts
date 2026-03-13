@@ -68,10 +68,14 @@ export interface BulletinSettings {
   commenting: 'board_only' | 'all_households';
 }
 
+export type EmailSendingMode = 'default' | 'custom_domain' | 'subdomain';
+
 export interface EmailSettings {
   reply_to?: string;
   from_name?: string;
   primary_color?: string;
+  sending_mode?: EmailSendingMode;
+  subdomain_address?: string;
 }
 
 export interface VendorSettings {
@@ -158,6 +162,47 @@ export interface MemberNote {
   community_id: string;
   note: string;
   created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type EmailDomainStatus = 'not_started' | 'pending' | 'verified' | 'failed' | 'temporary_failure';
+
+export interface CommunityEmailDomain {
+  id: string;
+  community_id: string;
+  resend_domain_id: string;
+  domain_name: string;
+  domain_type: 'custom' | 'subdomain';
+  status: EmailDomainStatus;
+  dns_records: DnsRecord[];
+  is_active: boolean;
+  last_verified_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DnsRecord {
+  record: 'SPF' | 'DKIM' | 'DMARC';
+  name: string;
+  value: string;
+  type: 'MX' | 'TXT' | 'CNAME';
+  ttl: string;
+  status: 'pending' | 'verified' | 'failed' | 'temporary_failure' | 'not_started';
+  priority?: number;
+}
+
+export interface EmailAddress {
+  id: string;
+  community_id: string;
+  domain_id: string;
+  address: string;
+  display_name: string | null;
+  address_type: 'community' | 'role';
+  role_label: string | null;
+  assigned_to: string | null;
+  forward_to: string | null;
+  is_default: boolean;
   created_at: string;
   updated_at: string;
 }

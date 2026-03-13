@@ -6,7 +6,8 @@ import { PaymentConfirmationEmail } from '@/lib/email/templates/payment-confirma
 import { PaymentReminderEmail } from '@/lib/email/templates/payment-reminder';
 import { AnnouncementEmail } from '@/lib/email/templates/announcement';
 import { WelcomeInviteEmail } from '@/lib/email/templates/welcome-invite';
-import type { EmailCategory } from '@/lib/types/database';
+import { resolveSender } from '@/lib/email/resolve-sender';
+import type { EmailCategory, EmailSettings } from '@/lib/types/database';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyProps = any;
@@ -83,10 +84,14 @@ export async function POST(req: NextRequest) {
       .eq('id', communityId)
       .single();
 
-    const emailSettings = (community?.theme as Record<string, unknown>)?.email_settings as Record<string, string> | undefined;
-    const fromName = emailSettings?.from_name || community?.name || 'DuesIQ';
-    const fromAddress = process.env.EMAIL_FROM_ADDRESS || 'notifications@duesiq.com';
-    const from = `${fromName} <${fromAddress}>`;
+    const emailSettings = (community?.theme as Record<string, unknown>)?.email_settings as EmailSettings | undefined;
+
+    // Resolve sender based on community's email configuration
+    const { from, replyTo } = await resolveSender(
+      communityId,
+      community?.name || 'DuesIQ',
+      emailSettings,
+    );
 
     // Send
     const { data: sendResult, error: sendError } = await resend.emails.send({
@@ -94,7 +99,7 @@ export async function POST(req: NextRequest) {
       to: recipientEmail,
       subject,
       html,
-      ...(emailSettings?.reply_to ? { reply_to: emailSettings.reply_to } : {}),
+      ...(replyTo ? { reply_to: replyTo } : {}),
     });
 
     if (sendError) {

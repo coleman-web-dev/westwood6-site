@@ -10,6 +10,8 @@ import { toast } from 'sonner';
 import { Mail, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes';
 import { UnsavedChangesDialog } from '@/components/settings/unsaved-changes-dialog';
+import { EmailDomainSetup } from '@/components/settings/email-domain-setup';
+import { EmailAddressManager } from '@/components/settings/email-address-manager';
 import type { EmailSettings } from '@/lib/types/database';
 
 interface RecentLog {
@@ -165,6 +167,16 @@ export function EmailSettingsSection() {
             {saving ? 'Saving...' : 'Save Email Settings'}
           </Button>
         </div>
+      </div>
+
+      {/* Sending address configuration */}
+      <div className="mt-6 pt-6 border-t border-stroke-light dark:border-stroke-dark">
+        <EmailDomainSetup />
+      </div>
+
+      {/* Email addresses */}
+      <div className="mt-6 pt-6 border-t border-stroke-light dark:border-stroke-dark">
+        <EmailAddressManager />
       </div>
 
       {/* Recent email activity */}

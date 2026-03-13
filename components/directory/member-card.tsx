@@ -18,7 +18,7 @@ const ROLE_LABEL: Record<MemberRole, string> = {
 };
 
 interface MemberCardProps {
-  member: Member & { unit: { unit_number: string } | null };
+  member: Member & { unit: { unit_number: string; address: string | null } | null };
 }
 
 export function MemberCard({ member }: MemberCardProps) {
@@ -35,9 +35,12 @@ export function MemberCard({ member }: MemberCardProps) {
         </div>
 
         {member.unit && (
-          <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-            Unit {member.unit.unit_number}
-          </p>
+          <div className="text-meta text-text-muted-light dark:text-text-muted-dark">
+            <p>Unit {member.unit.unit_number}</p>
+            {member.unit.address && (
+              <p>{member.unit.address}</p>
+            )}
+          </div>
         )}
 
         <div className="flex items-center gap-4 flex-wrap text-meta text-text-secondary-light dark:text-text-secondary-dark">
