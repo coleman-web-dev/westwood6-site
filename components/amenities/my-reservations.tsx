@@ -9,7 +9,7 @@ import { Button } from '@/components/shared/ui/button';
 import { DepositReturnDialog } from '@/components/amenities/deposit-return-dialog';
 import { SignedAgreementViewer } from '@/components/amenities/signed-agreement-viewer';
 import { CompleteAgreementDialog } from '@/components/amenities/complete-agreement-dialog';
-import { FileSignature, ClipboardCheck, CheckCircle2, XCircle, AlertTriangle, ExternalLink, Loader2 } from 'lucide-react';
+import { FileSignature, ClipboardCheck, CheckCircle2, XCircle, AlertTriangle, ExternalLink, Loader2, CreditCard } from 'lucide-react';
 import { toast } from 'sonner';
 import type { AgreementField, SignedAgreement, Reservation, ReservationStatus } from '@/lib/types/database';
 
@@ -45,6 +45,7 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
     units?: { unit_number: string };
   }) | null>(null);
   const [loadingInspect, setLoadingInspect] = useState<string | null>(null);
+  const [payingDepositId, setPayingDepositId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!unit && !isBoard) {
@@ -156,6 +157,38 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
         r.id === reservationId ? { ...r, deposit_paid: true, deposit_paid_at: new Date().toISOString() } : r
       )
     );
+  }
+
+  async function handlePayDeposit(reservation: ReservationWithAmenity) {
+    setPayingDepositId(reservation.id);
+
+    try {
+      const baseUrl = window.location.origin + window.location.pathname;
+      const response = await fetch('/api/amenities/deposit-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reservationId: reservation.id,
+          communityId: community.id,
+          successUrl: `${baseUrl}?deposit=success`,
+          cancelUrl: `${baseUrl}?deposit=cancelled`,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.error || 'Failed to start deposit payment.');
+        setPayingDepositId(null);
+        return;
+      }
+
+      // Redirect to Stripe Checkout
+      window.location.href = data.url;
+    } catch {
+      toast.error('Something went wrong.');
+      setPayingDepositId(null);
+    }
   }
 
   async function handleApprove(reservation: ReservationWithAmenity) {
@@ -360,8 +393,12 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
                       ? r.deposit_refunded
                         ? r.deposit_return_method === 'wallet'
                           ? '(security deposit → wallet)'
-                          : '(security deposit refunded)'
-                        : '(security deposit paid)'
+                          : r.deposit_return_method === 'card'
+                            ? '(security deposit → refunded to card)'
+                            : '(security deposit refunded)'
+                        : r.deposit_stripe_payment_intent
+                          ? '(security deposit paid by card)'
+                          : '(security deposit paid)'
                       : `(security deposit: $${(r.deposit_amount / 100).toFixed(2)})`}
                   </span>
                 )}
@@ -400,6 +437,23 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
                   onClick={() => handleCancel(r.id)}
                 >
                   Cancel
+                </Button>
+              )}
+
+              {/* Member: Pay deposit online */}
+              {!isBoard && r.deposit_amount > 0 && !r.deposit_paid && (r.status === 'approved' || r.status === 'pending') && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePayDeposit(r)}
+                  disabled={payingDepositId === r.id}
+                >
+                  {payingDepositId === r.id ? (
+                    <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                  ) : (
+                    <CreditCard className="h-3.5 w-3.5 mr-1" />
+                  )}
+                  Pay Security Deposit
                 </Button>
               )}
 

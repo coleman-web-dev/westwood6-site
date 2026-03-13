@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { startOfMonth, endOfMonth, addMonths, startOfDay, endOfDay } from 'date-fns';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
@@ -10,10 +11,22 @@ import { TimeSlotPicker } from '@/components/amenities/time-slot-picker';
 import { ReservationDialog } from '@/components/amenities/reservation-dialog';
 import { MyReservations } from '@/components/amenities/my-reservations';
 import { Button } from '@/components/shared/ui/button';
+import { toast } from 'sonner';
 import type { Amenity, BlockedDateRange } from '@/lib/types/database';
 
 export default function AmenitiesPage() {
   const { isBoard } = useCommunity();
+  const searchParams = useSearchParams();
+
+  // Show toast for deposit payment success/cancelled from Stripe redirect
+  useEffect(() => {
+    const depositParam = searchParams.get('deposit');
+    if (depositParam === 'success') {
+      toast.success('Security deposit paid successfully!');
+    } else if (depositParam === 'cancelled') {
+      toast.info('Security deposit payment was cancelled.');
+    }
+  }, [searchParams]);
 
   const [selectedAmenity, setSelectedAmenity] = useState<Amenity | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);

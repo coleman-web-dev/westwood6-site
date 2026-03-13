@@ -301,9 +301,11 @@ export interface Reservation {
   deposit_amount: number;
   stripe_payment_id: string | null;
   deposit_refunded: boolean;
-  deposit_return_method: 'check' | 'wallet' | null;
+  deposit_return_method: 'check' | 'wallet' | 'card' | null;
   deposit_paid: boolean;
   deposit_paid_at: string | null;
+  deposit_stripe_session_id: string | null;
+  deposit_stripe_payment_intent: string | null;
   admin_notes: string | null;
   created_at: string;
 }

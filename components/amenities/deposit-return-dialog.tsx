@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import {
@@ -37,8 +37,16 @@ export function DepositReturnDialog({
   onSuccess,
 }: DepositReturnDialogProps) {
   const { community, member } = useCommunity();
-  const [method, setMethod] = useState<'check' | 'wallet'>('wallet');
+  const paidByCard = !!reservation?.deposit_stripe_payment_intent;
+  const [method, setMethod] = useState<'check' | 'wallet' | 'card'>(paidByCard ? 'card' : 'wallet');
   const [submitting, setSubmitting] = useState(false);
+
+  // Reset method when a different reservation is opened
+  useEffect(() => {
+    if (reservation) {
+      setMethod(reservation.deposit_stripe_payment_intent ? 'card' : 'wallet');
+    }
+  }, [reservation]);
 
   if (!reservation) return null;
 
@@ -48,6 +56,40 @@ export function DepositReturnDialog({
     if (!reservation || !member) return;
 
     setSubmitting(true);
+
+    // Card refund goes through the API route (server-side Stripe call)
+    if (method === 'card') {
+      try {
+        const response = await fetch('/api/amenities/deposit-refund', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            reservationId: reservation.id,
+            communityId: community.id,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          setSubmitting(false);
+          toast.error(data.error || 'Failed to process refund.');
+          return;
+        }
+
+        setSubmitting(false);
+        toast.success(`$${depositDollars} refunded to the original payment method.`);
+        onOpenChange(false);
+        onSuccess();
+        return;
+      } catch {
+        setSubmitting(false);
+        toast.error('Something went wrong processing the refund.');
+        return;
+      }
+    }
+
+    // Wallet and check methods handled client-side
     const supabase = createClient();
 
     // 1. Mark deposit as refunded with the chosen method
@@ -154,6 +196,12 @@ export function DepositReturnDialog({
               <span className="text-text-secondary-light dark:text-text-secondary-dark">Amenity</span>
               <span className="text-text-primary-light dark:text-text-primary-dark">{reservation.amenities.name}</span>
             </div>
+            {paidByCard && (
+              <div className="flex justify-between text-body">
+                <span className="text-text-secondary-light dark:text-text-secondary-dark">Payment method</span>
+                <span className="text-text-primary-light dark:text-text-primary-dark">Credit card</span>
+              </div>
+            )}
           </div>
 
           {/* Return method */}
@@ -162,6 +210,25 @@ export function DepositReturnDialog({
               Return method
             </label>
             <div className="space-y-2">
+              {/* Refund to credit card (only when deposit was paid by card) */}
+              {paidByCard && (
+                <label className="flex items-center gap-3 p-3 rounded-inner-card border border-stroke-light dark:border-stroke-dark cursor-pointer hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors">
+                  <input
+                    type="radio"
+                    name="deposit-method"
+                    value="card"
+                    checked={method === 'card'}
+                    onChange={() => setMethod('card')}
+                    className="accent-primary-600"
+                  />
+                  <div>
+                    <p className="text-label text-text-primary-light dark:text-text-primary-dark">Refund to credit card</p>
+                    <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                      Refunds the deposit back to the original payment method via Stripe.
+                    </p>
+                  </div>
+                </label>
+              )}
               <label className="flex items-center gap-3 p-3 rounded-inner-card border border-stroke-light dark:border-stroke-dark cursor-pointer hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors">
                 <input
                   type="radio"

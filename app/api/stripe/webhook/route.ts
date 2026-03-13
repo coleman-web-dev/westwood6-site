@@ -52,6 +52,42 @@ export async function POST(req: NextRequest) {
         const session = event.data.object as Stripe.Checkout.Session;
         const communityId = session.metadata?.community_id;
 
+        // --- Deposit payment branch ---
+        const reservationId = session.metadata?.reservation_id;
+        const metadataType = session.metadata?.type;
+        if (reservationId && metadataType === 'deposit' && communityId) {
+          // Idempotency: check if already paid
+          const { data: reservation } = await supabase
+            .from('reservations')
+            .select('id, deposit_paid')
+            .eq('id', reservationId)
+            .single();
+
+          if (reservation && !reservation.deposit_paid) {
+            await supabase.from('reservations').update({
+              deposit_paid: true,
+              deposit_paid_at: new Date().toISOString(),
+              deposit_stripe_session_id: session.id,
+              deposit_stripe_payment_intent: (session.payment_intent as string) || null,
+            }).eq('id', reservationId);
+
+            // Notify board about deposit payment (fire-and-forget)
+            void supabase.rpc('create_board_notifications', {
+              p_community_id: communityId,
+              p_type: 'general',
+              p_title: 'Security deposit paid',
+              p_body: 'A member has paid their security deposit online.',
+              p_reference_id: reservationId,
+              p_reference_type: 'reservation',
+            });
+
+            console.log('Deposit payment confirmed for reservation:', reservationId);
+          } else {
+            console.log('Deposit already paid or reservation not found, skipping:', reservationId);
+          }
+          break;
+        }
+
         // --- RSVP payment branch ---
         const rsvpId = session.metadata?.rsvp_id;
         if (rsvpId && communityId) {
