@@ -85,6 +85,14 @@ export function CreateEventDialog({
   const [notifyOnCreate, setNotifyOnCreate] = useState(true);
   const [notifyRoles, setNotifyRoles] = useState<MemberRole[]>(['owner', 'member']);
 
+  // RSVP settings
+  const [rsvpEnabled, setRsvpEnabled] = useState(false);
+  const [rsvpFee, setRsvpFee] = useState('');
+  const [rsvpFeeType, setRsvpFeeType] = useState<'per_person' | 'flat'>('flat');
+  const [rsvpMaxCapacity, setRsvpMaxCapacity] = useState('');
+  const [rsvpAllowCancellation, setRsvpAllowCancellation] = useState(true);
+  const [rsvpCancellationNoticeHours, setRsvpCancellationNoticeHours] = useState('');
+
   const isEditing = editingEvent !== null;
 
   // Fetch amenities when dialog opens
@@ -118,6 +126,14 @@ export function CreateEventDialog({
       setIsPinned(editingEvent.is_pinned);
       setNotifyOnCreate(false); // Don't re-send on edit
       setNotifyRoles(editingEvent.notify_roles ?? ['owner', 'member']);
+
+      // RSVP settings
+      setRsvpEnabled(editingEvent.rsvp_enabled);
+      setRsvpFee(editingEvent.rsvp_fee > 0 ? (editingEvent.rsvp_fee / 100).toFixed(2) : '');
+      setRsvpFeeType(editingEvent.rsvp_fee_type);
+      setRsvpMaxCapacity(editingEvent.rsvp_max_capacity?.toString() ?? '');
+      setRsvpAllowCancellation(editingEvent.rsvp_allow_cancellation);
+      setRsvpCancellationNoticeHours(editingEvent.rsvp_cancellation_notice_hours?.toString() ?? '');
 
       // Determine location type from existing data
       if (editingEvent.amenity_id) {
@@ -154,6 +170,12 @@ export function CreateEventDialog({
     setIsPinned(false);
     setNotifyOnCreate(true);
     setNotifyRoles(['owner', 'member']);
+    setRsvpEnabled(false);
+    setRsvpFee('');
+    setRsvpFeeType('flat');
+    setRsvpMaxCapacity('');
+    setRsvpAllowCancellation(true);
+    setRsvpCancellationNoticeHours('');
   }
 
   // Auto-set end date/time to 1 hour after start when start changes
@@ -229,6 +251,8 @@ export function CreateEventDialog({
         ? customLocation.trim() || null
         : null;
 
+    const rsvpFeeCents = rsvpEnabled && rsvpFee ? Math.round(parseFloat(rsvpFee) * 100) : 0;
+
     const payload = {
       title: title.trim(),
       description: description.trim() || null,
@@ -242,6 +266,14 @@ export function CreateEventDialog({
       is_pinned: isPinned,
       notify_on_create: notifyOnCreate,
       notify_roles: notifyRoles,
+      rsvp_enabled: rsvpEnabled,
+      rsvp_fee: rsvpFeeCents,
+      rsvp_fee_type: rsvpFeeType,
+      rsvp_max_capacity: rsvpEnabled && rsvpMaxCapacity ? parseInt(rsvpMaxCapacity) : null,
+      rsvp_allow_cancellation: rsvpEnabled ? rsvpAllowCancellation : true,
+      rsvp_cancellation_notice_hours: rsvpEnabled && rsvpAllowCancellation && rsvpCancellationNoticeHours
+        ? parseInt(rsvpCancellationNoticeHours)
+        : null,
     };
 
     if (isEditing) {
@@ -556,6 +588,127 @@ export function CreateEventDialog({
                 </div>
               )}
             </div>
+          </div>
+
+          {/* RSVP Settings */}
+          <div className="space-y-3 rounded-lg border border-stroke-light dark:border-stroke-dark p-3">
+            <p className="text-label text-text-secondary-light dark:text-text-secondary-dark font-semibold">
+              RSVP Settings
+            </p>
+
+            {/* Enable RSVP */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-body text-text-secondary-light dark:text-text-secondary-dark">
+                  Require RSVP
+                </p>
+                <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                  Members must RSVP to attend this event
+                </p>
+              </div>
+              <Switch
+                checked={rsvpEnabled}
+                onCheckedChange={setRsvpEnabled}
+              />
+            </div>
+
+            {rsvpEnabled && (
+              <div className="space-y-3 pt-1">
+                {/* Fee */}
+                <div className="space-y-1.5">
+                  <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                    RSVP Fee
+                    <span className="ml-1 text-text-muted-light dark:text-text-muted-dark font-normal">
+                      (leave empty for free)
+                    </span>
+                  </label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-body text-text-muted-light dark:text-text-muted-dark">
+                        $
+                      </span>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={rsvpFee}
+                        onChange={(e) => setRsvpFee(e.target.value)}
+                        className="pl-7"
+                      />
+                    </div>
+                    <Select
+                      value={rsvpFeeType}
+                      onValueChange={(v) => setRsvpFeeType(v as 'per_person' | 'flat')}
+                    >
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="flat">Flat fee</SelectItem>
+                        <SelectItem value="per_person">Per person</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Max capacity */}
+                <div className="space-y-1.5">
+                  <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                    Max capacity
+                    <span className="ml-1 text-text-muted-light dark:text-text-muted-dark font-normal">
+                      (optional)
+                    </span>
+                  </label>
+                  <Input
+                    type="number"
+                    min="1"
+                    placeholder="Unlimited"
+                    value={rsvpMaxCapacity}
+                    onChange={(e) => setRsvpMaxCapacity(e.target.value)}
+                  />
+                </div>
+
+                {/* Cancellation policy */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-body text-text-secondary-light dark:text-text-secondary-dark">
+                      Allow cancellation
+                    </p>
+                    <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                      Members can cancel their RSVP with auto-refund
+                    </p>
+                  </div>
+                  <Switch
+                    checked={rsvpAllowCancellation}
+                    onCheckedChange={setRsvpAllowCancellation}
+                  />
+                </div>
+
+                {rsvpAllowCancellation && (
+                  <div className="space-y-1.5">
+                    <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                      Minimum notice for refund
+                      <span className="ml-1 text-text-muted-light dark:text-text-muted-dark font-normal">
+                        (hours before event, optional)
+                      </span>
+                    </label>
+                    <Input
+                      type="number"
+                      min="1"
+                      placeholder="Always refund"
+                      value={rsvpCancellationNoticeHours}
+                      onChange={(e) => setRsvpCancellationNoticeHours(e.target.value)}
+                    />
+                    <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                      {rsvpCancellationNoticeHours
+                        ? `Members can cancel anytime, but refunds are only given if cancelled ${rsvpCancellationNoticeHours}+ hours before the event.`
+                        : 'Members will always receive a refund when they cancel.'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

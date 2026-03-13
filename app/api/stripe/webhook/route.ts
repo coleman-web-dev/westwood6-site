@@ -50,8 +50,53 @@ export async function POST(req: NextRequest) {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
-        const invoiceId = session.metadata?.invoice_id;
         const communityId = session.metadata?.community_id;
+
+        // --- RSVP payment branch ---
+        const rsvpId = session.metadata?.rsvp_id;
+        if (rsvpId && communityId) {
+          // Idempotency: check if already confirmed
+          const { data: rsvp } = await supabase
+            .from('event_rsvps')
+            .select('id, status, event_id, member_id')
+            .eq('id', rsvpId)
+            .single();
+
+          if (rsvp && rsvp.status === 'pending_payment') {
+            await supabase.from('event_rsvps').update({
+              status: 'confirmed',
+              paid_at: new Date().toISOString(),
+              stripe_session_id: session.id,
+              stripe_payment_intent: (session.payment_intent as string) || null,
+            }).eq('id', rsvpId);
+
+            // Notify board about paid RSVP (fire-and-forget)
+            const { data: rsvpEvent } = await supabase
+              .from('events')
+              .select('title')
+              .eq('id', rsvp.event_id)
+              .single();
+
+            if (rsvpEvent) {
+              void supabase.rpc('create_board_notifications', {
+                p_community_id: communityId,
+                p_type: 'general',
+                p_title: `New paid RSVP for ${rsvpEvent.title}`,
+                p_body: 'A member has completed payment and confirmed their RSVP.',
+                p_reference_id: rsvp.event_id,
+                p_reference_type: 'event',
+              });
+            }
+
+            console.log('RSVP payment confirmed:', rsvpId);
+          } else {
+            console.log('RSVP already confirmed or not found, skipping:', rsvpId);
+          }
+          break;
+        }
+
+        // --- Invoice payment branch ---
+        const invoiceId = session.metadata?.invoice_id;
 
         if (!invoiceId || !communityId) {
           console.log('Checkout session missing metadata, skipping:', session.id);

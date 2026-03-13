@@ -2,25 +2,52 @@
 
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { Pencil, Trash2, MapPin, Clock, Calendar as CalendarIcon, Pin, Megaphone, Bell } from 'lucide-react';
+import {
+  Pencil,
+  Trash2,
+  MapPin,
+  Clock,
+  Calendar as CalendarIcon,
+  Pin,
+  Megaphone,
+  Users,
+  UserCheck,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+} from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Button } from '@/components/shared/ui/button';
 import { Badge } from '@/components/shared/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/shared/ui/tabs';
+import { RsvpDialog } from '@/components/events/rsvp-dialog';
+import { RsvpListDialog } from '@/components/events/rsvp-list-dialog';
 import { toast } from 'sonner';
-import type { Event } from '@/lib/types/database';
+import type { Event, EventRsvp } from '@/lib/types/database';
+
+/** RSVP summary for a single event */
+export interface EventRsvpSummary {
+  rsvpCount: number;
+  totalGuests: number;
+  myRsvp: EventRsvp | null;
+}
 
 interface EventListProps {
   events: Event[];
   loading: boolean;
+  rsvpMap: Record<string, EventRsvpSummary>;
   onEdit: (event: Event) => void;
   onDeleted: () => void;
+  onRsvpChanged: () => void;
 }
 
-export function EventList({ events, loading, onEdit, onDeleted }: EventListProps) {
-  const { isBoard } = useCommunity();
+export function EventList({ events, loading, rsvpMap, onEdit, onDeleted, onRsvpChanged }: EventListProps) {
+  const { isBoard, community, member } = useCommunity();
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [rsvpEvent, setRsvpEvent] = useState<Event | null>(null);
+  const [viewRsvpsEvent, setViewRsvpsEvent] = useState<Event | null>(null);
 
   const now = new Date().toISOString();
 
@@ -59,6 +86,37 @@ export function EventList({ events, loading, onEdit, onDeleted }: EventListProps
     onDeleted();
   }
 
+  async function handleCancelRsvp(event: Event) {
+    if (!member) return;
+    const confirm = window.confirm(
+      'Are you sure you want to cancel your RSVP?'
+    );
+    if (!confirm) return;
+
+    setCancellingId(event.id);
+
+    try {
+      const response = await fetch(`/api/events/${event.id}/rsvp`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ communityId: community.id }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.error || 'Failed to cancel RSVP.');
+      } else {
+        toast.success(data.message || 'RSVP cancelled.');
+        onRsvpChanged();
+      }
+    } catch {
+      toast.error('Something went wrong.');
+    }
+
+    setCancellingId(null);
+  }
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -77,54 +135,94 @@ export function EventList({ events, loading, onEdit, onDeleted }: EventListProps
   }
 
   return (
-    <Tabs defaultValue="upcoming">
-      <TabsList>
-        <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-        <TabsTrigger value="past">Past</TabsTrigger>
-      </TabsList>
+    <>
+      <Tabs defaultValue="upcoming">
+        <TabsList>
+          <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
+          <TabsTrigger value="past">Past</TabsTrigger>
+        </TabsList>
 
-      <TabsContent value="upcoming">
-        {upcoming.length === 0 ? (
-          <p className="text-body text-text-muted-light dark:text-text-muted-dark py-4">
-            No upcoming events.
-          </p>
-        ) : (
-          <div className="space-y-4">
-            {upcoming.map((event) => (
-              <EventCard
-                key={event.id}
-                event={event}
-                isBoard={isBoard}
-                isDeleting={deletingId === event.id}
-                onEdit={onEdit}
-                onDelete={handleDelete}
-              />
-            ))}
-          </div>
-        )}
-      </TabsContent>
+        <TabsContent value="upcoming">
+          {upcoming.length === 0 ? (
+            <p className="text-body text-text-muted-light dark:text-text-muted-dark py-4">
+              No upcoming events.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {upcoming.map((event) => (
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  isBoard={isBoard}
+                  isDeleting={deletingId === event.id}
+                  isCancelling={cancellingId === event.id}
+                  rsvpSummary={rsvpMap[event.id]}
+                  onEdit={onEdit}
+                  onDelete={handleDelete}
+                  onRsvp={() => setRsvpEvent(event)}
+                  onCancelRsvp={() => handleCancelRsvp(event)}
+                  onViewRsvps={() => setViewRsvpsEvent(event)}
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
 
-      <TabsContent value="past">
-        {past.length === 0 ? (
-          <p className="text-body text-text-muted-light dark:text-text-muted-dark py-4">
-            No past events.
-          </p>
-        ) : (
-          <div className="space-y-4">
-            {past.map((event) => (
-              <EventCard
-                key={event.id}
-                event={event}
-                isBoard={isBoard}
-                isDeleting={deletingId === event.id}
-                onEdit={onEdit}
-                onDelete={handleDelete}
-              />
-            ))}
-          </div>
-        )}
-      </TabsContent>
-    </Tabs>
+        <TabsContent value="past">
+          {past.length === 0 ? (
+            <p className="text-body text-text-muted-light dark:text-text-muted-dark py-4">
+              No past events.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {past.map((event) => (
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  isBoard={isBoard}
+                  isDeleting={deletingId === event.id}
+                  isCancelling={cancellingId === event.id}
+                  rsvpSummary={rsvpMap[event.id]}
+                  onEdit={onEdit}
+                  onDelete={handleDelete}
+                  onRsvp={() => setRsvpEvent(event)}
+                  onCancelRsvp={() => handleCancelRsvp(event)}
+                  onViewRsvps={() => setViewRsvpsEvent(event)}
+                  isPast
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* RSVP Dialog */}
+      {rsvpEvent && (
+        <RsvpDialog
+          open={rsvpEvent !== null}
+          onOpenChange={(open) => { if (!open) setRsvpEvent(null); }}
+          event={rsvpEvent}
+          spotsRemaining={
+            rsvpEvent.rsvp_max_capacity
+              ? rsvpEvent.rsvp_max_capacity - (rsvpMap[rsvpEvent.id]?.totalGuests ?? 0)
+              : null
+          }
+          onSuccess={() => {
+            setRsvpEvent(null);
+            onRsvpChanged();
+          }}
+        />
+      )}
+
+      {/* RSVP List Dialog (board) */}
+      {viewRsvpsEvent && (
+        <RsvpListDialog
+          open={viewRsvpsEvent !== null}
+          onOpenChange={(open) => { if (!open) setViewRsvpsEvent(null); }}
+          event={viewRsvpsEvent}
+        />
+      )}
+    </>
   );
 }
 
@@ -132,17 +230,40 @@ function EventCard({
   event,
   isBoard,
   isDeleting,
+  isCancelling,
+  rsvpSummary,
   onEdit,
   onDelete,
+  onRsvp,
+  onCancelRsvp,
+  onViewRsvps,
+  isPast,
 }: {
   event: Event;
   isBoard: boolean;
   isDeleting: boolean;
+  isCancelling: boolean;
+  rsvpSummary?: EventRsvpSummary;
   onEdit: (event: Event) => void;
   onDelete: (event: Event) => void;
+  onRsvp: () => void;
+  onCancelRsvp: () => void;
+  onViewRsvps: () => void;
+  isPast?: boolean;
 }) {
   const startDate = new Date(event.start_datetime);
   const endDate = new Date(event.end_datetime);
+  const myRsvp = rsvpSummary?.myRsvp;
+  const isUpcoming = !isPast;
+
+  // RSVP button state for members
+  const showRsvpSection = event.rsvp_enabled && isUpcoming;
+  const hasConfirmedRsvp = myRsvp?.status === 'confirmed';
+  const hasPendingRsvp = myRsvp?.status === 'pending_payment';
+  const isFull =
+    event.rsvp_max_capacity !== null &&
+    (rsvpSummary?.totalGuests ?? 0) >= event.rsvp_max_capacity;
+  const eventStarted = new Date(event.start_datetime) <= new Date();
 
   return (
     <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding">
@@ -166,6 +287,13 @@ function EventCard({
               <Badge variant="outline" className="text-meta shrink-0 gap-1">
                 <Megaphone className="h-3 w-3" />
                 Announcements
+              </Badge>
+            )}
+            {event.rsvp_enabled && (
+              <Badge variant="outline" className="text-meta shrink-0 gap-1">
+                <UserCheck className="h-3 w-3" />
+                RSVP
+                {event.rsvp_fee > 0 && ` · $${(event.rsvp_fee / 100).toFixed(2)}${event.rsvp_fee_type === 'per_person' ? '/person' : ''}`}
               </Badge>
             )}
           </div>
@@ -195,6 +323,97 @@ function EventCard({
               <MapPin className="h-3.5 w-3.5 shrink-0" />
               {event.location}
             </p>
+          )}
+
+          {/* RSVP section */}
+          {event.rsvp_enabled && (
+            <div className="flex items-center gap-2 flex-wrap pt-1">
+              {/* Board: RSVP count summary + view button */}
+              {isBoard && rsvpSummary && (
+                <>
+                  <Badge variant="outline" className="text-meta gap-1">
+                    <Users className="h-3 w-3" />
+                    {rsvpSummary.rsvpCount} RSVP{rsvpSummary.rsvpCount !== 1 ? 's' : ''}
+                    {' '}({rsvpSummary.totalGuests} guest{rsvpSummary.totalGuests !== 1 ? 's' : ''})
+                    {event.rsvp_max_capacity && (
+                      <span className="text-text-muted-light dark:text-text-muted-dark">
+                        {' '}/ {event.rsvp_max_capacity}
+                      </span>
+                    )}
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={onViewRsvps}
+                    className="h-7 text-meta"
+                  >
+                    View RSVPs
+                  </Button>
+                </>
+              )}
+
+              {/* Member: RSVP action buttons */}
+              {showRsvpSection && !isBoard && (
+                <>
+                  {hasConfirmedRsvp ? (
+                    <>
+                      <Badge className="text-meta bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 gap-1">
+                        <CheckCircle2 className="h-3 w-3" />
+                        RSVPd ({myRsvp.guest_count} guest{myRsvp.guest_count > 1 ? 's' : ''})
+                      </Badge>
+                      {event.rsvp_allow_cancellation && !eventStarted && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={onCancelRsvp}
+                          disabled={isCancelling}
+                          className="h-7 text-meta text-destructive hover:text-destructive"
+                        >
+                          {isCancelling ? (
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          ) : (
+                            <XCircle className="h-3 w-3 mr-1" />
+                          )}
+                          Cancel RSVP
+                        </Button>
+                      )}
+                    </>
+                  ) : hasPendingRsvp ? (
+                    <Badge variant="outline" className="text-meta border-amber-400/50 text-amber-600 dark:text-amber-400 gap-1">
+                      <Clock className="h-3 w-3" />
+                      Payment pending
+                    </Badge>
+                  ) : isFull ? (
+                    <Badge variant="outline" className="text-meta text-text-muted-light dark:text-text-muted-dark gap-1">
+                      <Users className="h-3 w-3" />
+                      Event full
+                    </Badge>
+                  ) : eventStarted ? (
+                    <Badge variant="outline" className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                      RSVP closed
+                    </Badge>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={onRsvp}
+                      className="h-7 text-meta"
+                    >
+                      <UserCheck className="h-3 w-3 mr-1" />
+                      RSVP
+                      {event.rsvp_fee > 0 && ` · $${(event.rsvp_fee / 100).toFixed(2)}${event.rsvp_fee_type === 'per_person' ? '/person' : ''}`}
+                    </Button>
+                  )}
+                </>
+              )}
+
+              {/* Capacity indicator */}
+              {event.rsvp_max_capacity && rsvpSummary && !isBoard && (
+                <span className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                  {Math.max(0, event.rsvp_max_capacity - rsvpSummary.totalGuests)} spots left
+                </span>
+              )}
+            </div>
           )}
         </div>
 

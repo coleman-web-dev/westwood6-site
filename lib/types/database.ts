@@ -323,7 +323,32 @@ export interface Event {
   is_pinned: boolean;
   notify_on_create: boolean;
   notify_roles: MemberRole[];
+  rsvp_enabled: boolean;
+  rsvp_fee: number;
+  rsvp_fee_type: 'per_person' | 'flat';
+  rsvp_max_capacity: number | null;
+  rsvp_allow_cancellation: boolean;
+  rsvp_cancellation_notice_hours: number | null;
   created_by: string;
+  created_at: string;
+}
+
+export type EventRsvpStatus = 'confirmed' | 'cancelled' | 'pending_payment';
+
+export interface EventRsvp {
+  id: string;
+  event_id: string;
+  community_id: string;
+  member_id: string;
+  unit_id: string | null;
+  guest_count: number;
+  total_fee: number;
+  status: EventRsvpStatus;
+  stripe_session_id: string | null;
+  stripe_payment_intent: string | null;
+  paid_at: string | null;
+  refunded_at: string | null;
+  cancelled_at: string | null;
   created_at: string;
 }
 
