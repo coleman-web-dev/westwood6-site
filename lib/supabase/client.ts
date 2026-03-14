@@ -24,6 +24,7 @@ export function createClient() {
         resetPasswordForEmail: async () => ({ error: { message: 'Supabase not configured' } }),
       },
       from: () => new Proxy({}, queryHandler),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any;
   }
 
