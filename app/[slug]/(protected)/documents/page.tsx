@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { format } from 'date-fns';
-import { Plus, FileSignature, Eye } from 'lucide-react';
+import { Plus, FolderPlus, FileSignature, Eye, Loader2, X } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -17,6 +17,7 @@ import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Button } from '@/components/shared/ui/button';
+import { Input } from '@/components/shared/ui/input';
 import { DocumentList } from '@/components/documents/document-list';
 import { UploadDocumentDialog } from '@/components/documents/upload-document-dialog';
 import { FolderSidebar } from '@/components/documents/folder-sidebar';
@@ -31,17 +32,28 @@ interface AgreementRow extends SignedAgreement {
 }
 
 export default function DocumentsPage() {
-  const { community, isBoard, canRead, canWrite } = useCommunity();
+  const { community, member, isBoard, canRead, canWrite } = useCommunity();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [folders, setFolders] = useState<DocumentFolder[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   // Unified state: selected folder ID (null = "All Documents")
-  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [selectedFolderId, setSelectedFolderIdRaw] = useState<string | null>(null);
+  function setSelectedFolderId(id: string | null) {
+    setSelectedFolderIdRaw(id);
+    // Reset subfolder creation when switching folders
+    setShowSubfolderCreate(false);
+    setSubfolderName('');
+  }
 
   // Active drag state for DragOverlay
   const [activeDragDoc, setActiveDragDoc] = useState<Document | null>(null);
+
+  // Inline subfolder creation in main area
+  const [showSubfolderCreate, setShowSubfolderCreate] = useState(false);
+  const [subfolderName, setSubfolderName] = useState('');
+  const [subfolderSubmitting, setSubfolderSubmitting] = useState(false);
 
   // Signed agreements state (for board/admin)
   const [agreements, setAgreements] = useState<AgreementRow[]>([]);
@@ -107,6 +119,46 @@ export default function DocumentsPage() {
   function handleRefresh() {
     fetchDocuments();
     fetchFolders();
+  }
+
+  // Check if the selected folder is a root folder (can have subfolders)
+  const selectedIsRoot = selectedFolderId
+    ? folders.find((f) => f.id === selectedFolderId)?.parent_id === null
+    : false;
+
+  async function handleCreateSubfolder() {
+    if (!subfolderName.trim() || !member || !selectedFolderId) return;
+
+    setSubfolderSubmitting(true);
+    const supabase = createClient();
+
+    const siblings = folders.filter((f) => f.parent_id === selectedFolderId);
+    const maxOrder =
+      siblings.length > 0 ? Math.max(...siblings.map((f) => f.sort_order)) : -1;
+
+    const { error } = await supabase.from('document_folders').insert({
+      community_id: community.id,
+      name: subfolderName.trim(),
+      parent_id: selectedFolderId,
+      created_by: member.id,
+      sort_order: maxOrder + 1,
+    });
+
+    setSubfolderSubmitting(false);
+
+    if (error) {
+      if (error.code === '23505') {
+        toast.error('A folder with that name already exists here.');
+      } else {
+        toast.error('Failed to create folder.');
+      }
+      return;
+    }
+
+    toast.success('Folder created.');
+    setSubfolderName('');
+    setShowSubfolderCreate(false);
+    handleRefresh();
   }
 
   // ─── Tree helpers ────────────────────────────────────────
@@ -303,6 +355,63 @@ export default function DocumentsPage() {
                 folders={folders}
                 isDragEnabled={isBoard}
               />
+
+              {/* New Folder button in main area (board, when viewing a root folder) */}
+              {isBoard && selectedFolderId && selectedIsRoot && (
+                <div>
+                  {showSubfolderCreate ? (
+                    <div className="flex items-center gap-2 max-w-sm">
+                      <Input
+                        placeholder="Subfolder name"
+                        value={subfolderName}
+                        onChange={(e) => setSubfolderName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && subfolderName.trim()) handleCreateSubfolder();
+                          if (e.key === 'Escape') {
+                            setShowSubfolderCreate(false);
+                            setSubfolderName('');
+                          }
+                        }}
+                        className="h-8 text-sm"
+                        autoFocus
+                        maxLength={100}
+                        disabled={subfolderSubmitting}
+                      />
+                      <Button
+                        size="sm"
+                        onClick={handleCreateSubfolder}
+                        disabled={subfolderSubmitting || !subfolderName.trim()}
+                        className="h-8 shrink-0"
+                      >
+                        {subfolderSubmitting ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          'Add'
+                        )}
+                      </Button>
+                      <button
+                        type="button"
+                        className="p-1 text-text-muted-light dark:text-text-muted-dark hover:text-destructive transition-colors shrink-0"
+                        onClick={() => {
+                          setShowSubfolderCreate(false);
+                          setSubfolderName('');
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowSubfolderCreate(true)}
+                    >
+                      <FolderPlus className="h-4 w-4 mr-2" />
+                      New Folder
+                    </Button>
+                  )}
+                </div>
+              )}
 
               {/* Signed agreements section */}
               {showAgreements && (

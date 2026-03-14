@@ -11,6 +11,7 @@ import {
   ChevronRight,
   ChevronDown,
   Plus,
+  X,
 } from 'lucide-react';
 import {
   SortableContext,
@@ -233,6 +234,14 @@ function InlineCreateInput({
       >
         {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Add'}
       </Button>
+      <button
+        type="button"
+        className="p-1 text-text-muted-light dark:text-text-muted-dark hover:text-destructive transition-colors shrink-0"
+        onClick={onCancel}
+        title="Cancel"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 }
