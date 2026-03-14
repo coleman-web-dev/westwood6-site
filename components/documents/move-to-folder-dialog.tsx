@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Folder } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import {
@@ -33,8 +33,23 @@ export function MoveToFolderDialog({
   const [selected, setSelected] = useState<string>(doc.folder_id ?? folders[0]?.id ?? '');
   const [saving, setSaving] = useState(false);
 
-  // Sort folders by sort_order
-  const sorted = [...folders].sort((a, b) => a.sort_order - b.sort_order);
+  // Build tree-ordered list for display
+  const treeOrdered = useMemo(() => {
+    const root = folders
+      .filter((f) => f.parent_id === null)
+      .sort((a, b) => a.sort_order - b.sort_order);
+    const result: { folder: DocumentFolder; depth: number }[] = [];
+    for (const r of root) {
+      result.push({ folder: r, depth: 0 });
+      const children = folders
+        .filter((f) => f.parent_id === r.id)
+        .sort((a, b) => a.sort_order - b.sort_order);
+      for (const c of children) {
+        result.push({ folder: c, depth: 1 });
+      }
+    }
+    return result;
+  }, [folders]);
 
   async function handleSave() {
     if (selected === doc.folder_id) {
@@ -82,10 +97,10 @@ export function MoveToFolderDialog({
         </DialogHeader>
 
         <div className="space-y-1 py-2">
-          {sorted.map((folder) => (
+          {treeOrdered.map(({ folder, depth }) => (
             <button
               key={folder.id}
-              className={itemClass(selected === folder.id)}
+              className={`${itemClass(selected === folder.id)}${depth > 0 ? ' ml-5' : ''}`}
               onClick={() => setSelected(folder.id)}
             >
               <Folder className="h-4 w-4 text-secondary-500 shrink-0" />
@@ -95,7 +110,7 @@ export function MoveToFolderDialog({
             </button>
           ))}
 
-          {sorted.length === 0 && (
+          {treeOrdered.length === 0 && (
             <p className="text-meta text-text-muted-light dark:text-text-muted-dark px-3 py-2">
               No folders created yet. Create a folder from the sidebar first.
             </p>

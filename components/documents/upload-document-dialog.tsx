@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useMemo } from 'react';
 import { Upload } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
@@ -47,8 +47,29 @@ export function UploadDocumentDialog({
   const [folderId, setFolderId] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Default to "Other" folder if available
-  const defaultFolderId = folders.find((f) => f.name === 'Other')?.id ?? folders[0]?.id ?? '';
+  // Default to "Other" root folder if available
+  const defaultFolderId =
+    folders.find((f) => f.name === 'Other' && f.parent_id === null)?.id ??
+    folders.find((f) => f.parent_id === null)?.id ??
+    '';
+
+  // Build tree-ordered list for the folder selector
+  const treeOrderedFolders = useMemo(() => {
+    const root = folders
+      .filter((f) => f.parent_id === null)
+      .sort((a, b) => a.sort_order - b.sort_order);
+    const result: { folder: DocumentFolder; depth: number }[] = [];
+    for (const r of root) {
+      result.push({ folder: r, depth: 0 });
+      const children = folders
+        .filter((f) => f.parent_id === r.id)
+        .sort((a, b) => a.sort_order - b.sort_order);
+      for (const c of children) {
+        result.push({ folder: c, depth: 1 });
+      }
+    }
+    return result;
+  }, [folders]);
 
   function resetForm() {
     setTitle('');
@@ -166,9 +187,9 @@ export function UploadDocumentDialog({
                 <SelectValue placeholder="Select folder" />
               </SelectTrigger>
               <SelectContent>
-                {folders.map((f) => (
-                  <SelectItem key={f.id} value={f.id}>
-                    {f.name}
+                {treeOrderedFolders.map(({ folder, depth }) => (
+                  <SelectItem key={folder.id} value={folder.id}>
+                    {depth > 0 ? `└ ${folder.name}` : folder.name}
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { format } from 'date-fns';
 import { Plus, FileSignature, Eye } from 'lucide-react';
 import {
@@ -109,10 +109,33 @@ export default function DocumentsPage() {
     fetchFolders();
   }
 
-  // Filter documents by selected folder
-  const filteredDocuments = selectedFolderId
-    ? documents.filter((d) => d.folder_id === selectedFolderId)
-    : documents;
+  // ─── Tree helpers ────────────────────────────────────────
+
+  // Root-level folders only (for tabs)
+  const rootFolders = useMemo(
+    () =>
+      folders
+        .filter((f) => f.parent_id === null)
+        .sort((a, b) => a.sort_order - b.sort_order),
+    [folders]
+  );
+
+  // Determine which root folder tab should be active
+  // (highlights parent tab when a sub-folder is selected)
+  const activeRootFolderId = useMemo(() => {
+    if (!selectedFolderId) return null;
+    const selected = folders.find((f) => f.id === selectedFolderId);
+    if (!selected) return null;
+    return selected.parent_id ?? selected.id;
+  }, [selectedFolderId, folders]);
+
+  // Filter documents: include selected folder + all its children
+  const filteredDocuments = useMemo(() => {
+    if (!selectedFolderId) return documents;
+    const children = folders.filter((f) => f.parent_id === selectedFolderId);
+    const folderIds = [selectedFolderId, ...children.map((c) => c.id)];
+    return documents.filter((d) => d.folder_id && folderIds.includes(d.folder_id));
+  }, [selectedFolderId, folders, documents]);
 
   // ─── Drag-and-Drop Handlers ───────────────────────────────
 
@@ -161,25 +184,42 @@ export default function DocumentsPage() {
       return;
     }
 
-    // Folder reorder (folder dropped on folder)
+    // Folder reorder (only among siblings with the same parent_id)
     if (activeId.startsWith('folder-') && overId.startsWith('folder-')) {
-      const oldIndex = folders.findIndex((f) => `folder-${f.id}` === activeId);
-      const newIndex = folders.findIndex((f) => `folder-${f.id}` === overId);
+      const activeFolderIdStr = activeId.replace('folder-', '');
+      const overFolderIdStr = overId.replace('folder-', '');
+
+      const activeFolder = folders.find((f) => f.id === activeFolderIdStr);
+      const overFolder = folders.find((f) => f.id === overFolderIdStr);
+      if (!activeFolder || !overFolder) return;
+
+      // Only reorder siblings (same parent)
+      if (activeFolder.parent_id !== overFolder.parent_id) return;
+
+      const siblings = folders
+        .filter((f) => f.parent_id === activeFolder.parent_id)
+        .sort((a, b) => a.sort_order - b.sort_order);
+
+      const oldIndex = siblings.findIndex((f) => f.id === activeFolderIdStr);
+      const newIndex = siblings.findIndex((f) => f.id === overFolderIdStr);
       if (oldIndex === -1 || newIndex === -1) return;
 
-      const reordered = [...folders];
+      const reordered = [...siblings];
       const [moved] = reordered.splice(oldIndex, 1);
       reordered.splice(newIndex, 0, moved);
-      const updated = reordered.map((f, i) => ({ ...f, sort_order: i }));
 
-      // Optimistic update
-      setFolders(updated);
+      // Optimistic update: apply new sort_order to siblings
+      const updatedFolders = folders.map((f) => {
+        const idx = reordered.findIndex((r) => r.id === f.id);
+        return idx !== -1 ? { ...f, sort_order: idx } : f;
+      });
+      setFolders(updatedFolders);
 
       const supabase = createClient();
-      for (const folder of updated) {
+      for (const [i, folder] of reordered.entries()) {
         const { error } = await supabase
           .from('document_folders')
-          .update({ sort_order: folder.sort_order })
+          .update({ sort_order: i })
           .eq('id', folder.id);
 
         if (error) {
@@ -236,7 +276,7 @@ export default function DocumentsPage() {
 
           {/* Document list with dynamic folder tabs */}
           <div className="flex-1 min-w-0">
-            {/* Dynamic tabs from folders */}
+            {/* Dynamic tabs from root-level folders */}
             <div className="flex items-center gap-1 flex-wrap mb-4 border-b border-stroke-light dark:border-stroke-dark pb-2">
               <DroppableTab
                 id="all"
@@ -244,12 +284,12 @@ export default function DocumentsPage() {
                 isActive={selectedFolderId === null}
                 onClick={() => setSelectedFolderId(null)}
               />
-              {folders.map((folder) => (
+              {rootFolders.map((folder) => (
                 <DroppableTab
                   key={folder.id}
                   id={`tab-${folder.id}`}
                   label={folder.name}
-                  isActive={selectedFolderId === folder.id}
+                  isActive={activeRootFolderId === folder.id}
                   onClick={() => setSelectedFolderId(folder.id)}
                 />
               ))}
