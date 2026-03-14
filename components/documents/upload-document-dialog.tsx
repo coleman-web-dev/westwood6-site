@@ -133,7 +133,7 @@ export function UploadDocumentDialog({
     const supabase = createClient();
     const totalFiles = files.length;
     let successCount = 0;
-    let failCount = 0;
+    const failedFiles: string[] = [];
 
     for (let i = 0; i < totalFiles; i++) {
       const file = files[i];
@@ -154,7 +154,8 @@ export function UploadDocumentDialog({
         .upload(filePath, file);
 
       if (uploadError) {
-        failCount++;
+        console.error(`Storage upload failed for "${file.name}":`, uploadError.message);
+        failedFiles.push(file.name);
         continue;
       }
 
@@ -171,9 +172,10 @@ export function UploadDocumentDialog({
       });
 
       if (insertError) {
+        console.error(`DB insert failed for "${file.name}":`, insertError.message);
         // Attempt to clean up the uploaded file
         await supabase.storage.from('hoa-documents').remove([filePath]);
-        failCount++;
+        failedFiles.push(file.name);
         continue;
       }
 
@@ -183,12 +185,16 @@ export function UploadDocumentDialog({
     setSubmitting(false);
     setProgress('');
 
-    if (failCount > 0 && successCount > 0) {
+    if (failedFiles.length > 0 && successCount > 0) {
       toast.warning(
-        `${successCount} document${successCount > 1 ? 's' : ''} uploaded. ${failCount} failed.`
+        `${successCount} uploaded. Failed: ${failedFiles.join(', ')}`,
+        { duration: 8000 }
       );
-    } else if (failCount > 0 && successCount === 0) {
-      toast.error('Failed to upload. Please try again.');
+    } else if (failedFiles.length > 0 && successCount === 0) {
+      toast.error(
+        `Upload failed for: ${failedFiles.join(', ')}`,
+        { duration: 8000 }
+      );
       return;
     } else {
       toast.success(
