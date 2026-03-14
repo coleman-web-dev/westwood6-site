@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Badge } from '@/components/shared/ui/badge';
 import type { Member, MemberRole } from '@/lib/types/database';
 
@@ -19,11 +20,16 @@ const ROLE_LABEL: Record<MemberRole, string> = {
 
 interface MemberCardProps {
   member: Member & { unit: { unit_number: string; address: string | null } | null };
+  href?: string;
 }
 
-export function MemberCard({ member }: MemberCardProps) {
-  return (
-    <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding">
+export function MemberCard({ member, href }: MemberCardProps) {
+  const card = (
+    <div
+      className={`rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding${
+        href ? ' hover:border-secondary-400/40 hover:shadow-sm transition-all cursor-pointer' : ''
+      }`}
+    >
       <div className="space-y-1">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-body font-medium text-text-primary-light dark:text-text-primary-dark">
@@ -50,4 +56,14 @@ export function MemberCard({ member }: MemberCardProps) {
       </div>
     </div>
   );
+
+  if (href) {
+    return (
+      <Link href={href} className="block">
+        {card}
+      </Link>
+    );
+  }
+
+  return card;
 }
