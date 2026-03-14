@@ -32,6 +32,7 @@ function getViewerType(filePath: string): ViewerType {
 
 export function DocumentViewerDialog({ open, onOpenChange, document: doc }: DocumentViewerDialogProps) {
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [textContent, setTextContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +41,10 @@ export function DocumentViewerDialog({ open, onOpenChange, document: doc }: Docu
 
   useEffect(() => {
     if (!open) {
+      // Revoke blob URL to free memory
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
       setSignedUrl(null);
+      setBlobUrl(null);
       setTextContent(null);
       setError(null);
       setLoading(true);
@@ -64,6 +68,18 @@ export function DocumentViewerDialog({ open, onOpenChange, document: doc }: Docu
 
       setSignedUrl(data.signedUrl);
 
+      // For PDFs, fetch as blob to avoid cross-origin iframe blocking
+      if (viewerType === 'pdf') {
+        try {
+          const res = await fetch(data.signedUrl);
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          setBlobUrl(url);
+        } catch {
+          setError('Failed to load PDF.');
+        }
+      }
+
       // For text files, fetch the content
       if (viewerType === 'text') {
         try {
@@ -79,6 +95,7 @@ export function DocumentViewerDialog({ open, onOpenChange, document: doc }: Docu
     }
 
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, doc.file_path, viewerType]);
 
   function handleDownload() {
@@ -104,9 +121,9 @@ export function DocumentViewerDialog({ open, onOpenChange, document: doc }: Docu
               <FileText className="h-12 w-12 text-text-muted-light dark:text-text-muted-dark" />
               <p className="text-body text-text-muted-light dark:text-text-muted-dark">{error}</p>
             </div>
-          ) : viewerType === 'pdf' && signedUrl ? (
+          ) : viewerType === 'pdf' && blobUrl ? (
             <iframe
-              src={signedUrl}
+              src={blobUrl}
               className="w-full h-[60vh] border-0"
               title={doc.title}
             />
