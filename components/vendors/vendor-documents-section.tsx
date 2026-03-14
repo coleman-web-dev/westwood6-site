@@ -62,7 +62,7 @@ export function VendorDocumentsSection({
 }: VendorDocumentsSectionProps) {
   const [documents, setDocuments] = useState<VendorDocument[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
