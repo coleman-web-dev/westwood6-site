@@ -6,7 +6,7 @@ import { useCommunity } from '@/lib/providers/community-provider';
 import { NotificationBell } from '@/components/notifications/notification-bell';
 import { ViewModeToggle } from './view-mode-toggle';
 import { CommunitySwitcher } from './community-switcher';
-import { SearchIcon, MailIcon, MenuIcon } from 'lucide-react';
+import { SearchIcon, MailIcon, MessageSquareIcon, MenuIcon } from 'lucide-react';
 import { useKBar } from '@shipixen/kbar';
 
 interface DashboardTopbarProps {
@@ -82,6 +82,12 @@ export function DashboardTopbar({ onMenuClick }: DashboardTopbarProps) {
             <MailIcon className="w-[18px] h-[18px]" />
           </Link>
         )}
+        <Link
+          href={`/${community.slug}/bulletin-board`}
+          className="relative p-2 rounded-inner-card text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors"
+        >
+          <MessageSquareIcon className="w-[18px] h-[18px]" />
+        </Link>
 
         <div className="w-7 h-7 rounded-full bg-secondary-400 flex items-center justify-center text-meta font-semibold text-primary-900">
           {initials || '?'}
