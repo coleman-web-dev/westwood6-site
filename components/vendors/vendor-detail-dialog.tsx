@@ -205,6 +205,52 @@ export function VendorDetailDialog({
     }
     setW9OnFile(true);
     setW9Path(path);
+
+    // Sync W-9 to vendor documents + documents folder
+    if (member?.id) {
+      // Remove any existing W-9 vendor_documents (and their synced docs)
+      const { data: existingW9s } = await supabase
+        .from('vendor_documents')
+        .select('id')
+        .eq('vendor_id', vendor.id)
+        .eq('document_type', 'w9');
+
+      if (existingW9s && existingW9s.length > 0) {
+        const w9Ids = existingW9s.map((d) => d.id);
+        await supabase.from('documents').delete().in('vendor_document_id', w9Ids);
+        await supabase.from('vendor_documents').delete().in('id', w9Ids);
+      }
+
+      // Create a vendor_documents entry for this W-9
+      const { data: w9Doc } = await supabase
+        .from('vendor_documents')
+        .insert({
+          vendor_id: vendor.id,
+          community_id: vendor.community_id,
+          document_type: 'w9' as const,
+          title: 'W-9',
+          file_path: path,
+          file_size: file.size,
+          uploaded_by: member.id,
+        })
+        .select('id')
+        .single();
+
+      // Sync to documents folder
+      if (w9Doc) {
+        syncVendorDocToFolder({
+          vendorDocId: w9Doc.id,
+          vendorId: vendor.id,
+          vendorName: vendor.company || vendor.name,
+          communityId: vendor.community_id,
+          memberId: member.id,
+          title: 'W-9',
+          filePath: path,
+          fileSize: file.size,
+        }).catch((err) => console.error('Failed to sync W-9 to folder:', err));
+      }
+    }
+
     toast.success('W-9 uploaded.');
     setUploadingW9(false);
     onUpdated();

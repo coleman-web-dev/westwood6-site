@@ -233,7 +233,7 @@ function DraggableDocumentRow({
 
       {/* Actions */}
       <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-        {isBoard && !isVendorSynced && (
+        {isBoard && (
           <Select
             value={visibility}
             onValueChange={(v) => onVisibilityChange(v as DocVisibility)}
