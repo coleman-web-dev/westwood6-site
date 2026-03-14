@@ -84,7 +84,7 @@ export default async function CommunityLandingPage({ params }: Props) {
               .from('documents')
               .select('id, title, category, file_path, file_size')
               .eq('community_id', c.id)
-              .eq('is_public', true)
+              .eq('visibility', 'public')
               .order('created_at', { ascending: false })
           : Promise.resolve({ data: [] }),
 

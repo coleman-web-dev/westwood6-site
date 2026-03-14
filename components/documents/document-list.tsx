@@ -1,17 +1,35 @@
 'use client';
 
-import { useState } from 'react';
-import { FileText, Download, Trash2, Globe, Eye, FolderInput, Folder, GripVertical } from 'lucide-react';
+import { useRef, useState } from 'react';
+import {
+  FileText,
+  Download,
+  Trash2,
+  Globe,
+  Eye,
+  FolderInput,
+  Folder,
+  GripVertical,
+  Lock,
+  Users,
+} from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Button } from '@/components/shared/ui/button';
 import { Badge } from '@/components/shared/ui/badge';
-import { Switch } from '@/components/shared/ui/switch';
+import { Input } from '@/components/shared/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/shared/ui/select';
 import { toast } from 'sonner';
 import { DocumentViewerDialog } from '@/components/documents/document-viewer-dialog';
 import { MoveToFolderDialog } from '@/components/documents/move-to-folder-dialog';
-import type { Document, DocumentFolder } from '@/lib/types/database';
+import type { Document, DocumentFolder, DocVisibility } from '@/lib/types/database';
 
 interface DocumentListProps {
   documents: Document[];
@@ -28,6 +46,12 @@ function formatFileSize(bytes: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+const VISIBILITY_OPTIONS: { value: DocVisibility; label: string; icon: typeof Globe }[] = [
+  { value: 'private', label: 'Private', icon: Lock },
+  { value: 'community', label: 'Community', icon: Users },
+  { value: 'public', label: 'Public', icon: Globe },
+];
+
 // ─── Draggable Document Row ─────────────────────────────
 
 function DraggableDocumentRow({
@@ -37,12 +61,18 @@ function DraggableDocumentRow({
   onView,
   onDownload,
   onDelete,
-  onTogglePublic,
+  onVisibilityChange,
   onMove,
   isBoard,
   isDeleting,
   isDownloading,
   hasFolders,
+  isEditing,
+  editTitle,
+  onEditStart,
+  onEditChange,
+  onEditSave,
+  onEditCancel,
 }: {
   doc: Document;
   folderName: string | null;
@@ -50,17 +80,58 @@ function DraggableDocumentRow({
   onView: () => void;
   onDownload: () => void;
   onDelete: () => void;
-  onTogglePublic: () => void;
+  onVisibilityChange: (v: DocVisibility) => void;
   onMove: () => void;
   isBoard: boolean;
   isDeleting: boolean;
   isDownloading: boolean;
   hasFolders: boolean;
+  isEditing: boolean;
+  editTitle: string;
+  onEditStart: () => void;
+  onEditChange: (v: string) => void;
+  onEditSave: () => void;
+  onEditCancel: () => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `doc-${doc.id}`,
     disabled: !isDragEnabled,
   });
+
+  const editInputRef = useRef<HTMLInputElement>(null);
+
+  // Use a timeout to distinguish single vs double click on the title
+  const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handleTitleClick(e: React.MouseEvent) {
+    if (!isBoard) return;
+    e.stopPropagation();
+
+    if (clickTimer.current) {
+      // Double-click detected, cancel single-click action
+      clearTimeout(clickTimer.current);
+      clickTimer.current = null;
+      onView();
+      return;
+    }
+
+    clickTimer.current = setTimeout(() => {
+      clickTimer.current = null;
+      onEditStart();
+    }, 250);
+  }
+
+  function handleEditKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      onEditSave();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      onEditCancel();
+    }
+  }
+
+  const visibility = doc.visibility ?? 'community';
 
   return (
     <div
@@ -91,48 +162,87 @@ function DraggableDocumentRow({
       {/* Title + meta */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-body font-medium text-text-primary-light dark:text-text-primary-dark truncate">
-            {doc.title}
-          </span>
-          {folderName && (
+          {isEditing ? (
+            <div className="flex items-center gap-1.5 flex-1 min-w-0" onClick={(e) => e.stopPropagation()}>
+              <Input
+                ref={editInputRef}
+                autoFocus
+                value={editTitle}
+                onChange={(e) => onEditChange(e.target.value)}
+                onKeyDown={handleEditKeyDown}
+                onBlur={onEditSave}
+                maxLength={200}
+                className="h-7 text-body font-medium"
+              />
+            </div>
+          ) : (
+            <span
+              className={`text-body font-medium text-text-primary-light dark:text-text-primary-dark truncate${
+                isBoard ? ' hover:underline hover:decoration-dotted cursor-text' : ''
+              }`}
+              onClick={isBoard ? handleTitleClick : undefined}
+            >
+              {doc.title}
+            </span>
+          )}
+          {folderName && !isEditing && (
             <Badge variant="secondary" className="text-meta shrink-0 gap-1">
               <Folder className="h-3 w-3" />
               {folderName}
             </Badge>
           )}
-          {doc.is_public && (
+          {visibility === 'public' && !isEditing && (
             <Badge variant="outline" className="text-meta shrink-0 gap-1">
               <Globe className="h-3 w-3" />
               Public
             </Badge>
           )}
-        </div>
-        <div className="flex items-center gap-3 mt-0.5">
-          <span className="text-meta text-text-muted-light dark:text-text-muted-dark">
-            {new Date(doc.created_at).toLocaleDateString(undefined, {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-            })}
-          </span>
-          {doc.file_size != null && doc.file_size > 0 && (
-            <span className="text-meta text-text-muted-light dark:text-text-muted-dark">
-              {formatFileSize(doc.file_size)}
-            </span>
+          {visibility === 'private' && !isEditing && (
+            <Badge variant="outline" className="text-meta shrink-0 gap-1 text-warning-dot">
+              <Lock className="h-3 w-3" />
+              Private
+            </Badge>
           )}
         </div>
+        {!isEditing && (
+          <div className="flex items-center gap-3 mt-0.5">
+            <span className="text-meta text-text-muted-light dark:text-text-muted-dark">
+              {new Date(doc.created_at).toLocaleDateString(undefined, {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+              })}
+            </span>
+            {doc.file_size != null && doc.file_size > 0 && (
+              <span className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                {formatFileSize(doc.file_size)}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Actions */}
       <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
         {isBoard && (
-          <div className="flex items-center gap-1.5 mr-1" title={doc.is_public ? 'Public' : 'Private'}>
-            <Globe className="h-3.5 w-3.5 text-text-muted-light dark:text-text-muted-dark" />
-            <Switch
-              checked={doc.is_public}
-              onCheckedChange={onTogglePublic}
-            />
-          </div>
+          <Select
+            value={visibility}
+            onValueChange={(v) => onVisibilityChange(v as DocVisibility)}
+          >
+            <SelectTrigger className="h-7 w-[115px] text-xs gap-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {VISIBILITY_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  <span className="flex items-center gap-1.5">
+                    <opt.icon className="h-3 w-3" />
+                    {opt.label}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         )}
 
         {isBoard && hasFolders && (
@@ -203,14 +313,19 @@ export function DocumentList({
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
   const [movingDoc, setMovingDoc] = useState<Document | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
 
   const folderMap = new Map(folders.map((f) => [f.id, f.name]));
 
-  async function handleTogglePublic(doc: Document) {
+  async function handleVisibilityChange(doc: Document, newVisibility: DocVisibility) {
     const supabase = createClient();
     const { error } = await supabase
       .from('documents')
-      .update({ is_public: !doc.is_public })
+      .update({
+        visibility: newVisibility,
+        is_public: newVisibility === 'public',
+      })
       .eq('id', doc.id);
 
     if (error) {
@@ -218,11 +333,36 @@ export function DocumentList({
       return;
     }
 
-    toast.success(
-      doc.is_public
-        ? 'Document is now private.'
-        : 'Document is now visible on the landing page.'
-    );
+    const messages: Record<DocVisibility, string> = {
+      private: 'Document is now private (board only).',
+      community: 'Document visible to community members.',
+      public: 'Document visible on the public site.',
+    };
+    toast.success(messages[newVisibility]);
+    onDeleted();
+  }
+
+  async function handleRename(docId: string, newTitle: string) {
+    const trimmed = newTitle.trim();
+    if (!trimmed) {
+      setEditingId(null);
+      return;
+    }
+
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('documents')
+      .update({ title: trimmed })
+      .eq('id', docId);
+
+    setEditingId(null);
+
+    if (error) {
+      toast.error('Failed to rename document.');
+      return;
+    }
+
+    toast.success('Document renamed.');
     onDeleted();
   }
 
@@ -319,12 +459,21 @@ export function DocumentList({
             onView={() => setViewingDoc(doc)}
             onDownload={() => handleDownload(doc)}
             onDelete={() => handleDelete(doc)}
-            onTogglePublic={() => handleTogglePublic(doc)}
+            onVisibilityChange={(v) => handleVisibilityChange(doc, v)}
             onMove={() => setMovingDoc(doc)}
             isBoard={isBoard}
             isDeleting={deletingId === doc.id}
             isDownloading={downloadingId === doc.id}
             hasFolders={folders.length > 0}
+            isEditing={editingId === doc.id}
+            editTitle={editingId === doc.id ? editTitle : doc.title}
+            onEditStart={() => {
+              setEditingId(doc.id);
+              setEditTitle(doc.title);
+            }}
+            onEditChange={setEditTitle}
+            onEditSave={() => handleRename(doc.id, editTitle)}
+            onEditCancel={() => setEditingId(null)}
           />
         ))}
       </div>

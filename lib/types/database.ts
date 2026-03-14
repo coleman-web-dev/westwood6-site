@@ -9,6 +9,7 @@ export type ReservationStatus = 'pending' | 'approved' | 'denied' | 'cancelled';
 export type BookingType = 'full_day' | 'time_slot' | 'both';
 export type EventVisibility = 'public' | 'private';
 export type DocCategory = 'rules' | 'financial' | 'meeting_minutes' | 'forms' | 'other';
+export type DocVisibility = 'private' | 'community' | 'public';
 export type AnnouncementPriority = 'normal' | 'important' | 'urgent';
 export type SignupRequestStatus = 'pending' | 'approved' | 'denied';
 export type PaymentFrequency = 'monthly' | 'quarterly' | 'semi_annual' | 'annual';
@@ -252,6 +253,7 @@ export interface Document {
   file_path: string;
   file_size: number | null;
   is_public: boolean;
+  visibility: DocVisibility;
   uploaded_by: string;
   created_at: string;
 }

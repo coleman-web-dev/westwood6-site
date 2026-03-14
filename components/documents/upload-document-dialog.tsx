@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, useMemo } from 'react';
-import { Upload } from 'lucide-react';
+import { Upload, Lock, Users, Globe } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import {
@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
-import type { DocumentFolder } from '@/lib/types/database';
+import type { DocumentFolder, DocVisibility } from '@/lib/types/database';
 
 interface UploadDocumentDialogProps {
   open: boolean;
@@ -35,6 +35,14 @@ interface UploadDocumentDialogProps {
 const ACCEPTED_FILE_TYPES =
   '.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.rtf,.ppt,.pptx,.jpg,.jpeg,.png';
 
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+
+function titleFromFilename(filename: string): string {
+  // Remove extension and replace separators with spaces
+  const name = filename.replace(/\.[^.]+$/, '');
+  return name.replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 export function UploadDocumentDialog({
   open,
   onOpenChange,
@@ -45,7 +53,10 @@ export function UploadDocumentDialog({
   const fileRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState('');
   const [folderId, setFolderId] = useState<string>('');
+  const [visibility, setVisibility] = useState<DocVisibility>('community');
   const [submitting, setSubmitting] = useState(false);
+  const [progress, setProgress] = useState('');
+  const [fileCount, setFileCount] = useState(0);
 
   // Default to "Other" root folder if available
   const defaultFolderId =
@@ -74,16 +85,24 @@ export function UploadDocumentDialog({
   function resetForm() {
     setTitle('');
     setFolderId('');
+    setVisibility('community');
+    setFileCount(0);
+    setProgress('');
     if (fileRef.current) {
       fileRef.current.value = '';
     }
   }
 
-  async function handleSubmit() {
-    const file = fileRef.current?.files?.[0];
+  function handleFileChange() {
+    const files = fileRef.current?.files;
+    setFileCount(files?.length ?? 0);
+  }
 
-    if (!title.trim()) {
-      toast.error('Please enter a document title.');
+  async function handleSubmit() {
+    const files = fileRef.current?.files;
+
+    if (!files || files.length === 0) {
+      toast.error('Please select at least one file to upload.');
       return;
     }
 
@@ -93,15 +112,18 @@ export function UploadDocumentDialog({
       return;
     }
 
-    if (!file) {
-      toast.error('Please select a file to upload.');
+    // For single file, require a title
+    if (files.length === 1 && !title.trim()) {
+      toast.error('Please enter a document title.');
       return;
     }
 
-    // Enforce 50 MB file size limit
-    const MAX_FILE_SIZE = 50 * 1024 * 1024;
-    if (file.size > MAX_FILE_SIZE) {
-      toast.error('File is too large. Maximum size is 50 MB.');
+    // Check all file sizes up front
+    const oversized = Array.from(files).filter((f) => f.size > MAX_FILE_SIZE);
+    if (oversized.length > 0) {
+      toast.error(
+        `${oversized.length} file${oversized.length > 1 ? 's exceed' : ' exceeds'} the 50 MB limit.`
+      );
       return;
     }
 
@@ -109,54 +131,90 @@ export function UploadDocumentDialog({
 
     setSubmitting(true);
     const supabase = createClient();
+    const totalFiles = files.length;
+    let successCount = 0;
+    let failCount = 0;
 
-    // Sanitize filename to prevent path traversal
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-').replace(/-+/g, '-');
-    const filePath = `${community.id}/${Date.now()}_${safeName}`;
+    for (let i = 0; i < totalFiles; i++) {
+      const file = files[i];
+      setProgress(totalFiles > 1 ? `Uploading ${i + 1} of ${totalFiles}...` : 'Uploading...');
 
-    const { error: uploadError } = await supabase.storage
-      .from('hoa-documents')
-      .upload(filePath, file);
+      // Sanitize filename to prevent path traversal
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-').replace(/-+/g, '-');
+      const filePath = `${community.id}/${Date.now()}_${safeName}`;
 
-    if (uploadError) {
-      setSubmitting(false);
-      toast.error('Failed to upload file. Please try again.');
-      return;
+      // Determine title: use provided title for single file, filename-derived for batch
+      const docTitle =
+        totalFiles === 1 && title.trim()
+          ? title.trim()
+          : titleFromFilename(file.name);
+
+      const { error: uploadError } = await supabase.storage
+        .from('hoa-documents')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        failCount++;
+        continue;
+      }
+
+      const { error: insertError } = await supabase.from('documents').insert({
+        community_id: community.id,
+        title: docTitle,
+        category: 'other',
+        folder_id: selectedFolder,
+        file_path: filePath,
+        file_size: file.size,
+        visibility,
+        is_public: visibility === 'public',
+        uploaded_by: member.id,
+      });
+
+      if (insertError) {
+        // Attempt to clean up the uploaded file
+        await supabase.storage.from('hoa-documents').remove([filePath]);
+        failCount++;
+        continue;
+      }
+
+      successCount++;
     }
-
-    // Insert document row (category set to 'other' for backward compat)
-    const { error: insertError } = await supabase.from('documents').insert({
-      community_id: community.id,
-      title: title.trim(),
-      category: 'other',
-      folder_id: selectedFolder,
-      file_path: filePath,
-      file_size: file.size,
-      uploaded_by: member.id,
-    });
 
     setSubmitting(false);
+    setProgress('');
 
-    if (insertError) {
-      // Attempt to clean up the uploaded file
-      await supabase.storage.from('hoa-documents').remove([filePath]);
-      toast.error('Failed to save document record. Please try again.');
+    if (failCount > 0 && successCount > 0) {
+      toast.warning(
+        `${successCount} document${successCount > 1 ? 's' : ''} uploaded. ${failCount} failed.`
+      );
+    } else if (failCount > 0 && successCount === 0) {
+      toast.error('Failed to upload. Please try again.');
       return;
+    } else {
+      toast.success(
+        totalFiles === 1
+          ? 'Document uploaded.'
+          : `${successCount} documents uploaded.`
+      );
     }
 
-    toast.success('Document uploaded.');
     resetForm();
     onOpenChange(false);
     onSuccess();
   }
 
+  const isMultiple = fileCount > 1;
+  const canSubmit = submitting
+    ? false
+    : fileCount > 0 && (isMultiple || title.trim().length > 0);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Upload Document</DialogTitle>
+          <DialogTitle>Upload Document{isMultiple ? 's' : ''}</DialogTitle>
           <DialogDescription>
-            Add a document for community members to access.
+            Add document{isMultiple ? 's' : ''} for community members to access.
           </DialogDescription>
         </DialogHeader>
 
@@ -164,10 +222,10 @@ export function UploadDocumentDialog({
           {/* Title */}
           <div className="space-y-1.5">
             <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-              Title
+              Title{isMultiple ? ' (optional for multiple files)' : ''}
             </label>
             <Input
-              placeholder="Document title"
+              placeholder={isMultiple ? 'Leave blank to use file names' : 'Document title'}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               maxLength={200}
@@ -189,9 +247,44 @@ export function UploadDocumentDialog({
               <SelectContent>
                 {treeOrderedFolders.map(({ folder, depth }) => (
                   <SelectItem key={folder.id} value={folder.id}>
-                    {depth > 0 ? `└ ${folder.name}` : folder.name}
+                    {depth > 0 ? `\u2514 ${folder.name}` : folder.name}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Visibility */}
+          <div className="space-y-1.5">
+            <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+              Visibility
+            </label>
+            <Select
+              value={visibility}
+              onValueChange={(v) => setVisibility(v as DocVisibility)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="private">
+                  <span className="flex items-center gap-1.5">
+                    <Lock className="h-3.5 w-3.5" />
+                    Private (board only)
+                  </span>
+                </SelectItem>
+                <SelectItem value="community">
+                  <span className="flex items-center gap-1.5">
+                    <Users className="h-3.5 w-3.5" />
+                    Community members
+                  </span>
+                </SelectItem>
+                <SelectItem value="public">
+                  <span className="flex items-center gap-1.5">
+                    <Globe className="h-3.5 w-3.5" />
+                    Public (landing page)
+                  </span>
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -199,12 +292,14 @@ export function UploadDocumentDialog({
           {/* File picker */}
           <div className="space-y-1.5">
             <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-              File
+              File{isMultiple ? `s (${fileCount} selected)` : ''}
             </label>
             <input
               ref={fileRef}
               type="file"
+              multiple
               accept={ACCEPTED_FILE_TYPES}
+              onChange={handleFileChange}
               className="block w-full text-sm text-text-secondary-light dark:text-text-secondary-dark file:mr-3 file:rounded-md file:border-0 file:bg-primary-300 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-foreground hover:file:bg-primary-300/80 dark:file:bg-primary-700 dark:hover:file:bg-primary-700/80 cursor-pointer"
             />
           </div>
@@ -216,14 +311,14 @@ export function UploadDocumentDialog({
           </DialogClose>
           <Button
             onClick={handleSubmit}
-            disabled={submitting || !title.trim()}
+            disabled={!canSubmit}
           >
             {submitting ? (
-              <>Uploading...</>
+              <>{progress || 'Uploading...'}</>
             ) : (
               <>
                 <Upload className="h-4 w-4 mr-2" />
-                Upload
+                Upload{isMultiple ? ` ${fileCount} Files` : ''}
               </>
             )}
           </Button>
