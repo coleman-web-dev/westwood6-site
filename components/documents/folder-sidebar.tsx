@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Folder,
   FolderPlus,
@@ -257,6 +257,7 @@ export function FolderSidebar({
 }: FolderSidebarProps) {
   const { community, member, isBoard } = useCommunity();
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
+  const initializedRef = useRef(false);
   const [showCreateInput, setShowCreateInput] = useState(false);
   const [createParentId, setCreateParentId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -270,6 +271,14 @@ export function FolderSidebar({
         .sort((a, b) => a.sort_order - b.sort_order),
     [folders]
   );
+
+  // Default all folders to collapsed on first load
+  useEffect(() => {
+    if (!initializedRef.current && rootFolders.length > 0) {
+      initializedRef.current = true;
+      setCollapsedFolders(new Set(rootFolders.map((f) => f.id)));
+    }
+  }, [rootFolders]);
 
   const childMap = useMemo(() => {
     const map = new Map<string, DocumentFolder[]>();
