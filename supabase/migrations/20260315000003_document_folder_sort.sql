@@ -12,7 +12,7 @@ ALTER TABLE document_folders ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NUL
 DO $$
 DECLARE
   comm RECORD;
-  default_folders TEXT[] := ARRAY['Rules', 'Financial', 'Meeting Minutes', 'Forms', 'Other'];
+  default_folders TEXT[] := ARRAY['Rules', 'Financial', 'Meeting Minutes', 'Other'];
   folder_name TEXT;
   idx INTEGER;
   first_member_id UUID;
@@ -53,7 +53,7 @@ BEGIN
         WHEN 'rules' THEN 'Rules'
         WHEN 'financial' THEN 'Financial'
         WHEN 'meeting_minutes' THEN 'Meeting Minutes'
-        WHEN 'forms' THEN 'Forms'
+        WHEN 'forms' THEN 'Other'
         WHEN 'other' THEN 'Other'
       END
     WHERE d.folder_id IS NULL
