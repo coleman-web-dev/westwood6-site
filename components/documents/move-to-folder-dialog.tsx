@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Folder, FolderX } from 'lucide-react';
+import { Folder } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import {
   Dialog,
@@ -30,12 +30,20 @@ export function MoveToFolderDialog({
   folders,
   onSuccess,
 }: MoveToFolderDialogProps) {
-  const [selected, setSelected] = useState<string | null>(doc.folder_id);
+  const [selected, setSelected] = useState<string>(doc.folder_id ?? folders[0]?.id ?? '');
   const [saving, setSaving] = useState(false);
+
+  // Sort folders by sort_order
+  const sorted = [...folders].sort((a, b) => a.sort_order - b.sort_order);
 
   async function handleSave() {
     if (selected === doc.folder_id) {
       onOpenChange(false);
+      return;
+    }
+
+    if (!selected) {
+      toast.error('Please select a folder.');
       return;
     }
 
@@ -53,7 +61,8 @@ export function MoveToFolderDialog({
       return;
     }
 
-    toast.success(selected ? 'Document moved to folder.' : 'Document removed from folder.');
+    const folderName = folders.find((f) => f.id === selected)?.name ?? 'folder';
+    toast.success(`Document moved to ${folderName}.`);
     onOpenChange(false);
     onSuccess();
   }
@@ -73,17 +82,7 @@ export function MoveToFolderDialog({
         </DialogHeader>
 
         <div className="space-y-1 py-2">
-          <button
-            className={itemClass(selected === null)}
-            onClick={() => setSelected(null)}
-          >
-            <FolderX className="h-4 w-4 text-text-muted-light dark:text-text-muted-dark shrink-0" />
-            <span className="text-body text-text-secondary-light dark:text-text-secondary-dark">
-              No folder
-            </span>
-          </button>
-
-          {folders.map((folder) => (
+          {sorted.map((folder) => (
             <button
               key={folder.id}
               className={itemClass(selected === folder.id)}
@@ -96,7 +95,7 @@ export function MoveToFolderDialog({
             </button>
           ))}
 
-          {folders.length === 0 && (
+          {sorted.length === 0 && (
             <p className="text-meta text-text-muted-light dark:text-text-muted-dark px-3 py-2">
               No folders created yet. Create a folder from the sidebar first.
             </p>
@@ -107,7 +106,7 @@ export function MoveToFolderDialog({
           <DialogClose asChild>
             <Button variant="outline">Cancel</Button>
           </DialogClose>
-          <Button onClick={handleSave} disabled={saving}>
+          <Button onClick={handleSave} disabled={saving || !selected}>
             {saving ? 'Moving...' : 'Move'}
           </Button>
         </DialogFooter>

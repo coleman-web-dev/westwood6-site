@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { FileText, Download, Trash2, Globe, Eye, FolderInput, Folder } from 'lucide-react';
+import { FileText, Download, Trash2, Globe, Eye, FolderInput, Folder, GripVertical } from 'lucide-react';
+import { useDraggable } from '@dnd-kit/core';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Button } from '@/components/shared/ui/button';
@@ -10,30 +11,15 @@ import { Switch } from '@/components/shared/ui/switch';
 import { toast } from 'sonner';
 import { DocumentViewerDialog } from '@/components/documents/document-viewer-dialog';
 import { MoveToFolderDialog } from '@/components/documents/move-to-folder-dialog';
-import type { Document, DocCategory, DocumentFolder } from '@/lib/types/database';
+import type { Document, DocumentFolder } from '@/lib/types/database';
 
 interface DocumentListProps {
   documents: Document[];
   loading: boolean;
   onDeleted: () => void;
   folders?: DocumentFolder[];
+  isDragEnabled?: boolean;
 }
-
-const CATEGORY_LABELS: Record<DocCategory, string> = {
-  rules: 'Rules',
-  financial: 'Financial',
-  meeting_minutes: 'Meeting Minutes',
-  forms: 'Forms',
-  other: 'Other',
-};
-
-const CATEGORY_BADGE_VARIANT: Record<DocCategory, 'default' | 'secondary' | 'outline'> = {
-  rules: 'secondary',
-  financial: 'default',
-  meeting_minutes: 'outline',
-  forms: 'secondary',
-  other: 'outline',
-};
 
 function formatFileSize(bytes: number | null): string {
   if (!bytes) return '';
@@ -42,7 +28,176 @@ function formatFileSize(bytes: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function DocumentList({ documents, loading, onDeleted, folders = [] }: DocumentListProps) {
+// ─── Draggable Document Row ─────────────────────────────
+
+function DraggableDocumentRow({
+  doc,
+  folderName,
+  isDragEnabled,
+  onView,
+  onDownload,
+  onDelete,
+  onTogglePublic,
+  onMove,
+  isBoard,
+  isDeleting,
+  isDownloading,
+  hasFolders,
+}: {
+  doc: Document;
+  folderName: string | null;
+  isDragEnabled: boolean;
+  onView: () => void;
+  onDownload: () => void;
+  onDelete: () => void;
+  onTogglePublic: () => void;
+  onMove: () => void;
+  isBoard: boolean;
+  isDeleting: boolean;
+  isDownloading: boolean;
+  hasFolders: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `doc-${doc.id}`,
+    disabled: !isDragEnabled,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding flex items-center gap-4 cursor-pointer hover:border-secondary-300 dark:hover:border-secondary-700 transition-colors${
+        isDragging ? ' opacity-50' : ''
+      }`}
+      onClick={onView}
+    >
+      {/* Drag handle (board only) */}
+      {isDragEnabled && (
+        <button
+          type="button"
+          className="cursor-grab text-text-muted-light dark:text-text-muted-dark hover:text-text-secondary-light dark:hover:text-text-secondary-dark touch-none shrink-0"
+          onClick={(e) => e.stopPropagation()}
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+      )}
+
+      {/* File icon */}
+      <div className="shrink-0 text-text-muted-light dark:text-text-muted-dark">
+        <FileText className="h-5 w-5" />
+      </div>
+
+      {/* Title + meta */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-body font-medium text-text-primary-light dark:text-text-primary-dark truncate">
+            {doc.title}
+          </span>
+          {folderName && (
+            <Badge variant="secondary" className="text-meta shrink-0 gap-1">
+              <Folder className="h-3 w-3" />
+              {folderName}
+            </Badge>
+          )}
+          {doc.is_public && (
+            <Badge variant="outline" className="text-meta shrink-0 gap-1">
+              <Globe className="h-3 w-3" />
+              Public
+            </Badge>
+          )}
+        </div>
+        <div className="flex items-center gap-3 mt-0.5">
+          <span className="text-meta text-text-muted-light dark:text-text-muted-dark">
+            {new Date(doc.created_at).toLocaleDateString(undefined, {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+            })}
+          </span>
+          {doc.file_size != null && doc.file_size > 0 && (
+            <span className="text-meta text-text-muted-light dark:text-text-muted-dark">
+              {formatFileSize(doc.file_size)}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+        {isBoard && (
+          <div className="flex items-center gap-1.5 mr-1" title={doc.is_public ? 'Public' : 'Private'}>
+            <Globe className="h-3.5 w-3.5 text-text-muted-light dark:text-text-muted-dark" />
+            <Switch
+              checked={doc.is_public}
+              onCheckedChange={onTogglePublic}
+            />
+          </div>
+        )}
+
+        {isBoard && hasFolders && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onMove}
+            className="h-8 w-8"
+            title="Move to folder"
+          >
+            <FolderInput className="h-4 w-4" />
+            <span className="sr-only">Move to folder</span>
+          </Button>
+        )}
+
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onView}
+          className="h-8 w-8"
+          title="View"
+        >
+          <Eye className="h-4 w-4" />
+          <span className="sr-only">View</span>
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onDownload}
+          disabled={isDownloading}
+          className="h-8 w-8"
+          title="Download"
+        >
+          <Download className="h-4 w-4" />
+          <span className="sr-only">Download</span>
+        </Button>
+
+        {isBoard && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onDelete}
+            disabled={isDeleting}
+            className="h-8 w-8 text-destructive hover:text-destructive"
+            title="Delete"
+          >
+            <Trash2 className="h-4 w-4" />
+            <span className="sr-only">Delete</span>
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Document List ─────────────────────────────────
+
+export function DocumentList({
+  documents,
+  loading,
+  onDeleted,
+  folders = [],
+  isDragEnabled = false,
+}: DocumentListProps) {
   const { isBoard } = useCommunity();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -68,7 +223,7 @@ export function DocumentList({ documents, loading, onDeleted, folders = [] }: Do
         ? 'Document is now private.'
         : 'Document is now visible on the landing page.'
     );
-    onDeleted(); // triggers refetch
+    onDeleted();
   }
 
   async function handleDownload(doc: Document) {
@@ -98,7 +253,6 @@ export function DocumentList({ documents, loading, onDeleted, folders = [] }: Do
     setDeletingId(doc.id);
     const supabase = createClient();
 
-    // Delete file from storage
     const { error: storageError } = await supabase.storage
       .from('hoa-documents')
       .remove([doc.file_path]);
@@ -109,7 +263,6 @@ export function DocumentList({ documents, loading, onDeleted, folders = [] }: Do
       return;
     }
 
-    // Delete row from database
     const { error: dbError } = await supabase
       .from('documents')
       .delete()
@@ -149,7 +302,7 @@ export function DocumentList({ documents, loading, onDeleted, folders = [] }: Do
   if (documents.length === 0) {
     return (
       <p className="text-body text-text-muted-light dark:text-text-muted-dark">
-        No documents uploaded yet.
+        No documents in this folder.
       </p>
     );
   }
@@ -157,131 +310,25 @@ export function DocumentList({ documents, loading, onDeleted, folders = [] }: Do
   return (
     <>
       <div className="space-y-3">
-        {documents.map((doc) => {
-          const isDeleting = deletingId === doc.id;
-          const isDownloading = downloadingId === doc.id;
-          const folderName = doc.folder_id ? folderMap.get(doc.folder_id) : null;
-
-          return (
-            <div
-              key={doc.id}
-              className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding flex items-center gap-4 cursor-pointer hover:border-secondary-300 dark:hover:border-secondary-700 transition-colors"
-              onClick={() => setViewingDoc(doc)}
-            >
-              {/* File icon */}
-              <div className="shrink-0 text-text-muted-light dark:text-text-muted-dark">
-                <FileText className="h-5 w-5" />
-              </div>
-
-              {/* Title + meta */}
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-body font-medium text-text-primary-light dark:text-text-primary-dark truncate">
-                    {doc.title}
-                  </span>
-                  <Badge
-                    variant={CATEGORY_BADGE_VARIANT[doc.category]}
-                    className="text-meta shrink-0"
-                  >
-                    {CATEGORY_LABELS[doc.category]}
-                  </Badge>
-                  {folderName && (
-                    <Badge variant="outline" className="text-meta shrink-0 gap-1">
-                      <Folder className="h-3 w-3" />
-                      {folderName}
-                    </Badge>
-                  )}
-                  {doc.is_public && (
-                    <Badge variant="outline" className="text-meta shrink-0 gap-1">
-                      <Globe className="h-3 w-3" />
-                      Public
-                    </Badge>
-                  )}
-                </div>
-                <div className="flex items-center gap-3 mt-0.5">
-                  <span className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                    {new Date(doc.created_at).toLocaleDateString(undefined, {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric',
-                    })}
-                  </span>
-                  {doc.file_size != null && doc.file_size > 0 && (
-                    <span className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                      {formatFileSize(doc.file_size)}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                {isBoard && (
-                  <div className="flex items-center gap-1.5 mr-1" title={doc.is_public ? 'Public' : 'Private'}>
-                    <Globe className="h-3.5 w-3.5 text-text-muted-light dark:text-text-muted-dark" />
-                    <Switch
-                      checked={doc.is_public}
-                      onCheckedChange={() => handleTogglePublic(doc)}
-                    />
-                  </div>
-                )}
-
-                {isBoard && folders.length > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setMovingDoc(doc)}
-                    className="h-8 w-8"
-                    title="Move to folder"
-                  >
-                    <FolderInput className="h-4 w-4" />
-                    <span className="sr-only">Move to folder</span>
-                  </Button>
-                )}
-
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setViewingDoc(doc)}
-                  className="h-8 w-8"
-                  title="View"
-                >
-                  <Eye className="h-4 w-4" />
-                  <span className="sr-only">View</span>
-                </Button>
-
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleDownload(doc)}
-                  disabled={isDownloading}
-                  className="h-8 w-8"
-                  title="Download"
-                >
-                  <Download className="h-4 w-4" />
-                  <span className="sr-only">Download</span>
-                </Button>
-
-                {isBoard && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDelete(doc)}
-                    disabled={isDeleting}
-                    className="h-8 w-8 text-destructive hover:text-destructive"
-                    title="Delete"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span className="sr-only">Delete</span>
-                  </Button>
-                )}
-              </div>
-            </div>
-          );
-        })}
+        {documents.map((doc) => (
+          <DraggableDocumentRow
+            key={doc.id}
+            doc={doc}
+            folderName={doc.folder_id ? (folderMap.get(doc.folder_id) ?? null) : null}
+            isDragEnabled={isDragEnabled}
+            onView={() => setViewingDoc(doc)}
+            onDownload={() => handleDownload(doc)}
+            onDelete={() => handleDelete(doc)}
+            onTogglePublic={() => handleTogglePublic(doc)}
+            onMove={() => setMovingDoc(doc)}
+            isBoard={isBoard}
+            isDeleting={deletingId === doc.id}
+            isDownloading={downloadingId === doc.id}
+            hasFolders={folders.length > 0}
+          />
+        ))}
       </div>
 
-      {/* Document viewer dialog */}
       {viewingDoc && (
         <DocumentViewerDialog
           open={!!viewingDoc}
@@ -290,7 +337,6 @@ export function DocumentList({ documents, loading, onDeleted, folders = [] }: Do
         />
       )}
 
-      {/* Move to folder dialog */}
       {movingDoc && (
         <MoveToFolderDialog
           open={!!movingDoc}

@@ -237,6 +237,7 @@ export interface DocumentFolder {
   id: string;
   community_id: string;
   name: string;
+  sort_order: number;
   created_by: string;
   created_at: string;
 }

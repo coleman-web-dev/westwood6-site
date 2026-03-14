@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
-import type { DocCategory, DocumentFolder } from '@/lib/types/database';
+import type { DocumentFolder } from '@/lib/types/database';
 
 interface UploadDocumentDialogProps {
   open: boolean;
@@ -44,14 +44,15 @@ export function UploadDocumentDialog({
   const { community, member } = useCommunity();
   const fileRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState<DocCategory>('other');
-  const [folderId, setFolderId] = useState<string>('none');
+  const [folderId, setFolderId] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Default to "Other" folder if available
+  const defaultFolderId = folders.find((f) => f.name === 'Other')?.id ?? folders[0]?.id ?? '';
 
   function resetForm() {
     setTitle('');
-    setCategory('other');
-    setFolderId('none');
+    setFolderId('');
     if (fileRef.current) {
       fileRef.current.value = '';
     }
@@ -62,6 +63,12 @@ export function UploadDocumentDialog({
 
     if (!title.trim()) {
       toast.error('Please enter a document title.');
+      return;
+    }
+
+    const selectedFolder = folderId || defaultFolderId;
+    if (!selectedFolder) {
+      toast.error('Please select a folder.');
       return;
     }
 
@@ -96,12 +103,12 @@ export function UploadDocumentDialog({
       return;
     }
 
-    // Insert document row
+    // Insert document row (category set to 'other' for backward compat)
     const { error: insertError } = await supabase.from('documents').insert({
       community_id: community.id,
       title: title.trim(),
-      category,
-      folder_id: folderId === 'none' ? null : folderId,
+      category: 'other',
+      folder_id: selectedFolder,
       file_path: filePath,
       file_size: file.size,
       uploaded_by: member.id,
@@ -146,52 +153,27 @@ export function UploadDocumentDialog({
             />
           </div>
 
-          {/* Category */}
+          {/* Folder */}
           <div className="space-y-1.5">
             <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-              Category
+              Folder
             </label>
             <Select
-              value={category}
-              onValueChange={(val) => setCategory(val as DocCategory)}
+              value={folderId || defaultFolderId}
+              onValueChange={setFolderId}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select category" />
+                <SelectValue placeholder="Select folder" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="rules">Rules</SelectItem>
-                <SelectItem value="financial">Financial</SelectItem>
-                <SelectItem value="meeting_minutes">Meeting Minutes</SelectItem>
-                <SelectItem value="forms">Forms</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
+                {folders.map((f) => (
+                  <SelectItem key={f.id} value={f.id}>
+                    {f.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
-
-          {/* Folder */}
-          {folders.length > 0 && (
-            <div className="space-y-1.5">
-              <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-                Folder (optional)
-              </label>
-              <Select
-                value={folderId}
-                onValueChange={setFolderId}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="No folder" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No folder</SelectItem>
-                  {folders.map((f) => (
-                    <SelectItem key={f.id} value={f.id}>
-                      {f.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
 
           {/* File picker */}
           <div className="space-y-1.5">
