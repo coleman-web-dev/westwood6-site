@@ -25,7 +25,7 @@ import {
 import { toast } from 'sonner';
 import { Upload, FileText, CheckCircle, DollarSign, Printer, ShieldCheck } from 'lucide-react';
 import { useCommunity } from '@/lib/providers/community-provider';
-import { VendorDocumentsSection } from '@/components/vendors/vendor-documents-section';
+import { VendorDocumentsSection, syncVendorDocToFolder } from '@/components/vendors/vendor-documents-section';
 import type { Vendor, VendorCategoryRow, VendorDocument, VendorStatus } from '@/lib/types/database';
 import type { Account } from '@/lib/types/accounting';
 
@@ -155,6 +155,15 @@ export function VendorDetailDialog({
       return;
     }
 
+    // Sync folder name if vendor was renamed and has a linked subfolder
+    if (vendor.document_folder_id && name.trim() !== vendor.name) {
+      supabase
+        .from('document_folders')
+        .update({ name: name.trim() })
+        .eq('id', vendor.document_folder_id)
+        .then(() => {});
+    }
+
     toast.success('Vendor updated.');
     onOpenChange(false);
     onUpdated();
@@ -246,6 +255,21 @@ export function VendorDetailDialog({
       return;
     }
     setInsuranceDoc(docData as VendorDocument);
+
+    // Sync to documents folder
+    if (docData && member?.id) {
+      syncVendorDocToFolder({
+        vendorDocId: docData.id,
+        vendorId: vendor.id,
+        vendorName: vendor.name,
+        communityId: vendor.community_id,
+        memberId: member.id,
+        title: 'Insurance Certificate',
+        filePath: path,
+        fileSize: file.size,
+      }).catch((err) => console.error('Failed to sync insurance doc to folder:', err));
+    }
+
     toast.success('Insurance certificate uploaded.');
     setUploadingInsurance(false);
     if (insuranceInputRef.current) insuranceInputRef.current.value = '';
@@ -508,6 +532,7 @@ export function VendorDetailDialog({
           {/* Vendor Documents */}
           <VendorDocumentsSection
             vendorId={vendor.id}
+            vendorName={vendor.name}
             communityId={vendor.community_id}
             memberId={member?.id ?? ''}
             isBoard={isBoard}

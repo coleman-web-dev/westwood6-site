@@ -12,6 +12,7 @@ import {
   GripVertical,
   Lock,
   Users,
+  Store,
 } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { createClient } from '@/lib/supabase/client';
@@ -103,8 +104,10 @@ function DraggableDocumentRow({
   // Use a timeout to distinguish single vs double click on the title
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const isVendorSynced = !!doc.vendor_document_id;
+
   function handleTitleClick(e: React.MouseEvent) {
-    if (!isBoard) return;
+    if (!isBoard || isVendorSynced) return;
     e.stopPropagation();
 
     if (clickTimer.current) {
@@ -178,9 +181,9 @@ function DraggableDocumentRow({
           ) : (
             <span
               className={`text-body font-medium text-text-primary-light dark:text-text-primary-dark truncate${
-                isBoard ? ' hover:underline hover:decoration-dotted cursor-text' : ''
+                isBoard && !isVendorSynced ? ' hover:underline hover:decoration-dotted cursor-text' : ''
               }`}
-              onClick={isBoard ? handleTitleClick : undefined}
+              onClick={isBoard && !isVendorSynced ? handleTitleClick : undefined}
             >
               {doc.title}
             </span>
@@ -201,6 +204,12 @@ function DraggableDocumentRow({
             <Badge variant="outline" className="text-meta shrink-0 gap-1 text-warning-dot">
               <Lock className="h-3 w-3" />
               Private
+            </Badge>
+          )}
+          {isVendorSynced && !isEditing && (
+            <Badge variant="outline" className="text-meta shrink-0 gap-1 text-text-muted-light dark:text-text-muted-dark">
+              <Store className="h-3 w-3" />
+              Vendor
             </Badge>
           )}
         </div>
@@ -224,7 +233,7 @@ function DraggableDocumentRow({
 
       {/* Actions */}
       <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-        {isBoard && (
+        {isBoard && !isVendorSynced && (
           <Select
             value={visibility}
             onValueChange={(v) => onVisibilityChange(v as DocVisibility)}
@@ -245,7 +254,7 @@ function DraggableDocumentRow({
           </Select>
         )}
 
-        {isBoard && hasFolders && (
+        {isBoard && hasFolders && !isVendorSynced && (
           <Button
             variant="ghost"
             size="icon"
@@ -281,7 +290,7 @@ function DraggableDocumentRow({
           <span className="sr-only">Download</span>
         </Button>
 
-        {isBoard && (
+        {isBoard && !isVendorSynced && (
           <Button
             variant="ghost"
             size="icon"

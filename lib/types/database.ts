@@ -255,6 +255,7 @@ export interface Document {
   is_public: boolean;
   visibility: DocVisibility;
   uploaded_by: string;
+  vendor_document_id: string | null;
   created_at: string;
 }
 
@@ -814,6 +815,7 @@ export interface Vendor {
   city: string | null;
   state: string | null;
   zip: string | null;
+  document_folder_id: string | null;
   created_at: string;
 }
 

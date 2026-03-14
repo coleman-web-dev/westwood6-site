@@ -49,13 +49,117 @@ const DOC_TYPE_ICONS: Record<VendorDocumentType, React.ReactNode> = {
 
 interface VendorDocumentsSectionProps {
   vendorId: string;
+  vendorName: string;
   communityId: string;
   memberId: string;
   isBoard: boolean;
 }
 
+/**
+ * Find or create the "Vendors" root folder and the vendor's subfolder,
+ * then insert a synced document row in the documents table.
+ */
+async function syncVendorDocToFolder(opts: {
+  vendorDocId: string;
+  vendorId: string;
+  vendorName: string;
+  communityId: string;
+  memberId: string;
+  title: string;
+  filePath: string;
+  fileSize: number | null;
+}) {
+  const supabase = createClient();
+
+  // 1. Find or create "Vendors" root folder
+  let vendorsRootId: string | null = null;
+  {
+    const { data } = await supabase
+      .from('document_folders')
+      .select('id')
+      .eq('community_id', opts.communityId)
+      .eq('name', 'Vendors')
+      .is('parent_id', null)
+      .single();
+
+    if (data) {
+      vendorsRootId = data.id;
+    } else {
+      const { data: created } = await supabase
+        .from('document_folders')
+        .insert({
+          community_id: opts.communityId,
+          name: 'Vendors',
+          parent_id: null,
+          sort_order: 4,
+          created_by: opts.memberId,
+        })
+        .select('id')
+        .single();
+      vendorsRootId = created?.id ?? null;
+    }
+  }
+
+  if (!vendorsRootId) return;
+
+  // 2. Find or create vendor subfolder
+  let vendorFolderId: string | null = null;
+  {
+    const { data } = await supabase
+      .from('document_folders')
+      .select('id')
+      .eq('community_id', opts.communityId)
+      .eq('parent_id', vendorsRootId)
+      .eq('name', opts.vendorName)
+      .single();
+
+    if (data) {
+      vendorFolderId = data.id;
+    } else {
+      const { data: created } = await supabase
+        .from('document_folders')
+        .insert({
+          community_id: opts.communityId,
+          name: opts.vendorName,
+          parent_id: vendorsRootId,
+          sort_order: 0,
+          created_by: opts.memberId,
+        })
+        .select('id')
+        .single();
+      vendorFolderId = created?.id ?? null;
+    }
+  }
+
+  if (!vendorFolderId) return;
+
+  // 3. Link vendor to its subfolder if not already set
+  await supabase
+    .from('vendors')
+    .update({ document_folder_id: vendorFolderId })
+    .eq('id', opts.vendorId)
+    .is('document_folder_id', null);
+
+  // 4. Insert synced document row
+  await supabase.from('documents').insert({
+    community_id: opts.communityId,
+    title: opts.title,
+    category: 'other',
+    folder_id: vendorFolderId,
+    file_path: opts.filePath,
+    file_size: opts.fileSize,
+    visibility: 'private',
+    is_public: false,
+    uploaded_by: opts.memberId,
+    vendor_document_id: opts.vendorDocId,
+  });
+}
+
+export { syncVendorDocToFolder };
+
 export function VendorDocumentsSection({
   vendorId,
+  vendorName,
   communityId,
   memberId,
   isBoard,
@@ -115,22 +219,38 @@ export function VendorDocumentsSection({
       return;
     }
 
-    const { error: insertError } = await supabase.from('vendor_documents').insert({
-      vendor_id: vendorId,
-      community_id: communityId,
-      document_type: uploadType,
-      title: uploadTitle.trim(),
-      file_path: path,
-      file_size: file.size,
-      uploaded_by: memberId,
-    });
+    const { data: vendorDoc, error: insertError } = await supabase
+      .from('vendor_documents')
+      .insert({
+        vendor_id: vendorId,
+        community_id: communityId,
+        document_type: uploadType,
+        title: uploadTitle.trim(),
+        file_path: path,
+        file_size: file.size,
+        uploaded_by: memberId,
+      })
+      .select('id')
+      .single();
 
-    if (insertError) {
+    if (insertError || !vendorDoc) {
       toast.error('Failed to save document record.');
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
+
+    // Sync to documents folder (fire-and-forget, non-blocking)
+    syncVendorDocToFolder({
+      vendorDocId: vendorDoc.id,
+      vendorId,
+      vendorName,
+      communityId,
+      memberId,
+      title: uploadTitle.trim(),
+      filePath: path,
+      fileSize: file.size,
+    }).catch((err) => console.error('Failed to sync vendor doc to folder:', err));
 
     toast.success('Document uploaded.');
     setUploading(false);
@@ -162,6 +282,9 @@ export function VendorDocumentsSection({
 
     setDeleting(doc.id);
     const supabase = createClient();
+
+    // Delete the synced documents row first (before vendor_documents FK SET NULL)
+    await supabase.from('documents').delete().eq('vendor_document_id', doc.id);
 
     const { error: storageError } = await supabase.storage
       .from('hoa-documents')
