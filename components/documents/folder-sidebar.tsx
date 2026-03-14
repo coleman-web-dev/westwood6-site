@@ -82,12 +82,12 @@ function FolderRow({
         </button>
       )}
 
-      {/* Chevron toggle (folders with children) */}
+      {/* Chevron toggle (folders with children) / spacer for alignment */}
       {hasChildren !== undefined && (
         hasChildren ? (
           <button
             type="button"
-            className="shrink-0 p-0.5 text-text-muted-light dark:text-text-muted-dark hover:text-text-secondary-light dark:hover:text-text-secondary-dark"
+            className="shrink-0 w-[18px] h-[18px] flex items-center justify-center text-text-muted-light dark:text-text-muted-dark hover:text-text-secondary-light dark:hover:text-text-secondary-dark"
             onClick={(e) => {
               e.stopPropagation();
               onToggleExpand?.();
@@ -100,7 +100,7 @@ function FolderRow({
             )}
           </button>
         ) : (
-          <span className="w-[22px] shrink-0" />
+          <span className="w-[18px] shrink-0" />
         )
       )}
 
