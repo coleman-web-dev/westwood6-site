@@ -20,7 +20,7 @@ import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes';
 import { UnsavedChangesDialog } from '@/components/settings/unsaved-changes-dialog';
 import { AmenityList } from '@/components/amenities/amenity-list';
 import { VendorsManager } from '@/components/settings/vendors-manager';
-import { EmailSettingsSection } from '@/components/settings/email-settings-section';
+
 import { StripeMigrationSection } from '@/components/settings/stripe-migration-section';
 import { InsuranceReminderSettings } from '@/components/settings/insurance-reminder-settings';
 import type { PaymentFrequency, BulletinSettings, LateFeeSettings } from '@/lib/types/database';
@@ -395,9 +395,6 @@ export function CommunitySettings() {
 
       {/* Stripe payment setup (direct mode) */}
       <StripeMigrationSection />
-
-      {/* Email notifications (board config) */}
-      <EmailSettingsSection />
 
       {/* Amenities */}
       {community && (

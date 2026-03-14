@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import ThemeSwitch from '@/components/shared/ThemeSwitch';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { NotificationBell } from '@/components/notifications/notification-bell';
@@ -13,7 +14,7 @@ interface DashboardTopbarProps {
 }
 
 export function DashboardTopbar({ onMenuClick }: DashboardTopbarProps) {
-  const { member, actualIsBoard } = useCommunity();
+  const { member, community, actualIsBoard } = useCommunity();
   const { query } = useKBar();
 
   const initials = [member?.first_name?.[0], member?.last_name?.[0]]
@@ -73,9 +74,14 @@ export function DashboardTopbar({ onMenuClick }: DashboardTopbarProps) {
         <ThemeSwitch />
 
         <NotificationBell />
-        <button className="p-2 rounded-inner-card text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors">
-          <MailIcon className="w-[18px] h-[18px]" />
-        </button>
+        {actualIsBoard && (
+          <Link
+            href={`/${community.slug}/email`}
+            className="relative p-2 rounded-inner-card text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors"
+          >
+            <MailIcon className="w-[18px] h-[18px]" />
+          </Link>
+        )}
 
         <div className="w-7 h-7 rounded-full bg-secondary-400 flex items-center justify-center text-meta font-semibold text-primary-900">
           {initials || '?'}

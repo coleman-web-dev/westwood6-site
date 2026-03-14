@@ -10,7 +10,8 @@ import {
   Calendar,
   Building2,
   Megaphone,
-  ClipboardList,
+  MessageSquare,
+  Mail,
   Users,
   BookUser,
   Vote,
@@ -38,7 +39,7 @@ const NAV_ITEMS = [
   { icon: Calendar, href: '/events', label: 'Events' },
   { icon: Building2, href: '/amenities', label: 'Amenities' },
   { icon: Megaphone, href: '/announcements', label: 'Announcements' },
-  { icon: ClipboardList, href: '/bulletin-board', label: 'Bulletin Board' },
+  { icon: MessageSquare, href: '/bulletin-board', label: 'Bulletin Board' },
 ];
 
 interface AppSidebarProps {
@@ -111,6 +112,14 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
             label={item.label}
           />
         ))}
+        {isBoard && (
+          <NavItem
+            icon={Mail}
+            href={`${basePath}/email`}
+            active={isActive('/email')}
+            label="Email"
+          />
+        )}
         {community.theme?.voting_enabled && (
           <NavItem
             icon={Vote}
