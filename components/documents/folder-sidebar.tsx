@@ -303,6 +303,31 @@ export function FolderSidebar({
     });
   }
 
+  // Auto-collapse: when a folder is selected, collapse all other root folders
+  function selectAndCollapse(folderId: string | null) {
+    // Determine which root folder should stay expanded
+    let activeRootId: string | null = null;
+    if (folderId) {
+      const folder = folders.find((f) => f.id === folderId);
+      if (folder) {
+        activeRootId = folder.parent_id === null ? folder.id : folder.parent_id;
+      }
+    }
+
+    // Collapse all root folders except the active one
+    setCollapsedFolders(() => {
+      const next = new Set<string>();
+      for (const root of rootFolders) {
+        if (root.id !== activeRootId) {
+          next.add(root.id);
+        }
+      }
+      return next;
+    });
+
+    onSelectFolder(folderId);
+  }
+
   // Count: folder docs + all children docs
   function getCount(folderId: string | null): number {
     if (folderId === null) return documents.length;
@@ -453,7 +478,7 @@ export function FolderSidebar({
               isActive={selectedFolderId === root.id}
               isBoard={isBoard}
               isDeletingId={deletingId}
-              onSelect={() => onSelectFolder(root.id)}
+              onSelect={() => selectAndCollapse(root.id)}
               onDelete={() => handleDelete(root)}
               hasChildren={children.length > 0}
               isExpanded={isExpanded(root.id)}
@@ -467,7 +492,7 @@ export function FolderSidebar({
               isActive={selectedFolderId === root.id}
               isBoard={false}
               isDeletingId={null}
-              onSelect={() => onSelectFolder(root.id)}
+              onSelect={() => selectAndCollapse(root.id)}
               onDelete={() => {}}
               hasChildren={children.length > 0}
               isExpanded={isExpanded(root.id)}
@@ -486,7 +511,7 @@ export function FolderSidebar({
                   isActive={selectedFolderId === child.id}
                   isBoard={isBoard}
                   isDeletingId={deletingId}
-                  onSelect={() => onSelectFolder(child.id)}
+                  onSelect={() => selectAndCollapse(child.id)}
                   onDelete={() => handleDelete(child)}
                 />
               ))}
@@ -530,7 +555,7 @@ export function FolderSidebar({
             ? 'bg-secondary-100 dark:bg-secondary-900/30 text-text-primary-light dark:text-text-primary-dark'
             : 'text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light-2 dark:hover:bg-surface-dark-2'
         }`}
-        onClick={() => onSelectFolder(null)}
+        onClick={() => selectAndCollapse(null)}
       >
         <Files className="h-4 w-4 shrink-0" />
         <span className="text-label flex-1 truncate">All Documents</span>
