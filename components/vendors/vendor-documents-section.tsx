@@ -172,6 +172,7 @@ export function VendorDocumentsSection({
   const [deleting, setDeleting] = useState<string | null>(null);
   const [uploadType, setUploadType] = useState<VendorDocumentType>('contract');
   const [uploadTitle, setUploadTitle] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -198,11 +199,25 @@ export function VendorDocumentsSection({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Auto-fill title from filename if blank
+    if (!uploadTitle.trim()) {
+      const name = file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
+      setUploadTitle(name);
+    }
+
+    setSelectedFile(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  async function handleConfirmUpload() {
+    if (!selectedFile) return;
+
     if (!uploadTitle.trim()) {
       toast.error('Please enter a document title.');
       return;
     }
 
+    const file = selectedFile;
     setUploading(true);
     const supabase = createClient();
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-').replace(/-+/g, '-');
@@ -215,7 +230,6 @@ export function VendorDocumentsSection({
     if (uploadError) {
       toast.error('Failed to upload file.');
       setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
@@ -236,7 +250,6 @@ export function VendorDocumentsSection({
     if (insertError || !vendorDoc) {
       toast.error('Failed to save document record.');
       setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
@@ -257,6 +270,7 @@ export function VendorDocumentsSection({
     setShowUpload(false);
     setUploadTitle('');
     setUploadType('contract');
+    setSelectedFile(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
     loadDocuments();
   }
@@ -449,12 +463,28 @@ export function VendorDocumentsSection({
                   type="button"
                   variant="outline"
                   size="sm"
-                  disabled={uploading || !uploadTitle.trim()}
+                  disabled={uploading}
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <Upload className="h-3.5 w-3.5 mr-1" />
-                  {uploading ? 'Uploading...' : 'Choose File'}
+                  {selectedFile ? 'Change File' : 'Choose File'}
                 </Button>
+                {selectedFile && (
+                  <span className="text-meta text-text-secondary-light dark:text-text-secondary-dark truncate max-w-[140px]">
+                    {selectedFile.name}
+                  </span>
+                )}
+                <div className="flex-1" />
+                {selectedFile && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={uploading || !uploadTitle.trim()}
+                    onClick={handleConfirmUpload}
+                  >
+                    {uploading ? 'Uploading...' : 'Upload'}
+                  </Button>
+                )}
                 <Button
                   type="button"
                   variant="ghost"
@@ -463,6 +493,7 @@ export function VendorDocumentsSection({
                     setShowUpload(false);
                     setUploadTitle('');
                     setUploadType('contract');
+                    setSelectedFile(null);
                   }}
                 >
                   Cancel
