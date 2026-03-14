@@ -155,11 +155,13 @@ export function VendorDetailDialog({
       return;
     }
 
-    // Sync folder name if vendor was renamed and has a linked subfolder
-    if (vendor.document_folder_id && name.trim() !== vendor.name) {
+    // Sync folder name if vendor display name changed and has a linked subfolder
+    const newDisplayName = company.trim() || name.trim();
+    const oldDisplayName = vendor.company || vendor.name;
+    if (vendor.document_folder_id && newDisplayName !== oldDisplayName) {
       supabase
         .from('document_folders')
-        .update({ name: name.trim() })
+        .update({ name: newDisplayName })
         .eq('id', vendor.document_folder_id)
         .then(() => {});
     }
@@ -261,7 +263,7 @@ export function VendorDetailDialog({
       syncVendorDocToFolder({
         vendorDocId: docData.id,
         vendorId: vendor.id,
-        vendorName: vendor.name,
+        vendorName: vendor.company || vendor.name,
         communityId: vendor.community_id,
         memberId: member.id,
         title: 'Insurance Certificate',
@@ -532,7 +534,7 @@ export function VendorDetailDialog({
           {/* Vendor Documents */}
           <VendorDocumentsSection
             vendorId={vendor.id}
-            vendorName={vendor.name}
+            vendorName={vendor.company || vendor.name}
             communityId={vendor.community_id}
             memberId={member?.id ?? ''}
             isBoard={isBoard}
