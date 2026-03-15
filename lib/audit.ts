@@ -1,6 +1,12 @@
+'use server';
+
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { AuditLogEntry } from '@/lib/types/audit';
 
+/**
+ * Log an audit event. Callable from server actions, API routes,
+ * or client components (as a server action). Fire-and-forget.
+ */
 export async function logAuditEvent(entry: AuditLogEntry) {
   try {
     const admin = createAdminClient();

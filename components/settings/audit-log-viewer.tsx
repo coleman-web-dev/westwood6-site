@@ -7,14 +7,73 @@ import { Button } from '@/components/shared/ui/button';
 import type { AuditLog } from '@/lib/types/audit';
 
 const ACTION_LABELS: Record<string, string> = {
+  // Auth & security
   login_success: 'Login',
   login_failed: 'Failed login',
-  member_deprovisioned: 'Member removed',
   mfa_enrolled: 'MFA enabled',
   mfa_removed: 'MFA disabled',
   plaid_connected: 'Bank connected',
+
+  // Members & roles
+  member_deprovisioned: 'Member removed',
   role_changed: 'Role changed',
+  role_template_assigned: 'Role template assigned',
+
+  // Settings
   settings_changed: 'Settings updated',
+  settings_updated: 'Settings updated',
+
+  // Invoices & payments
+  invoice_created: 'Invoice created',
+  invoice_marked_paid: 'Invoice marked paid',
+  invoice_waived: 'Invoice waived',
+  invoice_voided: 'Invoice voided',
+  invoice_bulk_update: 'Bulk invoice update',
+  invoice_bounced: 'Invoice bounced',
+  payment_received: 'Payment received',
+  payment_failed: 'Payment failed',
+
+  // Assessments
+  assessment_created: 'Assessment created',
+  assessment_activated: 'Assessment activated',
+  assessment_deactivated: 'Assessment deactivated',
+  invoices_generated: 'Invoices generated',
+
+  // Wallet
+  wallet_credit: 'Wallet credit',
+  wallet_debit: 'Wallet debit',
+
+  // Deposits
+  deposit_paid: 'Deposit paid',
+  deposit_marked_paid: 'Deposit marked paid',
+  fee_marked_paid: 'Fee marked paid',
+
+  // Voting
+  ballot_created: 'Ballot created',
+  ballot_updated: 'Ballot updated',
+  ballot_opened: 'Ballot opened',
+  ballot_closed: 'Ballot closed',
+  ballot_cancelled: 'Ballot cancelled',
+  ballot_deleted: 'Ballot deleted',
+  vote_cast: 'Vote cast',
+
+  // Reservations
+  reservation_approved: 'Reservation approved',
+  reservation_denied: 'Reservation denied',
+
+  // Announcements
+  announcement_created: 'Announcement created',
+  announcement_updated: 'Announcement updated',
+  announcement_deleted: 'Announcement deleted',
+
+  // Maintenance
+  maintenance_updated: 'Maintenance updated',
+
+  // Documents
+  document_moved: 'Document moved',
+  document_deleted: 'Document deleted',
+  document_renamed: 'Document renamed',
+  document_visibility_changed: 'Document visibility changed',
 };
 
 function formatDate(iso: string) {

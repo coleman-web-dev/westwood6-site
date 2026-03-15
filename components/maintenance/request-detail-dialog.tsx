@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
+import { logAuditEvent } from '@/lib/audit';
 import type { MaintenanceRequest, RequestStatus, Vendor } from '@/lib/types/database';
 
 const STATUS_LABELS: Record<RequestStatus, string> = {
@@ -55,7 +56,7 @@ export function RequestDetailDialog({
   onOpenChange,
   onUpdated,
 }: RequestDetailDialogProps) {
-  const { isBoard, community } = useCommunity();
+  const { isBoard, community, member } = useCommunity();
   const [status, setStatus] = useState<RequestStatus>('open');
   const [adminNotes, setAdminNotes] = useState('');
   const [vendorId, setVendorId] = useState<string>('none');
@@ -106,6 +107,15 @@ export function RequestDetailDialog({
       return;
     }
 
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'maintenance_updated',
+      targetType: 'maintenance_request',
+      targetId: request.id,
+      metadata: { title: request.title, status, previous_status: request.status },
+    });
     toast.success('Request updated.');
     onOpenChange(false);
     onUpdated();

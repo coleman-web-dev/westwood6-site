@@ -23,6 +23,7 @@ import {
 } from '@/components/shared/ui/select';
 import { ChevronLeft, ChevronRight, Plus, Trash2, GripVertical, Lock } from 'lucide-react';
 import { toast } from 'sonner';
+import { logAuditEvent } from '@/lib/audit';
 import type { BallotType, BallotTallyMethod, Ballot } from '@/lib/types/database';
 
 const BALLOT_TYPE_LABELS: Record<BallotType, string> = {
@@ -240,6 +241,15 @@ export function CreateBallotDialog({
         await supabase.from('ballot_options').delete().in('id', oldOptionIds);
       }
 
+      logAuditEvent({
+        communityId: community.id,
+        actorId: member?.user_id,
+        actorEmail: member?.email,
+        action: 'ballot_updated',
+        targetType: 'ballot',
+        targetId: editBallot.id,
+        metadata: { title: title.trim() },
+      });
       toast.success('Ballot updated.');
     } else {
       // Create ballot
@@ -291,6 +301,15 @@ export function CreateBallotDialog({
         p_reference_type: 'ballot',
       });
 
+      logAuditEvent({
+        communityId: community.id,
+        actorId: member?.user_id,
+        actorEmail: member?.email,
+        action: 'ballot_created',
+        targetType: 'ballot',
+        targetId: ballotData.id,
+        metadata: { title: title.trim(), ballot_type: ballotType },
+      });
       toast.success('Ballot created as draft.');
     }
 

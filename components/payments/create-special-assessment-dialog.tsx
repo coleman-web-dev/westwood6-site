@@ -17,6 +17,7 @@ import { Input } from '@/components/shared/ui/input';
 import { Textarea } from '@/components/shared/ui/textarea';
 import { Checkbox } from '@/components/shared/ui/checkbox';
 import { toast } from 'sonner';
+import { logAuditEvent } from '@/lib/audit';
 import { generateInvoicesForAssessment } from '@/lib/utils/generate-assessment-invoices';
 import { applyWalletToInvoiceBatch } from '@/lib/utils/apply-wallet-to-invoices';
 import type { Unit, PaymentFrequency } from '@/lib/types/database';
@@ -113,6 +114,16 @@ export function CreateSpecialAssessmentDialog({
       toast.error('Failed to create special assessment. Please try again.');
       return;
     }
+
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'assessment_created',
+      targetType: 'assessment',
+      targetId: assessment.id,
+      metadata: { title: title.trim(), type: 'special', amount: amountCents, installments: parsedInstallments },
+    });
 
     // Generate invoices immediately if checked
     if (generateImmediately) {

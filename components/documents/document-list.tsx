@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
+import { logAuditEvent } from '@/lib/audit';
 import { DocumentViewerDialog } from '@/components/documents/document-viewer-dialog';
 import { MoveToFolderDialog } from '@/components/documents/move-to-folder-dialog';
 import { SignedAgreementViewer } from '@/components/amenities/signed-agreement-viewer';
@@ -324,7 +325,7 @@ export function DocumentList({
   searchQuery = '',
   selectedFolderId,
 }: DocumentListProps) {
-  const { isBoard } = useCommunity();
+  const { community, member, isBoard } = useCommunity();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
@@ -384,6 +385,15 @@ export function DocumentList({
       community: 'Document visible to community members.',
       public: 'Document visible on the public site.',
     };
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'document_visibility_changed',
+      targetType: 'document',
+      targetId: doc.id,
+      metadata: { title: doc.title, from: doc.visibility, to: newVisibility },
+    });
     toast.success(messages[newVisibility]);
     onDeleted();
   }
@@ -408,6 +418,16 @@ export function DocumentList({
       return;
     }
 
+    const doc = documents.find((d) => d.id === docId);
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'document_renamed',
+      targetType: 'document',
+      targetId: docId,
+      metadata: { old_title: doc?.title, new_title: trimmed },
+    });
     toast.success('Document renamed.');
     onDeleted();
   }
@@ -465,6 +485,15 @@ export function DocumentList({
       return;
     }
 
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'document_deleted',
+      targetType: 'document',
+      targetId: doc.id,
+      metadata: { title: doc.title },
+    });
     toast.success('Document deleted.');
     onDeleted();
   }

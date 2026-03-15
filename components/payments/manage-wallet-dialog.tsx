@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
+import { logAuditEvent } from '@/lib/audit';
 
 interface ManageWalletDialogProps {
   unitId: string;
@@ -96,6 +97,16 @@ export function ManageWalletDialog({
       toast.error('Transaction recorded but balance update failed. Please contact support.');
       return;
     }
+
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: type === 'credit' ? 'wallet_credit' : 'wallet_debit',
+      targetType: 'wallet',
+      targetId: unitId,
+      metadata: { amount: cents, description: description.trim() || null, new_balance: newBalance },
+    });
 
     toast.success(
       type === 'credit'

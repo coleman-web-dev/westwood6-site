@@ -16,6 +16,7 @@ import { Button } from '@/components/shared/ui/button';
 import { Input } from '@/components/shared/ui/input';
 import { Textarea } from '@/components/shared/ui/textarea';
 import { toast } from 'sonner';
+import { logAuditEvent } from '@/lib/audit';
 
 interface CreateAssessmentDialogProps {
   open: boolean;
@@ -88,6 +89,15 @@ export function CreateAssessmentDialog({
       toast.error('Failed to create assessment. Please try again.');
       return;
     }
+
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'assessment_created',
+      targetType: 'assessment',
+      metadata: { title: title.trim(), annual_amount: amountCents, fiscal_year_start: fiscalYearStart, fiscal_year_end: fiscalYearEnd },
+    });
 
     toast.success('Assessment created. You can now generate invoices for it.');
     resetForm();

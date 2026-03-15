@@ -25,6 +25,7 @@ import {
 import { toast } from 'sonner';
 import { applyWalletToInvoice } from '@/lib/utils/apply-wallet-to-invoices';
 import { postInvoiceCreatedAction, postWalletAppliedAction } from '@/lib/actions/accounting-actions';
+import { logAuditEvent } from '@/lib/audit';
 import type { Unit } from '@/lib/types/database';
 
 interface CreateInvoiceDialogProps {
@@ -116,6 +117,16 @@ export function CreateInvoiceDialog({
       toast.error('Failed to create invoice. Please try again.');
       return;
     }
+
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'invoice_created',
+      targetType: 'invoice',
+      targetId: inserted.id,
+      metadata: { title: title.trim(), amount: amountCents, unit_id: unitId, due_date: dueDate },
+    });
 
     // Post accounting journal entry (silently skips if not set up)
     await postInvoiceCreatedAction(community.id, inserted.id, unitId, amountCents, title.trim());

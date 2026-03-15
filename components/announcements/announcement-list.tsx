@@ -8,6 +8,7 @@ import { Button } from '@/components/shared/ui/button';
 import { Badge } from '@/components/shared/ui/badge';
 import { Switch } from '@/components/shared/ui/switch';
 import { toast } from 'sonner';
+import { logAuditEvent } from '@/lib/audit';
 import type { Announcement } from '@/lib/types/database';
 
 interface AnnouncementListProps {
@@ -23,7 +24,7 @@ export function AnnouncementList({
   onEdit,
   onDeleted,
 }: AnnouncementListProps) {
-  const { isBoard } = useCommunity();
+  const { isBoard, community, member } = useCommunity();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -72,6 +73,15 @@ export function AnnouncementList({
       return;
     }
 
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'announcement_deleted',
+      targetType: 'announcement',
+      targetId: announcement.id,
+      metadata: { title: announcement.title },
+    });
     toast.success('Announcement deleted.');
     onDeleted();
   }

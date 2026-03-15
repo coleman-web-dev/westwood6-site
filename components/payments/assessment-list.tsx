@@ -6,6 +6,7 @@ import { useCommunity } from '@/lib/providers/community-provider';
 import { Button } from '@/components/shared/ui/button';
 import { Badge } from '@/components/shared/ui/badge';
 import { toast } from 'sonner';
+import { logAuditEvent } from '@/lib/audit';
 import { generateInvoicesForAssessment } from '@/lib/utils/generate-assessment-invoices';
 import { applyWalletToInvoiceBatch } from '@/lib/utils/apply-wallet-to-invoices';
 import type { Assessment, Unit, PaymentFrequency } from '@/lib/types/database';
@@ -70,6 +71,16 @@ export function AssessmentList({ assessments, loading, onAssessmentUpdated }: As
 
     setGeneratingId(null);
 
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'invoices_generated',
+      targetType: 'assessment',
+      targetId: assessment.id,
+      metadata: { title: assessment.title, invoice_count: invoices.length, unit_count: units.length },
+    });
+
     if (walletResult.totalApplied > 0) {
       const appliedDollars = (walletResult.totalApplied / 100).toFixed(2);
       toast.success(
@@ -97,6 +108,15 @@ export function AssessmentList({ assessments, loading, onAssessmentUpdated }: As
       return;
     }
 
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: assessment.is_active ? 'assessment_deactivated' : 'assessment_activated',
+      targetType: 'assessment',
+      targetId: assessment.id,
+      metadata: { title: assessment.title },
+    });
     toast.success(assessment.is_active ? 'Assessment deactivated.' : 'Assessment activated.');
     onAssessmentUpdated();
   }

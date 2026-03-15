@@ -159,7 +159,7 @@ function FolderRow({
 
 // ─── Sortable Root Folder (board only) ────────────────
 
-function SortableRootFolder(props: Omit<FolderRowProps, 'isOver' | 'gripProps'>) {
+function SortableRootFolder(props: Omit<FolderRowProps, 'isOver' | 'gripProps'> & { onDragHoverExpand?: (folderId: string) => void }) {
   const {
     attributes,
     listeners,
@@ -169,6 +169,19 @@ function SortableRootFolder(props: Omit<FolderRowProps, 'isOver' | 'gripProps'>)
     isDragging,
     isOver,
   } = useSortable({ id: `folder-${props.folder.id}` });
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (isOver && props.hasChildren && props.onDragHoverExpand) {
+      hoverTimerRef.current = setTimeout(() => {
+        props.onDragHoverExpand!(props.folder.id);
+      }, 500);
+    }
+    return () => {
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOver]);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -188,8 +201,21 @@ function SortableRootFolder(props: Omit<FolderRowProps, 'isOver' | 'gripProps'>)
 
 // ─── Droppable Folder (non-board root or any child) ───
 
-function DroppableFolder(props: Omit<FolderRowProps, 'isOver' | 'gripProps'>) {
+function DroppableFolder(props: Omit<FolderRowProps, 'isOver' | 'gripProps'> & { onDragHoverExpand?: (folderId: string) => void }) {
   const { isOver, setNodeRef } = useDroppable({ id: `folder-${props.folder.id}` });
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (isOver && props.hasChildren && props.onDragHoverExpand) {
+      hoverTimerRef.current = setTimeout(() => {
+        props.onDragHoverExpand!(props.folder.id);
+      }, 500);
+    }
+    return () => {
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOver]);
 
   return (
     <div ref={setNodeRef}>
@@ -308,6 +334,16 @@ export function FolderSidebar({
       const next = new Set(prev);
       if (next.has(folderId)) next.delete(folderId);
       else next.add(folderId);
+      return next;
+    });
+  }
+
+  // Expand a folder on drag hover (called from DroppableFolder/SortableRootFolder)
+  function dragExpandFolder(folderId: string) {
+    setCollapsedFolders((prev) => {
+      if (!prev.has(folderId)) return prev;
+      const next = new Set(prev);
+      next.delete(folderId);
       return next;
     });
   }
@@ -493,6 +529,7 @@ export function FolderSidebar({
               isExpanded={isExpanded(root.id)}
               onToggleExpand={() => toggleExpanded(root.id)}
               onAddChild={() => startCreating(root.id)}
+              onDragHoverExpand={dragExpandFolder}
             />
           ) : (
             <DroppableFolder
@@ -506,6 +543,7 @@ export function FolderSidebar({
               hasChildren={children.length > 0}
               isExpanded={isExpanded(root.id)}
               onToggleExpand={() => toggleExpanded(root.id)}
+              onDragHoverExpand={dragExpandFolder}
             />
           )}
 

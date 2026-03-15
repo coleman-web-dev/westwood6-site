@@ -27,6 +27,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { logAuditEvent } from '@/lib/audit';
 import { BallotStatusBadge } from './ballot-status-badge';
 import { QuorumTracker } from './quorum-tracker';
 import type { Ballot, BallotEligibility } from '@/lib/types/database';
@@ -57,7 +58,7 @@ export function BallotList({
   onViewResults,
   onRefresh,
 }: BallotListProps) {
-  const { isBoard, member, unit } = useCommunity();
+  const { isBoard, community, member, unit } = useCommunity();
   const [eligibilityMap, setEligibilityMap] = useState<Record<string, BallotEligibility>>({});
   const [actionBallot, setActionBallot] = useState<{ ballot: Ballot; action: 'open' | 'close' | 'cancel' | 'delete' } | null>(null);
   const [actioning, setActioning] = useState(false);
@@ -99,6 +100,15 @@ export function BallotList({
       if (error || result?.error) {
         toast.error(result?.error ?? 'Failed to open ballot.');
       } else {
+        logAuditEvent({
+          communityId: community.id,
+          actorId: member?.user_id,
+          actorEmail: member?.email,
+          action: 'ballot_opened',
+          targetType: 'ballot',
+          targetId: ballot.id,
+          metadata: { title: ballot.title, eligible_voters: result?.eligible_voters },
+        });
         toast.success(`Ballot opened with ${result?.eligible_voters ?? 0} eligible voters.`);
 
         // Notify all approved members
@@ -117,6 +127,15 @@ export function BallotList({
       if (error || result?.error) {
         toast.error(result?.error ?? 'Failed to close ballot.');
       } else {
+        logAuditEvent({
+          communityId: community.id,
+          actorId: member?.user_id,
+          actorEmail: member?.email,
+          action: 'ballot_closed',
+          targetType: 'ballot',
+          targetId: ballot.id,
+          metadata: { title: ballot.title, quorum_met: result?.quorum_met },
+        });
         toast.success(`Ballot closed. Quorum ${result?.quorum_met ? 'met' : 'NOT met'}.`);
 
         await supabase.rpc('create_member_notifications', {
@@ -130,9 +149,27 @@ export function BallotList({
       }
     } else if (action === 'cancel') {
       await supabase.from('ballots').update({ status: 'cancelled' }).eq('id', ballot.id);
+      logAuditEvent({
+        communityId: community.id,
+        actorId: member?.user_id,
+        actorEmail: member?.email,
+        action: 'ballot_cancelled',
+        targetType: 'ballot',
+        targetId: ballot.id,
+        metadata: { title: ballot.title },
+      });
       toast.success('Ballot cancelled.');
     } else if (action === 'delete') {
       await supabase.from('ballots').delete().eq('id', ballot.id);
+      logAuditEvent({
+        communityId: community.id,
+        actorId: member?.user_id,
+        actorEmail: member?.email,
+        action: 'ballot_deleted',
+        targetType: 'ballot',
+        targetId: ballot.id,
+        metadata: { title: ballot.title },
+      });
       toast.success('Ballot deleted.');
     }
 

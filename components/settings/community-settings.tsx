@@ -16,6 +16,7 @@ import {
 } from '@/components/shared/ui/select';
 import { Collapsible, CollapsibleContent } from '@/components/shared/ui/collapsible';
 import { toast } from 'sonner';
+import { logAuditEvent } from '@/lib/audit';
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes';
 import { UnsavedChangesDialog } from '@/components/settings/unsaved-changes-dialog';
 import { AmenityList } from '@/components/amenities/amenity-list';
@@ -26,7 +27,7 @@ import { InsuranceReminderSettings } from '@/components/settings/insurance-remin
 import type { PaymentFrequency, BulletinSettings, LateFeeSettings } from '@/lib/types/database';
 
 export function CommunitySettings() {
-  const { community } = useCommunity();
+  const { community, member } = useCommunity();
 
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
@@ -181,6 +182,15 @@ export function CommunitySettings() {
       return;
     }
 
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'settings_updated',
+      targetType: 'community',
+      targetId: community.id,
+      metadata: { name: name.trim() },
+    });
     toast.success('Community settings updated.');
   }
 

@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/shared/ui/button';
 import { Input } from '@/components/shared/ui/input';
 import { toast } from 'sonner';
+import { logAuditEvent } from '@/lib/audit';
 import type { Invoice } from '@/lib/types/database';
 
 interface BounceInvoiceDialogProps {
@@ -100,6 +101,16 @@ export function BounceInvoiceDialog({
       toast.error('Original invoice voided, but failed to create replacement. Please create manually.');
       return;
     }
+
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'invoice_bounced',
+      targetType: 'invoice',
+      targetId: invoice.id,
+      metadata: { title: invoice.title, original_amount: invoice.amount, fee: feeCents },
+    });
 
     toast.success('Bounced payment processed. New invoice created with original due date.');
     resetForm();

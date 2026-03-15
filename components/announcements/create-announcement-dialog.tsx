@@ -24,6 +24,7 @@ import {
 } from '@/components/shared/ui/select';
 import { Switch } from '@/components/shared/ui/switch';
 import { toast } from 'sonner';
+import { logAuditEvent } from '@/lib/audit';
 import { sendAnnouncementEmails } from '@/lib/actions/email-actions';
 import type { Announcement, AnnouncementPriority } from '@/lib/types/database';
 
@@ -100,6 +101,15 @@ export function CreateAnnouncementDialog({
         return;
       }
 
+      logAuditEvent({
+        communityId: community.id,
+        actorId: member?.user_id,
+        actorEmail: member?.email,
+        action: 'announcement_updated',
+        targetType: 'announcement',
+        targetId: editingAnnouncement.id,
+        metadata: { title: title.trim() },
+      });
       toast.success('Announcement updated.');
     } else {
       const { error } = await supabase.from('announcements').insert({
@@ -118,6 +128,14 @@ export function CreateAnnouncementDialog({
         return;
       }
 
+      logAuditEvent({
+        communityId: community.id,
+        actorId: member?.user_id,
+        actorEmail: member?.email,
+        action: 'announcement_created',
+        targetType: 'announcement',
+        metadata: { title: title.trim(), priority },
+      });
       toast.success('Announcement posted.');
 
       // Queue email notifications for all members (fire-and-forget)

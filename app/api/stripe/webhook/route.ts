@@ -3,6 +3,7 @@ import { getStripeClient } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { queuePaymentConfirmation } from '@/lib/email/queue';
 import { postPaymentReceived, postOverpaymentWalletCredit } from '@/lib/utils/accounting-entries';
+import { logAuditEvent } from '@/lib/audit';
 import type Stripe from 'stripe';
 
 export const runtime = 'nodejs';
@@ -81,6 +82,13 @@ export async function POST(req: NextRequest) {
               p_reference_type: 'reservation',
             });
 
+            await logAuditEvent({
+              communityId: communityId,
+              action: 'deposit_paid',
+              targetType: 'reservation',
+              targetId: reservationId,
+              metadata: { method: 'stripe_checkout' },
+            });
             console.log('Deposit payment confirmed for reservation:', reservationId);
           } else {
             console.log('Deposit already paid or reservation not found, skipping:', reservationId);
@@ -256,6 +264,14 @@ export async function POST(req: NextRequest) {
           );
         }
 
+        await logAuditEvent({
+          communityId: communityId,
+          action: 'payment_received',
+          targetType: 'invoice',
+          targetId: invoiceId,
+          metadata: { amount: stripePaidAmount, method: 'stripe_checkout', title: invoice.title },
+        });
+
         console.log('Checkout session completed for invoice:', invoiceId);
         break;
       }
@@ -388,6 +404,14 @@ export async function POST(req: NextRequest) {
           );
         }
 
+        await logAuditEvent({
+          communityId: unit.community_id,
+          action: 'payment_received',
+          targetType: 'invoice',
+          targetId: duesiqInvoice.id,
+          metadata: { amount: amountPaid, method: 'stripe_subscription', title: duesiqInvoice.title },
+        });
+
         console.log('Subscription invoice paid for unit:', unit.id, 'invoice:', duesiqInvoice.id);
         break;
       }
@@ -427,6 +451,13 @@ export async function POST(req: NextRequest) {
         // Update subscription status on unit
         await supabase.from('units').update({ stripe_subscription_status: 'past_due' }).eq('id', unit.id);
 
+        await logAuditEvent({
+          communityId: unit.community_id,
+          action: 'payment_failed',
+          targetType: 'invoice',
+          targetId: duesiqInvoice?.id,
+          metadata: { unit_id: unit.id, method: 'stripe_subscription' },
+        });
         console.log('Subscription payment failed for unit:', unit.id);
         break;
       }

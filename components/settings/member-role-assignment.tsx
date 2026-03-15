@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
+import { logAuditEvent } from '@/lib/audit';
 import { Users } from 'lucide-react';
 import type { RoleTemplate } from '@/lib/types/permissions';
 
@@ -31,7 +32,7 @@ interface MemberRoleAssignmentProps {
 }
 
 export function MemberRoleAssignment({ templates, onAssigned }: MemberRoleAssignmentProps) {
-  const { community } = useCommunity();
+  const { community, member } = useCommunity();
   const [boardMembers, setBoardMembers] = useState<BoardMember[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -74,7 +75,22 @@ export function MemberRoleAssignment({ templates, onAssigned }: MemberRoleAssign
       ),
     );
 
+    const bm = boardMembers.find((m) => m.id === memberId);
     const template = templates.find((t) => t.id === templateId);
+
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'role_template_assigned',
+      targetType: 'member',
+      targetId: memberId,
+      metadata: {
+        member_email: bm?.email,
+        template_name: template?.name ?? 'none',
+        previous_template_id: bm?.role_template_id,
+      },
+    });
     toast.success(
       templateId
         ? `Assigned "${template?.name || templateId}" role.`

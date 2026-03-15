@@ -27,6 +27,7 @@ import {
 } from '@/components/shared/ui/alert-dialog';
 import { downloadCsv } from '@/lib/utils/export-csv';
 import { postInvoiceWaivedAction, postInvoiceVoidedAction, postPaymentReceivedAction } from '@/lib/actions/accounting-actions';
+import { logAuditEvent } from '@/lib/audit';
 import { BounceInvoiceDialog } from '@/components/payments/bounce-invoice-dialog';
 import { PayInvoiceButton } from '@/components/payments/pay-invoice-button';
 import type { Invoice, InvoiceStatus, Unit } from '@/lib/types/database';
@@ -71,7 +72,7 @@ export function InvoiceList({
   stripeEnabled,
   subscriptionActive,
 }: InvoiceListProps) {
-  const { isBoard, community } = useCommunity();
+  const { isBoard, community, member } = useCommunity();
   const [statusFilter, setStatusFilter] = useState('all');
   const [unitFilter, setUnitFilter] = useState('all');
   const [unregisteredOnly, setUnregisteredOnly] = useState(false);
@@ -129,6 +130,15 @@ export function InvoiceList({
     }
 
     toast.success('Invoice marked as paid.');
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'invoice_marked_paid',
+      targetType: 'invoice',
+      targetId: invoice.id,
+      metadata: { title: invoice.title, amount: invoice.amount },
+    });
     await postPaymentReceivedAction(community.id, invoice.id, invoice.unit_id, invoice.amount, invoice.title);
     onInvoiceUpdated();
   }
@@ -150,6 +160,15 @@ export function InvoiceList({
     }
 
     toast.success('Invoice waived.');
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'invoice_waived',
+      targetType: 'invoice',
+      targetId: invoice.id,
+      metadata: { title: invoice.title, amount: invoice.amount },
+    });
     const remaining = invoice.amount - (invoice.amount_paid || 0);
     if (remaining > 0) {
       await postInvoiceWaivedAction(community.id, invoice.id, invoice.unit_id, remaining, invoice.title);
@@ -174,6 +193,15 @@ export function InvoiceList({
     }
 
     toast.success('Invoice voided.');
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'invoice_voided',
+      targetType: 'invoice',
+      targetId: invoice.id,
+      metadata: { title: invoice.title, amount: invoice.amount },
+    });
     await postInvoiceVoidedAction(community.id, invoice.id, invoice.unit_id, invoice.amount, invoice.title);
     onInvoiceUpdated();
   }
@@ -250,6 +278,14 @@ export function InvoiceList({
     } else {
       toast.success(`${ids.length} invoice(s) updated.`);
     }
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'invoice_bulk_update',
+      targetType: 'invoice',
+      metadata: { action: bulkAction, count: ids.length - failed, failed },
+    });
     onInvoiceUpdated();
   }
 

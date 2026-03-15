@@ -16,6 +16,7 @@ import { Button } from '@/components/shared/ui/button';
 import { ScrollArea } from '@/components/shared/ui/scroll-area';
 import { CheckCircle2, Lock, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
+import { logAuditEvent } from '@/lib/audit';
 import { BallotStatusBadge } from './ballot-status-badge';
 import type { Ballot, BallotOption } from '@/lib/types/database';
 
@@ -27,7 +28,7 @@ interface VoteDialogProps {
 }
 
 export function VoteDialog({ open, onOpenChange, ballot, onVoted }: VoteDialogProps) {
-  const { member } = useCommunity();
+  const { community, member } = useCommunity();
   const [options, setOptions] = useState<BallotOption[]>([]);
   const [selectedOptions, setSelectedOptions] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -103,6 +104,15 @@ export function VoteDialog({ open, onOpenChange, ballot, onVoted }: VoteDialogPr
       return;
     }
 
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'vote_cast',
+      targetType: 'ballot',
+      targetId: ballot.id,
+      metadata: { title: ballot.title, is_secret: ballot.is_secret_ballot },
+    });
     setVoted(true);
     onVoted();
   }

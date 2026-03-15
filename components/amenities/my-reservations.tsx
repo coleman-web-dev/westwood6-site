@@ -20,6 +20,7 @@ import {
 import { Textarea } from '@/components/shared/ui/textarea';
 import { FileSignature, ClipboardCheck, CheckCircle2, XCircle, AlertTriangle, ExternalLink, Loader2, CreditCard } from 'lucide-react';
 import { toast } from 'sonner';
+import { logAuditEvent } from '@/lib/audit';
 import type { AgreementField, SignedAgreement, Reservation, ReservationStatus } from '@/lib/types/database';
 
 interface MyReservationsProps {
@@ -42,7 +43,7 @@ const STATUS_BADGE: Record<ReservationStatus, { variant: 'default' | 'secondary'
 };
 
 export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
-  const { community, unit, isBoard } = useCommunity();
+  const { community, member, unit, isBoard } = useCommunity();
   const [reservations, setReservations] = useState<ReservationWithAmenity[]>([]);
   const [loading, setLoading] = useState(true);
   const [returningReservation, setReturningReservation] = useState<ReservationWithAmenity | null>(null);
@@ -166,6 +167,14 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
       return;
     }
 
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'deposit_marked_paid',
+      targetType: 'reservation',
+      targetId: reservationId,
+    });
     toast.success('Security deposit marked as paid.');
     setReservations((prev) =>
       prev.map((r) =>
@@ -186,6 +195,14 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
       return;
     }
 
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'fee_marked_paid',
+      targetType: 'reservation',
+      targetId: reservationId,
+    });
     toast.success('Rental fee marked as paid.');
     setReservations((prev) =>
       prev.map((r) =>
@@ -259,6 +276,15 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
       return;
     }
 
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'reservation_approved',
+      targetType: 'reservation',
+      targetId: reservation.id,
+      metadata: { amenity: reservation.amenities?.name, has_message: !!boardMessage.trim() },
+    });
     toast.success('Reservation approved.');
     setReservations((prev) =>
       prev.map((r) =>
@@ -313,6 +339,15 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
       return;
     }
 
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'reservation_denied',
+      targetType: 'reservation',
+      targetId: reservation.id,
+      metadata: { amenity: reservation.amenities?.name, has_message: !!boardMessage.trim() },
+    });
     toast.success('Reservation denied.');
     setReservations((prev) =>
       prev.map((r) =>
