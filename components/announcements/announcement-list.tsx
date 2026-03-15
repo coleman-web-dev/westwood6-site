@@ -49,6 +49,15 @@ export function AnnouncementList({
         ? 'Announcement is now private.'
         : 'Announcement is now visible on the landing page.'
     );
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'announcement_visibility_changed',
+      targetType: 'announcement',
+      targetId: announcement.id,
+      metadata: { title: announcement.title, is_public: !announcement.is_public },
+    });
     onDeleted(); // triggers refetch
   }
 

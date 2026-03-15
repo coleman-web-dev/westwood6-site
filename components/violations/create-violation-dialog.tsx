@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
+import { logAuditEvent } from '@/lib/audit';
 import type { Unit, ViolationCategory, ViolationSeverity } from '@/lib/types/database';
 
 interface CreateViolationDialogProps {
@@ -80,6 +81,15 @@ export function CreateViolationDialog({
     }
 
     toast.success('Violation reported.');
+    logAuditEvent({
+      communityId,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'violation_created',
+      targetType: 'violation',
+      targetId: unitId,
+      metadata: { title: title.trim(), category, severity },
+    });
     setTitle('');
     setDescription('');
     setUnitId('');

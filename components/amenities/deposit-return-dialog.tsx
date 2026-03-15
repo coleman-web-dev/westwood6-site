@@ -14,6 +14,7 @@ import {
 } from '@/components/shared/ui/dialog';
 import { Button } from '@/components/shared/ui/button';
 import { toast } from 'sonner';
+import { logAuditEvent } from '@/lib/audit';
 import type { Reservation } from '@/lib/types/database';
 
 type ReservationWithDetails = Reservation & {
@@ -79,6 +80,15 @@ export function DepositReturnDialog({
 
         setSubmitting(false);
         toast.success(`$${depositDollars} refunded to the original payment method.`);
+        logAuditEvent({
+          communityId: community.id,
+          actorId: member?.user_id,
+          actorEmail: member?.email,
+          action: 'deposit_returned',
+          targetType: 'reservation',
+          targetId: reservation.id,
+          metadata: { method: 'card', amount: reservation.deposit_amount, amenity: reservation.amenities.name },
+        });
         onOpenChange(false);
         onSuccess();
         return;
@@ -163,6 +173,16 @@ export function DepositReturnDialog({
     } else {
       toast.success('Deposit marked as returned via check.');
     }
+
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'deposit_returned',
+      targetType: 'reservation',
+      targetId: reservation.id,
+      metadata: { method, amount: reservation.deposit_amount, amenity: reservation.amenities.name },
+    });
 
     onOpenChange(false);
     onSuccess();

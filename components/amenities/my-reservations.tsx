@@ -148,6 +148,16 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
     }
 
     toast.success('Reservation cancelled.');
+    const cancelled = reservations.find((r) => r.id === reservationId);
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'reservation_cancelled',
+      targetType: 'reservation',
+      targetId: reservationId,
+      metadata: { amenity: cancelled?.amenities.name },
+    });
     setReservations((prev) =>
       prev.map((r) =>
         r.id === reservationId ? { ...r, status: 'cancelled' as ReservationStatus } : r

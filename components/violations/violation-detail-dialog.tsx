@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
+import { logAuditEvent } from '@/lib/audit';
 import { NoticeHistory } from '@/components/violations/notice-history';
 import type { Violation, ViolationStatus, ViolationNotice, NoticeType, DeliveryMethod } from '@/lib/types/database';
 
@@ -59,7 +60,7 @@ export function ViolationDetailDialog({
   onOpenChange,
   onUpdated,
 }: ViolationDetailDialogProps) {
-  const { isBoard, member } = useCommunity();
+  const { isBoard, member, community } = useCommunity();
   const [status, setStatus] = useState<ViolationStatus>('reported');
   const [resolutionNotes, setResolutionNotes] = useState('');
   const [notices, setNotices] = useState<ViolationNotice[]>([]);
@@ -120,6 +121,15 @@ export function ViolationDetailDialog({
     }
 
     toast.success('Violation updated.');
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'violation_updated',
+      targetType: 'violation',
+      targetId: violation.id,
+      metadata: { status, previous_status: violation.status },
+    });
     onOpenChange(false);
     onUpdated();
   }
@@ -156,6 +166,15 @@ export function ViolationDetailDialog({
     }
 
     toast.success('Notice recorded.');
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'violation_notice_sent',
+      targetType: 'violation',
+      targetId: violation.id,
+      metadata: { notice_type: noticeType },
+    });
     setNoticeNotes('');
     fetchNotices();
     onUpdated();

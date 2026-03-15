@@ -16,6 +16,7 @@ import { Button } from '@/components/shared/ui/button';
 import { Badge } from '@/components/shared/ui/badge';
 import { CheckCircle2, Award, Loader2, Eye } from 'lucide-react';
 import { toast } from 'sonner';
+import { logAuditEvent } from '@/lib/audit';
 import { QuorumTracker } from './quorum-tracker';
 import type { Ballot, BallotOption, BallotResultCache, QuorumStatus } from '@/lib/types/database';
 
@@ -31,7 +32,7 @@ interface ResultWithOption extends BallotResultCache {
 }
 
 export function ResultsViewer({ open, onOpenChange, ballot, onUpdated }: ResultsViewerProps) {
-  const { isBoard } = useCommunity();
+  const { isBoard, community, member } = useCommunity();
   const [results, setResults] = useState<ResultWithOption[]>([]);
   const [quorum, setQuorum] = useState<QuorumStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -89,6 +90,15 @@ export function ResultsViewer({ open, onOpenChange, ballot, onUpdated }: Results
       toast.error('Failed to publish results.');
     } else {
       toast.success('Results published. All members can now view them.');
+      logAuditEvent({
+        communityId: community.id,
+        actorId: member?.user_id,
+        actorEmail: member?.email,
+        action: 'ballot_results_published',
+        targetType: 'ballot',
+        targetId: ballot.id,
+        metadata: { title: ballot.title },
+      });
 
       // Notify all members
       await supabase.rpc('create_member_notifications', {
@@ -129,6 +139,15 @@ export function ResultsViewer({ open, onOpenChange, ballot, onUpdated }: Results
       toast.error('Failed to certify ballot.');
     } else {
       toast.success('Ballot certified as official record.');
+      logAuditEvent({
+        communityId: community.id,
+        actorId: member?.user_id,
+        actorEmail: member?.email,
+        action: 'ballot_certified',
+        targetType: 'ballot',
+        targetId: ballot.id,
+        metadata: { title: ballot.title },
+      });
       onUpdated?.();
     }
     setCertifying(false);

@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
+import { logAuditEvent } from '@/lib/audit';
 import { Plus, Shield, Trash2, Copy, Loader2 } from 'lucide-react';
 import type { RoleTemplate, PermissionKey } from '@/lib/types/permissions';
 import {
@@ -36,7 +37,7 @@ import {
 import { MemberRoleAssignment } from './member-role-assignment';
 
 export function RolePermissionsManager() {
-  const { community } = useCommunity();
+  const { community, member } = useCommunity();
   const [templates, setTemplates] = useState<RoleTemplate[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -101,6 +102,15 @@ export function RolePermissionsManager() {
 
     setTemplates(updated);
     toast.success('Role templates saved.');
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'role_template_updated',
+      targetType: 'community',
+      targetId: community.id,
+      metadata: { template_count: updated.length },
+    });
     return true;
   }
 
@@ -160,6 +170,15 @@ export function RolePermissionsManager() {
     const updated = [...templates, newTemplate];
     const saved = await saveTemplates(updated);
     if (saved) {
+      logAuditEvent({
+        communityId: community.id,
+        actorId: member?.user_id,
+        actorEmail: member?.email,
+        action: 'role_template_created',
+        targetType: 'community',
+        targetId: community.id,
+        metadata: { template_name: newName.trim(), cloned_from: cloneFrom || null },
+      });
       setSelectedId(id);
       setShowCreate(false);
       setNewName('');
@@ -182,8 +201,19 @@ export function RolePermissionsManager() {
 
     const updated = templates.filter((t) => t.id !== templateId);
     const saved = await saveTemplates(updated);
-    if (saved && selectedId === templateId) {
-      setSelectedId(updated[0]?.id || null);
+    if (saved) {
+      logAuditEvent({
+        communityId: community.id,
+        actorId: member?.user_id,
+        actorEmail: member?.email,
+        action: 'role_template_deleted',
+        targetType: 'community',
+        targetId: community.id,
+        metadata: { template_name: template.name },
+      });
+      if (selectedId === templateId) {
+        setSelectedId(updated[0]?.id || null);
+      }
     }
   }
 

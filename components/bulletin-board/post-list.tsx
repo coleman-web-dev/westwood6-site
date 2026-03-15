@@ -9,6 +9,7 @@ import { Button } from '@/components/shared/ui/button';
 import { Badge } from '@/components/shared/ui/badge';
 import { PostComments } from './post-comments';
 import { toast } from 'sonner';
+import { logAuditEvent } from '@/lib/audit';
 import type { BulletinPost } from '@/lib/types/database';
 
 interface PostListProps {
@@ -26,7 +27,7 @@ export function PostList({
   onEdit,
   onRefresh,
 }: PostListProps) {
-  const { member, isBoard } = useCommunity();
+  const { member, isBoard, community } = useCommunity();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -64,6 +65,15 @@ export function PostList({
     }
 
     toast.success('Post deleted.');
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'bulletin_post_deleted',
+      targetType: 'bulletin_post',
+      targetId: post.id,
+      metadata: { title: post.title },
+    });
     onRefresh();
   }
 
@@ -81,6 +91,15 @@ export function PostList({
     }
 
     toast.success(post.is_pinned ? 'Post unpinned.' : 'Post pinned.');
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: post.is_pinned ? 'bulletin_post_unpinned' : 'bulletin_post_pinned',
+      targetType: 'bulletin_post',
+      targetId: post.id,
+      metadata: { title: post.title },
+    });
     onRefresh();
   }
 

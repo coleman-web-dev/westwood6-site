@@ -17,6 +17,7 @@ import { Input } from '@/components/shared/ui/input';
 import { Textarea } from '@/components/shared/ui/textarea';
 import { Switch } from '@/components/shared/ui/switch';
 import { toast } from 'sonner';
+import { logAuditEvent } from '@/lib/audit';
 import type { BulletinPost } from '@/lib/types/database';
 
 interface CreatePostDialogProps {
@@ -87,6 +88,15 @@ export function CreatePostDialog({
       }
 
       toast.success('Post updated.');
+      logAuditEvent({
+        communityId: community.id,
+        actorId: member?.user_id,
+        actorEmail: member?.email,
+        action: 'bulletin_post_updated',
+        targetType: 'bulletin_post',
+        targetId: editPost.id,
+        metadata: { title: title.trim() },
+      });
     } else {
       const { error } = await supabase.from('bulletin_posts').insert({
         community_id: community.id,
@@ -104,6 +114,15 @@ export function CreatePostDialog({
       }
 
       toast.success('Post published.');
+      logAuditEvent({
+        communityId: community.id,
+        actorId: member?.user_id,
+        actorEmail: member?.email,
+        action: 'bulletin_post_created',
+        targetType: 'bulletin_post',
+        targetId: community.id,
+        metadata: { title: title.trim() },
+      });
     }
 
     resetForm();

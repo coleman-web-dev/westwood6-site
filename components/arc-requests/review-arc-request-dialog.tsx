@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
+import { logAuditEvent } from '@/lib/audit';
 import type { ArcRequest, ArcStatus } from '@/lib/types/database';
 
 const STATUS_LABELS: Record<ArcStatus, string> = {
@@ -58,7 +59,7 @@ export function ReviewArcRequestDialog({
   onOpenChange,
   onUpdated,
 }: ReviewArcRequestDialogProps) {
-  const { isBoard, member } = useCommunity();
+  const { isBoard, member, community } = useCommunity();
   const [status, setStatus] = useState<ArcStatus>('submitted');
   const [conditions, setConditions] = useState('');
   const [expiresAt, setExpiresAt] = useState('');
@@ -103,6 +104,15 @@ export function ReviewArcRequestDialog({
     }
 
     toast.success('ARC request updated.');
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'arc_request_reviewed',
+      targetType: 'arc_request',
+      targetId: request.id,
+      metadata: { status, previous_status: request.status, title: request.title },
+    });
     onOpenChange(false);
     onUpdated();
   }

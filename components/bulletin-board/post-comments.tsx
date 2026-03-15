@@ -9,6 +9,7 @@ import { Button } from '@/components/shared/ui/button';
 import { Textarea } from '@/components/shared/ui/textarea';
 import { Badge } from '@/components/shared/ui/badge';
 import { toast } from 'sonner';
+import { logAuditEvent } from '@/lib/audit';
 import type { BulletinComment } from '@/lib/types/database';
 
 interface PostCommentsProps {
@@ -60,6 +61,14 @@ export function PostComments({ postId, canComment }: PostCommentsProps) {
       return;
     }
 
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'bulletin_comment_created',
+      targetType: 'bulletin_comment',
+      targetId: postId,
+    });
     setBody('');
     fetchComments();
   }
@@ -81,6 +90,15 @@ export function PostComments({ postId, canComment }: PostCommentsProps) {
     }
 
     toast.success('Comment deleted.');
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'bulletin_comment_deleted',
+      targetType: 'bulletin_comment',
+      targetId: comment.id,
+      metadata: { post_id: postId },
+    });
     fetchComments();
   }
 

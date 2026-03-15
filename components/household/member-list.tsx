@@ -18,6 +18,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/shared/ui/alert-dialog';
 import { toast } from 'sonner';
+import { logAuditEvent } from '@/lib/audit';
 import { Eye, EyeOff, Trash2, UserPlus, StickyNote } from 'lucide-react';
 import { format } from 'date-fns';
 import { MemberNotesDialog } from '@/components/household/member-notes-dialog';
@@ -54,7 +55,7 @@ export function MemberList({
   onAddClick,
   onMemberRemoved,
 }: MemberListProps) {
-  const { isBoard } = useCommunity();
+  const { isBoard, community, member: currentMember } = useCommunity();
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [notesForMember, setNotesForMember] = useState<{ id: string; name: string } | null>(null);
 
@@ -73,7 +74,17 @@ export function MemberList({
       return;
     }
 
+    const removedMember = members.find((m) => m.id === memberId);
     toast.success('Member removed from household.');
+    logAuditEvent({
+      communityId: community.id,
+      actorId: currentMember?.user_id,
+      actorEmail: currentMember?.email,
+      action: 'member_removed',
+      targetType: 'member',
+      targetId: memberId,
+      metadata: { name: removedMember ? `${removedMember.first_name} ${removedMember.last_name}` : memberId, email: removedMember?.email },
+    });
     setRemovingId(null);
     onMemberRemoved();
   }

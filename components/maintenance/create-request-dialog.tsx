@@ -16,6 +16,7 @@ import { Button } from '@/components/shared/ui/button';
 import { Input } from '@/components/shared/ui/input';
 import { Textarea } from '@/components/shared/ui/textarea';
 import { toast } from 'sonner';
+import { logAuditEvent } from '@/lib/audit';
 
 interface CreateRequestDialogProps {
   open: boolean;
@@ -66,6 +67,15 @@ export function CreateRequestDialog({
     }
 
     toast.success('Maintenance request submitted.');
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'maintenance_created',
+      targetType: 'maintenance_request',
+      targetId: unit.id,
+      metadata: { title: title.trim() },
+    });
     resetForm();
     onOpenChange(false);
     onSuccess();

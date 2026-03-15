@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
+import { logAuditEvent } from '@/lib/audit';
 import type { MemberRole, Unit } from '@/lib/types/database';
 
 interface AddMemberDialogProps {
@@ -100,6 +101,15 @@ export function AddMemberDialog({ open, onOpenChange, onSuccess, unitOverride }:
     }
 
     toast.success(`${trimmedFirst} ${trimmedLast} has been added to your household.`);
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'member_added',
+      targetType: 'member',
+      targetId: unit.id,
+      metadata: { name: `${trimmedFirst} ${trimmedLast}`, role, email: email.trim() || null },
+    });
 
     // Send invite email if requested
     if (sendInvite && email.trim()) {

@@ -16,8 +16,13 @@ const ACTION_LABELS: Record<string, string> = {
 
   // Members & roles
   member_deprovisioned: 'Member removed',
+  member_added: 'Member added',
+  member_removed: 'Member removed from household',
   role_changed: 'Role changed',
   role_template_assigned: 'Role template assigned',
+  role_template_created: 'Role template created',
+  role_template_updated: 'Role template updated',
+  role_template_deleted: 'Role template deleted',
 
   // Settings
   settings_changed: 'Settings updated',
@@ -46,6 +51,7 @@ const ACTION_LABELS: Record<string, string> = {
   // Deposits
   deposit_paid: 'Deposit paid',
   deposit_marked_paid: 'Deposit marked paid',
+  deposit_returned: 'Deposit returned',
   fee_marked_paid: 'Fee marked paid',
 
   // Voting
@@ -56,18 +62,41 @@ const ACTION_LABELS: Record<string, string> = {
   ballot_cancelled: 'Ballot cancelled',
   ballot_deleted: 'Ballot deleted',
   vote_cast: 'Vote cast',
+  ballot_results_published: 'Results published',
+  ballot_certified: 'Ballot certified',
 
   // Reservations
   reservation_approved: 'Reservation approved',
   reservation_denied: 'Reservation denied',
+  reservation_cancelled: 'Reservation cancelled',
 
   // Announcements
   announcement_created: 'Announcement created',
   announcement_updated: 'Announcement updated',
   announcement_deleted: 'Announcement deleted',
+  announcement_visibility_changed: 'Announcement visibility changed',
 
   // Maintenance
+  maintenance_created: 'Maintenance request created',
   maintenance_updated: 'Maintenance updated',
+
+  // Violations
+  violation_created: 'Violation reported',
+  violation_updated: 'Violation updated',
+  violation_notice_sent: 'Violation notice sent',
+
+  // ARC requests
+  arc_request_submitted: 'ARC request submitted',
+  arc_request_reviewed: 'ARC request reviewed',
+
+  // Bulletin board
+  bulletin_post_created: 'Post created',
+  bulletin_post_updated: 'Post updated',
+  bulletin_post_deleted: 'Post deleted',
+  bulletin_post_pinned: 'Post pinned',
+  bulletin_post_unpinned: 'Post unpinned',
+  bulletin_comment_created: 'Comment posted',
+  bulletin_comment_deleted: 'Comment deleted',
 
   // Documents
   document_moved: 'Document moved',

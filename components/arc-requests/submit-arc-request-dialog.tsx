@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
+import { logAuditEvent } from '@/lib/audit';
 import type { ArcProjectType } from '@/lib/types/database';
 
 interface SubmitArcRequestDialogProps {
@@ -77,6 +78,14 @@ export function SubmitArcRequestDialog({
     }
 
     toast.success('ARC request submitted.');
+    logAuditEvent({
+      communityId,
+      actorId: memberId,
+      action: 'arc_request_submitted',
+      targetType: 'arc_request',
+      targetId: unitId,
+      metadata: { title: title.trim(), project_type: projectType },
+    });
     setTitle('');
     setDescription('');
     setProjectType('other');
