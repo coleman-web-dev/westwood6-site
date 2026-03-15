@@ -226,7 +226,7 @@ Return ONLY the JSON object, no markdown code fences, no extra text.`;
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
-          max_tokens: 8192,
+          max_tokens: 16384,
           messages: [
             {
               role: "user",
@@ -291,9 +291,10 @@ Return ONLY the JSON object, no markdown code fences, no extra text.`;
 
     // Validate the response structure
     if (!parsed.template || !Array.isArray(parsed.fields)) {
+      console.error("AI response missing required fields. Keys:", Object.keys(parsed), "Raw:", JSON.stringify(parsed).substring(0, 1000));
       return new Response(
         JSON.stringify({
-          error: "AI response is missing required fields.",
+          error: "AI response was incomplete. The agreement may be too long for a single AI request. Try making the change manually in the field editor instead.",
           raw: JSON.stringify(parsed).substring(0, 500),
         }),
         {

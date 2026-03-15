@@ -13,6 +13,7 @@ import {
   DialogClose,
 } from '@/components/shared/ui/dialog';
 import { Button } from '@/components/shared/ui/button';
+import { Input } from '@/components/shared/ui/input';
 import { toast } from 'sonner';
 import { logAuditEvent } from '@/lib/audit';
 import type { Reservation } from '@/lib/types/database';
@@ -40,23 +41,39 @@ export function DepositReturnDialog({
   const { community, member } = useCommunity();
   const paidByCard = !!reservation?.deposit_stripe_payment_intent;
   const [method, setMethod] = useState<'check' | 'wallet' | 'card'>(paidByCard ? 'card' : 'wallet');
+  const [refundAmountStr, setRefundAmountStr] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Reset method when a different reservation is opened
+  // Reset state when a different reservation is opened
   useEffect(() => {
     if (reservation) {
       setMethod(reservation.deposit_stripe_payment_intent ? 'card' : 'wallet');
+      setRefundAmountStr((reservation.deposit_amount / 100).toFixed(2));
     }
   }, [reservation]);
 
   if (!reservation) return null;
 
   const depositDollars = (reservation.deposit_amount / 100).toFixed(2);
+  const refundCents = Math.round(parseFloat(refundAmountStr || '0') * 100);
+  const retainedCents = reservation.deposit_amount - refundCents;
+  const isPartial = refundCents > 0 && refundCents < reservation.deposit_amount;
+  const isValidAmount = refundCents > 0 && refundCents <= reservation.deposit_amount;
 
   async function handleSubmit() {
     if (!reservation || !member) return;
+    if (!isValidAmount) {
+      toast.error('Please enter a valid refund amount.');
+      return;
+    }
 
     setSubmitting(true);
+
+    const depositUpdate = {
+      deposit_refunded: true,
+      deposit_return_method: method,
+      deposit_refund_amount: refundCents,
+    };
 
     // Card refund goes through the API route (server-side Stripe call)
     if (method === 'card') {
@@ -67,6 +84,7 @@ export function DepositReturnDialog({
           body: JSON.stringify({
             reservationId: reservation.id,
             communityId: community.id,
+            amount: refundCents,
           }),
         });
 
@@ -79,7 +97,12 @@ export function DepositReturnDialog({
         }
 
         setSubmitting(false);
-        toast.success(`$${depositDollars} refunded to the original payment method.`);
+        const refundDollars = (refundCents / 100).toFixed(2);
+        if (isPartial) {
+          toast.success(`$${refundDollars} refunded to card. $${(retainedCents / 100).toFixed(2)} retained.`);
+        } else {
+          toast.success(`$${refundDollars} refunded to the original payment method.`);
+        }
         logAuditEvent({
           communityId: community.id,
           actorId: member?.user_id,
@@ -87,7 +110,13 @@ export function DepositReturnDialog({
           action: 'deposit_returned',
           targetType: 'reservation',
           targetId: reservation.id,
-          metadata: { method: 'card', amount: reservation.deposit_amount, amenity: reservation.amenities.name },
+          metadata: {
+            method: 'card',
+            amount: refundCents,
+            retained: retainedCents,
+            full_deposit: reservation.deposit_amount,
+            amenity: reservation.amenities.name,
+          },
         });
         onOpenChange(false);
         onSuccess();
@@ -102,13 +131,10 @@ export function DepositReturnDialog({
     // Wallet and check methods handled client-side
     const supabase = createClient();
 
-    // 1. Mark deposit as refunded with the chosen method
+    // 1. Mark deposit as refunded with the chosen method and amount
     const { error: reservationError } = await supabase
       .from('reservations')
-      .update({
-        deposit_refunded: true,
-        deposit_return_method: method,
-      })
+      .update(depositUpdate)
       .eq('id', reservation.id);
 
     if (reservationError) {
@@ -117,17 +143,18 @@ export function DepositReturnDialog({
       return;
     }
 
-    // 2. If wallet method, credit the household wallet
+    // 2. If wallet method, credit the household wallet with refund amount
     if (method === 'wallet') {
-      // Insert wallet transaction
       const { error: txError } = await supabase.from('wallet_transactions').insert({
         unit_id: reservation.unit_id,
         community_id: community.id,
         member_id: member.id,
-        amount: reservation.deposit_amount,
+        amount: refundCents,
         type: 'deposit_return' as const,
         reference_id: reservation.id,
-        description: `Deposit return: ${reservation.amenities.name}`,
+        description: isPartial
+          ? `Partial deposit return: ${reservation.amenities.name} ($${(refundCents / 100).toFixed(2)} of $${depositDollars})`
+          : `Deposit return: ${reservation.amenities.name}`,
         created_by: member.id,
       });
 
@@ -139,11 +166,11 @@ export function DepositReturnDialog({
         return;
       }
 
-      // Atomically increment wallet balance to avoid race conditions
+      // Atomically increment wallet balance
       const { error: walletError } = await supabase.rpc('increment_wallet_balance', {
         p_unit_id: reservation.unit_id,
         p_community_id: community.id,
-        p_amount: reservation.deposit_amount,
+        p_amount: refundCents,
       });
 
       if (walletError) {
@@ -160,7 +187,7 @@ export function DepositReturnDialog({
           .upsert({
             unit_id: reservation.unit_id,
             community_id: community.id,
-            balance: currentBalance + reservation.deposit_amount,
+            balance: currentBalance + refundCents,
             updated_at: new Date().toISOString(),
           }, { onConflict: 'unit_id' });
       }
@@ -168,10 +195,19 @@ export function DepositReturnDialog({
 
     setSubmitting(false);
 
+    const refundDollars = (refundCents / 100).toFixed(2);
     if (method === 'wallet') {
-      toast.success(`$${depositDollars} deposit applied to household wallet.`);
+      if (isPartial) {
+        toast.success(`$${refundDollars} applied to wallet. $${(retainedCents / 100).toFixed(2)} retained.`);
+      } else {
+        toast.success(`$${refundDollars} deposit applied to household wallet.`);
+      }
     } else {
-      toast.success('Deposit marked as returned via check.');
+      if (isPartial) {
+        toast.success(`$${refundDollars} returned via check. $${(retainedCents / 100).toFixed(2)} retained.`);
+      } else {
+        toast.success('Deposit marked as returned via check.');
+      }
     }
 
     logAuditEvent({
@@ -181,7 +217,13 @@ export function DepositReturnDialog({
       action: 'deposit_returned',
       targetType: 'reservation',
       targetId: reservation.id,
-      metadata: { method, amount: reservation.deposit_amount, amenity: reservation.amenities.name },
+      metadata: {
+        method,
+        amount: refundCents,
+        retained: retainedCents,
+        full_deposit: reservation.deposit_amount,
+        amenity: reservation.amenities.name,
+      },
     });
 
     onOpenChange(false);
@@ -194,7 +236,7 @@ export function DepositReturnDialog({
         <DialogHeader>
           <DialogTitle>Return Security Deposit</DialogTitle>
           <DialogDescription>
-            Choose how to return the security deposit for this reservation.
+            Choose the amount and method to return the security deposit.
           </DialogDescription>
         </DialogHeader>
 
@@ -221,6 +263,35 @@ export function DepositReturnDialog({
                 <span className="text-text-secondary-light dark:text-text-secondary-dark">Payment method</span>
                 <span className="text-text-primary-light dark:text-text-primary-dark">Credit card</span>
               </div>
+            )}
+          </div>
+
+          {/* Refund amount */}
+          <div className="space-y-1.5">
+            <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+              Amount to return
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-body text-text-muted-light dark:text-text-muted-dark">$</span>
+              <Input
+                type="number"
+                step="0.01"
+                min="0.01"
+                max={(reservation.deposit_amount / 100).toFixed(2)}
+                value={refundAmountStr}
+                onChange={(e) => setRefundAmountStr(e.target.value)}
+                className="pl-7 tabular-nums"
+              />
+            </div>
+            {isPartial && retainedCents > 0 && (
+              <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                ${(retainedCents / 100).toFixed(2)} will be retained by the association.
+              </p>
+            )}
+            {!isValidAmount && refundAmountStr !== '' && (
+              <p className="text-meta text-red-500">
+                Amount must be between $0.01 and ${depositDollars}.
+              </p>
             )}
           </div>
 
@@ -289,8 +360,8 @@ export function DepositReturnDialog({
           <DialogClose asChild>
             <Button variant="outline">Cancel</Button>
           </DialogClose>
-          <Button onClick={handleSubmit} disabled={submitting}>
-            {submitting ? 'Processing...' : 'Return Security Deposit'}
+          <Button onClick={handleSubmit} disabled={submitting || !isValidAmount}>
+            {submitting ? 'Processing...' : isPartial ? `Return $${(refundCents / 100).toFixed(2)}` : 'Return Security Deposit'}
           </Button>
         </DialogFooter>
       </DialogContent>

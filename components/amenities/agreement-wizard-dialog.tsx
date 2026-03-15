@@ -106,12 +106,22 @@ export function AgreementWizardDialog({
   // Template textarea ref for variable insertion
   const templateRef = useRef<HTMLTextAreaElement>(null);
 
+  // Sync state when dialog opens
+  useEffect(() => {
+    if (open) {
+      setTemplate(existingTemplate ?? '');
+      setFields(existingFields ?? []);
+      setChatHistory([]);
+      setEditingFieldId(null);
+      setStep(existingTemplate ? 2 : 1);
+    }
+  }, [open, existingTemplate, existingFields]);
+
   // Reset state when dialog opens/closes
   const handleOpenChange = useCallback(
     (newOpen: boolean) => {
       if (!newOpen) {
         // Reset on close
-        setStep(existingTemplate ? 2 : 1);
         setRawText('');
         setAnalyzing(false);
         setAiSummary('');
@@ -122,15 +132,10 @@ export function AgreementWizardDialog({
           setTemplate('');
           setFields([]);
         }
-      } else {
-        setTemplate(existingTemplate ?? '');
-        setFields(existingFields ?? []);
-        setChatHistory([]);
-        setStep(existingTemplate ? 2 : 1);
       }
       onOpenChange(newOpen);
     },
-    [onOpenChange, existingTemplate, existingFields],
+    [onOpenChange, existingTemplate],
   );
 
   // PDF text extraction via server-side API (avoids client-side worker/CSP issues)
@@ -276,7 +281,7 @@ export function AgreementWizardDialog({
       }
 
       if (!data.template) {
-        throw new Error('AI returned an invalid response');
+        throw new Error('AI response was incomplete. Try editing the fields manually below instead.');
       }
 
       setTemplate(data.template);
@@ -377,6 +382,185 @@ export function AgreementWizardDialog({
     }
     onSave(template, fields);
     onOpenChange(false);
+  }
+
+  function renderFieldRow(field: AgreementField) {
+    return (
+      <div
+        key={field.id}
+        className="rounded-inner-card border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-3"
+      >
+        {editingFieldId === field.id ? (
+          /* Edit mode */
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                  Question
+                </label>
+                <Input
+                  value={field.label}
+                  onChange={(e) => {
+                    const label = e.target.value;
+                    const updates: Partial<AgreementField> = { label };
+                    if (!field.key || field.key === labelToKey(field.label)) {
+                      updates.key = labelToKey(label);
+                    }
+                    updateField(field.id, updates);
+                  }}
+                  placeholder="e.g. Will alcohol be served?"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                  Type
+                </label>
+                <Select
+                  value={field.type}
+                  onValueChange={(v) =>
+                    updateField(field.id, { type: v as AgreementFieldType })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FIELD_TYPE_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                  Variable key
+                </label>
+                <div className="flex items-center gap-1">
+                  <span className="text-meta text-text-muted-light dark:text-text-muted-dark">{'{{'}</span>
+                  <Input
+                    value={field.key}
+                    onChange={(e) =>
+                      updateField(field.id, {
+                        key: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''),
+                      })
+                    }
+                    placeholder="variable_name"
+                    className="font-mono text-body"
+                  />
+                  <span className="text-meta text-text-muted-light dark:text-text-muted-dark">{'}}'}</span>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                  When filled
+                </label>
+                <Select
+                  value={field.fill_phase ?? 'reservation'}
+                  onValueChange={(v) =>
+                    updateField(field.id, { fill_phase: v as AgreementFieldPhase })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="reservation">During reservation (member)</SelectItem>
+                    <SelectItem value="post_event">After event (board)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex items-end gap-3 pb-1">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Switch
+                  checked={field.required}
+                  onCheckedChange={(v) =>
+                    updateField(field.id, { required: v })
+                  }
+                />
+                <span className="text-body text-text-secondary-light dark:text-text-secondary-dark">
+                  Required
+                </span>
+              </label>
+            </div>
+            {field.type === 'select' && (
+              <div className="space-y-1">
+                <label className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                  Options (comma-separated)
+                </label>
+                <Input
+                  value={field.options?.join(', ') ?? ''}
+                  onChange={(e) =>
+                    updateField(field.id, {
+                      options: e.target.value
+                        .split(',')
+                        .map((s) => s.trim())
+                        .filter(Boolean),
+                    })
+                  }
+                  placeholder="Option 1, Option 2, Option 3"
+                />
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => removeField(field.id)}
+                className="text-red-500 hover:text-red-600"
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-1" />
+                Remove
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setEditingFieldId(null)}
+              >
+                Done
+              </Button>
+            </div>
+          </div>
+        ) : (
+          /* Display mode */
+          <div
+            className="flex items-center gap-3 cursor-pointer"
+            onClick={() => setEditingFieldId(field.id)}
+          >
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-body text-text-primary-light dark:text-text-primary-dark truncate">
+                  {field.label || 'Untitled question'}
+                </span>
+                <Badge variant="outline" className="text-[10px] shrink-0">
+                  {FIELD_TYPE_BADGE[field.type]}
+                </Badge>
+                {field.required && (
+                  <span className="text-red-500 text-meta">*</span>
+                )}
+              </div>
+              <span className="text-meta text-text-muted-light dark:text-text-muted-dark font-mono">
+                {`{{${field.key || '...'}}}`}
+              </span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                removeField(field.id);
+              }}
+              className="shrink-0 text-text-muted-light dark:text-text-muted-dark hover:text-red-500"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -566,7 +750,7 @@ export function AgreementWizardDialog({
               </div>
             </div>
 
-            {/* Custom Questions */}
+            {/* Custom Questions - grouped by phase */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <h3 className="text-label text-text-primary-light dark:text-text-primary-dark">
@@ -578,8 +762,7 @@ export function AgreementWizardDialog({
                 </Button>
               </div>
               <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                Questions filled during reservation by the member, or after the event by the board.
-                System fields (name, dates, amounts) are filled automatically.
+                Click a question to edit it, or use the trash icon to remove it.
               </p>
 
               {fields.length === 0 ? (
@@ -589,189 +772,31 @@ export function AgreementWizardDialog({
                   </p>
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {fields.map((field) => (
-                    <div
-                      key={field.id}
-                      className="rounded-inner-card border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-3"
-                    >
-                      {editingFieldId === field.id ? (
-                        /* Edit mode */
-                        <div className="space-y-3">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div className="space-y-1">
-                              <label className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                                Question
-                              </label>
-                              <Input
-                                value={field.label}
-                                onChange={(e) => {
-                                  const label = e.target.value;
-                                  const updates: Partial<AgreementField> = { label };
-                                  if (!field.key || field.key === labelToKey(field.label)) {
-                                    updates.key = labelToKey(label);
-                                  }
-                                  updateField(field.id, updates);
-                                }}
-                                placeholder="e.g. Will alcohol be served?"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                                Type
-                              </label>
-                              <Select
-                                value={field.type}
-                                onValueChange={(v) =>
-                                  updateField(field.id, { type: v as AgreementFieldType })
-                                }
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {FIELD_TYPE_OPTIONS.map((opt) => (
-                                    <SelectItem key={opt.value} value={opt.value}>
-                                      {opt.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
+                <div className="space-y-4">
+                  {/* Reservation fields */}
+                  {(() => {
+                    const { reservationFields, postEventFields } = partitionFieldsByPhase(fields);
+                    return (
+                      <>
+                        {reservationFields.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-meta font-medium text-text-secondary-light dark:text-text-secondary-dark">
+                              During Reservation ({reservationFields.length})
+                            </p>
+                            {reservationFields.map((field) => renderFieldRow(field))}
                           </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div className="space-y-1">
-                              <label className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                                Variable key
-                              </label>
-                              <div className="flex items-center gap-1">
-                                <span className="text-meta text-text-muted-light dark:text-text-muted-dark">{'{{'}</span>
-                                <Input
-                                  value={field.key}
-                                  onChange={(e) =>
-                                    updateField(field.id, {
-                                      key: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''),
-                                    })
-                                  }
-                                  placeholder="variable_name"
-                                  className="font-mono text-body"
-                                />
-                                <span className="text-meta text-text-muted-light dark:text-text-muted-dark">{'}}'}</span>
-                              </div>
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                                When filled
-                              </label>
-                              <Select
-                                value={field.fill_phase ?? 'reservation'}
-                                onValueChange={(v) =>
-                                  updateField(field.id, { fill_phase: v as AgreementFieldPhase })
-                                }
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="reservation">During reservation (member)</SelectItem>
-                                  <SelectItem value="post_event">After event (board)</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
+                        )}
+                        {postEventFields.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-meta font-medium text-amber-600 dark:text-amber-400">
+                              Post-Event Inspection ({postEventFields.length})
+                            </p>
+                            {postEventFields.map((field) => renderFieldRow(field))}
                           </div>
-                          <div className="flex items-end gap-3 pb-1">
-                              <label className="flex items-center gap-2 cursor-pointer">
-                                <Switch
-                                  checked={field.required}
-                                  onCheckedChange={(v) =>
-                                    updateField(field.id, { required: v })
-                                  }
-                                />
-                                <span className="text-body text-text-secondary-light dark:text-text-secondary-dark">
-                                  Required
-                                </span>
-                              </label>
-                          </div>
-                          {field.type === 'select' && (
-                            <div className="space-y-1">
-                              <label className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                                Options (comma-separated)
-                              </label>
-                              <Input
-                                value={field.options?.join(', ') ?? ''}
-                                onChange={(e) =>
-                                  updateField(field.id, {
-                                    options: e.target.value
-                                      .split(',')
-                                      .map((s) => s.trim())
-                                      .filter(Boolean),
-                                  })
-                                }
-                                placeholder="Option 1, Option 2, Option 3"
-                              />
-                            </div>
-                          )}
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeField(field.id)}
-                              className="text-red-500 hover:text-red-600"
-                            >
-                              <Trash2 className="h-3.5 w-3.5 mr-1" />
-                              Remove
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => setEditingFieldId(null)}
-                            >
-                              Done
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        /* Display mode */
-                        <div
-                          className="flex items-center gap-3 cursor-pointer"
-                          onClick={() => setEditingFieldId(field.id)}
-                        >
-                          <GripVertical className="h-4 w-4 text-text-muted-light dark:text-text-muted-dark shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-body text-text-primary-light dark:text-text-primary-dark truncate">
-                                {field.label || 'Untitled question'}
-                              </span>
-                              <Badge variant="outline" className="text-[10px] shrink-0">
-                                {FIELD_TYPE_BADGE[field.type]}
-                              </Badge>
-                              {field.fill_phase === 'post_event' && (
-                                <Badge variant="outline" className="text-[10px] shrink-0 border-amber-400/50 text-amber-600 dark:text-amber-400">
-                                  Post-event
-                                </Badge>
-                              )}
-                              {field.required && (
-                                <span className="text-red-500 text-meta">*</span>
-                              )}
-                            </div>
-                            <span className="text-meta text-text-muted-light dark:text-text-muted-dark font-mono">
-                              {`{{${field.key || '...'}}}`}
-                            </span>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeField(field.id);
-                            }}
-                            className="shrink-0 text-text-muted-light dark:text-text-muted-dark hover:text-red-500"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               )}
             </div>

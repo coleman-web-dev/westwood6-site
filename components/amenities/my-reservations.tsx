@@ -531,18 +531,26 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
                 {r.fee_amount > 0 && (
                   <span className="ml-2 tabular-nums">
                     ${(r.fee_amount / 100).toFixed(2)}
-                    {r.is_manual && (r.fee_paid ? ' (paid)' : ' (unpaid)')}
+                    {r.fee_paid ? ' (paid)' : ' (unpaid)'}
                   </span>
                 )}
                 {r.deposit_amount > 0 && (
                   <span className="ml-2">
                     {r.deposit_paid
                       ? r.deposit_refunded
-                        ? r.deposit_return_method === 'wallet'
-                          ? '(security deposit → wallet)'
-                          : r.deposit_return_method === 'card'
-                            ? '(security deposit → refunded to card)'
-                            : '(security deposit refunded)'
+                        ? (() => {
+                            const refunded = r.deposit_refund_amount ?? r.deposit_amount;
+                            const retained = r.deposit_amount - refunded;
+                            const isPartial = retained > 0;
+                            const methodLabel = r.deposit_return_method === 'wallet' ? 'wallet' : r.deposit_return_method === 'card' ? 'card' : 'check';
+                            return isPartial
+                              ? `(deposit: $${(refunded / 100).toFixed(2)} → ${methodLabel}, $${(retained / 100).toFixed(2)} retained)`
+                              : r.deposit_return_method === 'wallet'
+                                ? '(security deposit → wallet)'
+                                : r.deposit_return_method === 'card'
+                                  ? '(security deposit → refunded to card)'
+                                  : '(security deposit refunded)';
+                          })()
                         : r.deposit_stripe_payment_intent
                           ? '(security deposit paid by card)'
                           : '(security deposit paid)'
@@ -604,14 +612,14 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
                 </Button>
               )}
 
-              {/* Fee paid management (board, manual reservations) */}
-              {isBoard && r.is_manual && r.fee_amount > 0 && !r.fee_paid && r.status !== 'cancelled' && (
+              {/* Fee paid management (board) */}
+              {isBoard && r.fee_amount > 0 && !r.fee_paid && r.status !== 'cancelled' && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handleFeePaid(r.id)}
                 >
-                  Mark Fee Paid
+                  Mark Rental Fee Paid
                 </Button>
               )}
 

@@ -7,11 +7,12 @@ import { createClient } from '@/lib/supabase/server';
  * POST /api/amenities/deposit-refund
  * Refunds a security deposit to the original credit card via Stripe.
  * Board-only action.
- * Body: { reservationId, communityId }
+ * Body: { reservationId, communityId, amount? }
+ * amount is optional, in cents. If omitted, full refund is issued.
  */
 export async function POST(req: NextRequest) {
   try {
-    const { reservationId, communityId } = await req.json();
+    const { reservationId, communityId, amount } = await req.json();
 
     if (!reservationId || !communityId) {
       return NextResponse.json(
@@ -90,13 +91,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Process Stripe refund
+    // Validate refund amount if provided
+    const refundAmount = amount ? Number(amount) : reservation.deposit_amount;
+    if (refundAmount <= 0 || refundAmount > reservation.deposit_amount) {
+      return NextResponse.json(
+        { error: `Refund amount must be between 1 and ${reservation.deposit_amount} cents.` },
+        { status: 400 }
+      );
+    }
+
+    // Process Stripe refund (partial or full)
     const stripe = getStripeClient();
 
     try {
-      await stripe.refunds.create({
+      const refundParams: { payment_intent: string; amount?: number } = {
         payment_intent: reservation.deposit_stripe_payment_intent,
-      });
+      };
+      // Only pass amount for partial refunds; omitting it refunds the full PI
+      if (refundAmount < reservation.deposit_amount) {
+        refundParams.amount = refundAmount;
+      }
+      await stripe.refunds.create(refundParams);
     } catch (refundError) {
       console.error('Stripe deposit refund error:', refundError);
       const message = refundError instanceof Error ? refundError.message : 'Stripe refund failed';
@@ -112,6 +127,7 @@ export async function POST(req: NextRequest) {
       .update({
         deposit_refunded: true,
         deposit_return_method: 'card',
+        deposit_refund_amount: refundAmount,
       })
       .eq('id', reservationId);
 
