@@ -35,13 +35,15 @@ interface AgreementWithJoins extends SignedAgreement {
 interface SignedAgreementViewerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  reservationId: string;
+  reservationId?: string;
+  agreementId?: string;
 }
 
 export function SignedAgreementViewer({
   open,
   onOpenChange,
   reservationId,
+  agreementId,
 }: SignedAgreementViewerProps) {
   const { community, isBoard } = useCommunity();
   const [agreement, setAgreement] = useState<AgreementWithJoins | null>(null);
@@ -51,10 +53,17 @@ export function SignedAgreementViewer({
   function loadAgreement() {
     setLoading(true);
     const supabase = createClient();
-    supabase
+    let query = supabase
       .from('signed_agreements')
-      .select('*, amenities(name, agreement_template, agreement_fields), reservations(start_datetime, end_datetime, purpose, guest_count, fee_amount, deposit_amount), units(unit_number)')
-      .eq('reservation_id', reservationId)
+      .select('*, amenities(name, agreement_template, agreement_fields), reservations(start_datetime, end_datetime, purpose, guest_count, fee_amount, deposit_amount), units(unit_number)');
+
+    if (agreementId) {
+      query = query.eq('id', agreementId);
+    } else if (reservationId) {
+      query = query.eq('reservation_id', reservationId);
+    }
+
+    query
       .single()
       .then(({ data }) => {
         setAgreement(data as AgreementWithJoins | null);
@@ -62,10 +71,12 @@ export function SignedAgreementViewer({
       });
   }
 
+  const lookupKey = agreementId ?? reservationId;
+
   useEffect(() => {
-    if (!open || !reservationId) return;
+    if (!open || !lookupKey) return;
     loadAgreement();
-  }, [open, reservationId]);
+  }, [open, lookupKey]);
 
   // Check if this agreement has post-event fields
   const hasPostEventFields = useMemo(() => {

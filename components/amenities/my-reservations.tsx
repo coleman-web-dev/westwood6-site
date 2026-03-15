@@ -9,6 +9,15 @@ import { Button } from '@/components/shared/ui/button';
 import { DepositReturnDialog } from '@/components/amenities/deposit-return-dialog';
 import { SignedAgreementViewer } from '@/components/amenities/signed-agreement-viewer';
 import { CompleteAgreementDialog } from '@/components/amenities/complete-agreement-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/shared/ui/dialog';
+import { Textarea } from '@/components/shared/ui/textarea';
 import { FileSignature, ClipboardCheck, CheckCircle2, XCircle, AlertTriangle, ExternalLink, Loader2, CreditCard } from 'lucide-react';
 import { toast } from 'sonner';
 import type { AgreementField, SignedAgreement, Reservation, ReservationStatus } from '@/lib/types/database';
@@ -47,6 +56,11 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
   }) | null>(null);
   const [loadingInspect, setLoadingInspect] = useState<string | null>(null);
   const [payingDepositId, setPayingDepositId] = useState<string | null>(null);
+  // Approval/denial dialog state
+  const [approvingReservation, setApprovingReservation] = useState<ReservationWithAmenity | null>(null);
+  const [denyingReservation, setDenyingReservation] = useState<ReservationWithAmenity | null>(null);
+  const [boardMessage, setBoardMessage] = useState('');
+  const [approvalSubmitting, setApprovalSubmitting] = useState(false);
 
   useEffect(() => {
     if (!unit && !isBoard) {
@@ -225,14 +239,22 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
     }
   }
 
-  async function handleApprove(reservation: ReservationWithAmenity) {
+  async function handleApproveConfirm() {
+    const reservation = approvingReservation;
+    if (!reservation) return;
+
+    setApprovalSubmitting(true);
     const supabase = createClient();
+    const updateData: Record<string, unknown> = { status: 'approved' as ReservationStatus };
+    if (boardMessage.trim()) updateData.board_note = boardMessage.trim();
+
     const { error } = await supabase
       .from('reservations')
-      .update({ status: 'approved' as ReservationStatus })
+      .update(updateData)
       .eq('id', reservation.id);
 
     if (error) {
+      setApprovalSubmitting(false);
       toast.error('Failed to approve reservation.');
       return;
     }
@@ -240,9 +262,12 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
     toast.success('Reservation approved.');
     setReservations((prev) =>
       prev.map((r) =>
-        r.id === reservation.id ? { ...r, status: 'approved' as ReservationStatus } : r
+        r.id === reservation.id ? { ...r, status: 'approved' as ReservationStatus, board_note: boardMessage.trim() || null } : r
       )
     );
+    setApprovingReservation(null);
+    setBoardMessage('');
+    setApprovalSubmitting(false);
 
     // Notify the member's household (only if unit assigned)
     if (reservation.unit_id) {
@@ -252,11 +277,15 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
         .eq('unit_id', reservation.unit_id)
         .eq('community_id', community.id);
 
+      const body = boardMessage.trim()
+        ? `Your reservation for ${reservation.amenities?.name ?? 'the amenity'} has been approved.\n\nMessage from the board: ${boardMessage.trim()}`
+        : `Your reservation for ${reservation.amenities?.name ?? 'the amenity'} has been approved.`;
+
       await supabase.rpc('create_member_notifications', {
         p_community_id: community.id,
         p_type: 'reservation_approved',
         p_title: `${reservation.amenities?.name ?? 'Amenity'} reservation approved`,
-        p_body: `Your reservation for ${reservation.amenities?.name ?? 'the amenity'} has been approved.`,
+        p_body: body,
         p_reference_id: reservation.id,
         p_reference_type: 'reservation',
         p_member_ids: (unitMembers ?? []).map((m) => m.id),
@@ -264,14 +293,22 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
     }
   }
 
-  async function handleDeny(reservation: ReservationWithAmenity) {
+  async function handleDenyConfirm() {
+    const reservation = denyingReservation;
+    if (!reservation) return;
+
+    setApprovalSubmitting(true);
     const supabase = createClient();
+    const updateData: Record<string, unknown> = { status: 'denied' as ReservationStatus };
+    if (boardMessage.trim()) updateData.board_note = boardMessage.trim();
+
     const { error } = await supabase
       .from('reservations')
-      .update({ status: 'denied' as ReservationStatus })
+      .update(updateData)
       .eq('id', reservation.id);
 
     if (error) {
+      setApprovalSubmitting(false);
       toast.error('Failed to deny reservation.');
       return;
     }
@@ -279,9 +316,12 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
     toast.success('Reservation denied.');
     setReservations((prev) =>
       prev.map((r) =>
-        r.id === reservation.id ? { ...r, status: 'denied' as ReservationStatus } : r
+        r.id === reservation.id ? { ...r, status: 'denied' as ReservationStatus, board_note: boardMessage.trim() || null } : r
       )
     );
+    setDenyingReservation(null);
+    setBoardMessage('');
+    setApprovalSubmitting(false);
 
     // Notify the member's household (only if unit assigned)
     if (reservation.unit_id) {
@@ -291,11 +331,15 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
         .eq('unit_id', reservation.unit_id)
         .eq('community_id', community.id);
 
+      const body = boardMessage.trim()
+        ? `Your reservation for ${reservation.amenities?.name ?? 'the amenity'} has been denied.\n\nMessage from the board: ${boardMessage.trim()}`
+        : `Your reservation for ${reservation.amenities?.name ?? 'the amenity'} has been denied.`;
+
       await supabase.rpc('create_member_notifications', {
         p_community_id: community.id,
         p_type: 'reservation_denied',
         p_title: `${reservation.amenities?.name ?? 'Amenity'} reservation denied`,
-        p_body: `Your reservation for ${reservation.amenities?.name ?? 'the amenity'} has been denied.`,
+        p_body: body,
         p_reference_id: reservation.id,
         p_reference_type: 'reservation',
         p_member_ids: (unitMembers ?? []).map((m) => m.id),
@@ -471,7 +515,7 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
                     variant="outline"
                     size="sm"
                     className="border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-950/40"
-                    onClick={() => handleApprove(r)}
+                    onClick={() => { setApprovingReservation(r); setBoardMessage(''); }}
                   >
                     <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
                     Approve
@@ -480,7 +524,7 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
                     variant="outline"
                     size="sm"
                     className="border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/40"
-                    onClick={() => handleDeny(r)}
+                    onClick={() => { setDenyingReservation(r); setBoardMessage(''); }}
                   >
                     <XCircle className="h-3.5 w-3.5 mr-1" />
                     Deny
@@ -624,6 +668,88 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
           onSuccess={handleDepositReturnSuccess}
         />
       )}
+
+      {/* Approval dialog */}
+      <Dialog
+        open={approvingReservation !== null}
+        onOpenChange={(open) => { if (!open) { setApprovingReservation(null); setBoardMessage(''); } }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Approve Reservation</DialogTitle>
+            <DialogDescription>
+              {approvingReservation?.amenities?.name ?? 'Amenity'} on{' '}
+              {approvingReservation ? format(new Date(approvingReservation.start_datetime), 'MMM d, yyyy') : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+              Message (optional)
+            </label>
+            <Textarea
+              placeholder="Add a note for the resident..."
+              value={boardMessage}
+              onChange={(e) => setBoardMessage(e.target.value)}
+              maxLength={500}
+              className="mt-1.5 resize-none"
+              rows={3}
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => { setApprovingReservation(null); setBoardMessage(''); }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleApproveConfirm}
+              disabled={approvalSubmitting}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              {approvalSubmitting ? 'Approving...' : 'Approve'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Denial dialog */}
+      <Dialog
+        open={denyingReservation !== null}
+        onOpenChange={(open) => { if (!open) { setDenyingReservation(null); setBoardMessage(''); } }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Deny Reservation</DialogTitle>
+            <DialogDescription>
+              {denyingReservation?.amenities?.name ?? 'Amenity'} on{' '}
+              {denyingReservation ? format(new Date(denyingReservation.start_datetime), 'MMM d, yyyy') : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+              Reason (optional)
+            </label>
+            <Textarea
+              placeholder="Explain why this reservation is being denied..."
+              value={boardMessage}
+              onChange={(e) => setBoardMessage(e.target.value)}
+              maxLength={500}
+              className="mt-1.5 resize-none"
+              rows={3}
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => { setDenyingReservation(null); setBoardMessage(''); }}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDenyConfirm}
+              disabled={approvalSubmitting}
+            >
+              {approvalSubmitting ? 'Denying...' : 'Deny'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

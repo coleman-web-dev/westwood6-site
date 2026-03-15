@@ -250,12 +250,13 @@ export interface Document {
   title: string;
   category: DocCategory;
   folder_id: string | null;
-  file_path: string;
+  file_path: string | null;
   file_size: number | null;
   is_public: boolean;
   visibility: DocVisibility;
   uploaded_by: string;
   vendor_document_id: string | null;
+  signed_agreement_id: string | null;
   created_at: string;
 }
 
@@ -387,6 +388,7 @@ export interface Reservation {
   fee_paid_at: string | null;
   payment_method: string | null;
   check_number: string | null;
+  board_note: string | null;
 }
 
 export interface Event {

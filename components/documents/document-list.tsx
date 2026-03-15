@@ -1,8 +1,9 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   FileText,
+  FileSignature,
   Download,
   Trash2,
   Globe,
@@ -30,6 +31,7 @@ import {
 import { toast } from 'sonner';
 import { DocumentViewerDialog } from '@/components/documents/document-viewer-dialog';
 import { MoveToFolderDialog } from '@/components/documents/move-to-folder-dialog';
+import { SignedAgreementViewer } from '@/components/amenities/signed-agreement-viewer';
 import type { Document, DocumentFolder, DocVisibility } from '@/lib/types/database';
 
 interface DocumentListProps {
@@ -38,6 +40,8 @@ interface DocumentListProps {
   onDeleted: () => void;
   folders?: DocumentFolder[];
   isDragEnabled?: boolean;
+  searchQuery?: string;
+  selectedFolderId?: string | null;
 }
 
 function formatFileSize(bytes: number | null): string {
@@ -105,6 +109,7 @@ function DraggableDocumentRow({
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isVendorSynced = !!doc.vendor_document_id;
+  const isAgreementDoc = !!doc.signed_agreement_id;
 
   function handleTitleClick(e: React.MouseEvent) {
     if (!isBoard || isVendorSynced) return;
@@ -159,7 +164,7 @@ function DraggableDocumentRow({
 
       {/* File icon */}
       <div className="shrink-0 text-text-muted-light dark:text-text-muted-dark">
-        <FileText className="h-5 w-5" />
+        {isAgreementDoc ? <FileSignature className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
       </div>
 
       {/* Title + meta */}
@@ -316,6 +321,8 @@ export function DocumentList({
   onDeleted,
   folders = [],
   isDragEnabled = false,
+  searchQuery = '',
+  selectedFolderId,
 }: DocumentListProps) {
   const { isBoard } = useCommunity();
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -324,8 +331,38 @@ export function DocumentList({
   const [movingDoc, setMovingDoc] = useState<Document | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
+  const [viewingAgreementId, setViewingAgreementId] = useState<string | null>(null);
 
   const folderMap = new Map(folders.map((f) => [f.id, f.name]));
+
+  // Search filtering and sorting
+  const displayDocuments = useMemo(() => {
+    if (!searchQuery.trim()) return documents;
+
+    const q = searchQuery.toLowerCase();
+    const matched = documents.filter((d) =>
+      d.title.toLowerCase().includes(q)
+    );
+
+    // Sort: current folder matches first, then by title relevance
+    if (selectedFolderId) {
+      const children = folders.filter((f) => f.parent_id === selectedFolderId);
+      const folderIds = new Set([selectedFolderId, ...children.map((c) => c.id)]);
+
+      return matched.sort((a, b) => {
+        const aInFolder = a.folder_id ? folderIds.has(a.folder_id) : false;
+        const bInFolder = b.folder_id ? folderIds.has(b.folder_id) : false;
+        if (aInFolder && !bInFolder) return -1;
+        if (!aInFolder && bInFolder) return 1;
+        // Within same group, sort by title match position
+        const aIdx = a.title.toLowerCase().indexOf(q);
+        const bIdx = b.title.toLowerCase().indexOf(q);
+        return aIdx - bIdx;
+      });
+    }
+
+    return matched;
+  }, [documents, searchQuery, selectedFolderId, folders]);
 
   async function handleVisibilityChange(doc: Document, newVisibility: DocVisibility) {
     const supabase = createClient();
@@ -376,6 +413,7 @@ export function DocumentList({
   }
 
   async function handleDownload(doc: Document) {
+    if (!doc.file_path) return; // e-signed agreements have no file
     setDownloadingId(doc.id);
     const supabase = createClient();
 
@@ -402,14 +440,17 @@ export function DocumentList({
     setDeletingId(doc.id);
     const supabase = createClient();
 
-    const { error: storageError } = await supabase.storage
-      .from('hoa-documents')
-      .remove([doc.file_path]);
+    // Only delete from storage if there's a physical file
+    if (doc.file_path) {
+      const { error: storageError } = await supabase.storage
+        .from('hoa-documents')
+        .remove([doc.file_path]);
 
-    if (storageError) {
-      setDeletingId(null);
-      toast.error('Failed to delete the file. Please try again.');
-      return;
+      if (storageError) {
+        setDeletingId(null);
+        toast.error('Failed to delete the file. Please try again.');
+        return;
+      }
     }
 
     const { error: dbError } = await supabase
@@ -448,24 +489,34 @@ export function DocumentList({
     );
   }
 
-  if (documents.length === 0) {
+  if (displayDocuments.length === 0) {
     return (
       <p className="text-body text-text-muted-light dark:text-text-muted-dark">
-        No documents in this folder.
+        {searchQuery ? 'No documents match your search.' : 'No documents in this folder.'}
       </p>
     );
+  }
+
+  function handleView(doc: Document) {
+    if (doc.signed_agreement_id) {
+      // E-signed agreement: look up reservation_id via the signed_agreement_id
+      // For simplicity, open the agreement viewer using a query
+      setViewingAgreementId(doc.signed_agreement_id);
+    } else {
+      setViewingDoc(doc);
+    }
   }
 
   return (
     <>
       <div className="space-y-3">
-        {documents.map((doc) => (
+        {displayDocuments.map((doc) => (
           <DraggableDocumentRow
             key={doc.id}
             doc={doc}
             folderName={doc.folder_id ? (folderMap.get(doc.folder_id) ?? null) : null}
-            isDragEnabled={isDragEnabled}
-            onView={() => setViewingDoc(doc)}
+            isDragEnabled={isDragEnabled && !searchQuery}
+            onView={() => handleView(doc)}
             onDownload={() => handleDownload(doc)}
             onDelete={() => handleDelete(doc)}
             onVisibilityChange={(v) => handleVisibilityChange(doc, v)}
@@ -492,6 +543,14 @@ export function DocumentList({
           open={!!viewingDoc}
           onOpenChange={(isOpen) => { if (!isOpen) setViewingDoc(null); }}
           document={viewingDoc}
+        />
+      )}
+
+      {viewingAgreementId && (
+        <SignedAgreementViewer
+          open={!!viewingAgreementId}
+          onOpenChange={(isOpen) => { if (!isOpen) setViewingAgreementId(null); }}
+          agreementId={viewingAgreementId}
         />
       )}
 

@@ -61,7 +61,7 @@ interface ManualReservationDialogProps {
 
 /**
  * Sync an uploaded paper agreement to the Documents section,
- * creating an "Amenity Agreements" root folder and amenity subfolder.
+ * creating an "Agreements" root folder and amenity subfolder.
  */
 async function syncAgreementDocToFolder(opts: {
   communityId: string;
@@ -73,14 +73,14 @@ async function syncAgreementDocToFolder(opts: {
 }) {
   const supabase = createClient();
 
-  // 1. Find or create "Amenity Agreements" root folder
+  // 1. Find or create "Agreements" root folder
   let rootId: string | null = null;
   {
     const { data } = await supabase
       .from('document_folders')
       .select('id')
       .eq('community_id', opts.communityId)
-      .eq('name', 'Amenity Agreements')
+      .eq('name', 'Agreements')
       .is('parent_id', null)
       .single();
 
@@ -91,7 +91,7 @@ async function syncAgreementDocToFolder(opts: {
         .from('document_folders')
         .insert({
           community_id: opts.communityId,
-          name: 'Amenity Agreements',
+          name: 'Agreements',
           parent_id: null,
           sort_order: 5,
           created_by: opts.memberId,

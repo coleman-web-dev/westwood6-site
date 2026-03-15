@@ -37,7 +37,7 @@ export function DocumentViewerDialog({ open, onOpenChange, document: doc }: Docu
   const [textContent, setTextContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const viewerType = getViewerType(doc.file_path);
+  const viewerType = doc.file_path ? getViewerType(doc.file_path) : 'unsupported';
 
   useEffect(() => {
     if (!open) {
@@ -51,6 +51,12 @@ export function DocumentViewerDialog({ open, onOpenChange, document: doc }: Docu
       return;
     }
 
+    if (!doc.file_path) {
+      setError('This document has no associated file.');
+      setLoading(false);
+      return;
+    }
+
     async function load() {
       setLoading(true);
       setError(null);
@@ -58,7 +64,7 @@ export function DocumentViewerDialog({ open, onOpenChange, document: doc }: Docu
       const supabase = createClient();
       const { data, error: urlError } = await supabase.storage
         .from('hoa-documents')
-        .createSignedUrl(doc.file_path, 3600);
+        .createSignedUrl(doc.file_path!, 3600);
 
       if (urlError || !data?.signedUrl) {
         setError('Failed to load document.');

@@ -56,6 +56,96 @@ import {
 } from '@/lib/utils/agreement-template';
 import { formatAgreementHtml } from '@/lib/utils/format-agreement';
 import type { Amenity, Member, Unit } from '@/lib/types/database';
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+// Sync e-signed agreement to Documents > Agreements > {amenity name}
+async function syncESignedAgreementToFolder(opts: {
+  supabase: SupabaseClient;
+  communityId: string;
+  memberId: string;
+  amenityName: string;
+  signerName: string;
+  reservationDate: string;
+  signedAgreementId: string;
+}) {
+  const { supabase } = opts;
+
+  // 1. Find or create "Agreements" root folder
+  let rootId: string | null = null;
+  {
+    const { data } = await supabase
+      .from('document_folders')
+      .select('id')
+      .eq('community_id', opts.communityId)
+      .eq('name', 'Agreements')
+      .is('parent_id', null)
+      .single();
+
+    if (data) {
+      rootId = data.id;
+    } else {
+      const { data: created } = await supabase
+        .from('document_folders')
+        .insert({
+          community_id: opts.communityId,
+          name: 'Agreements',
+          parent_id: null,
+          sort_order: 6,
+          created_by: opts.memberId,
+        })
+        .select('id')
+        .single();
+      rootId = created?.id ?? null;
+    }
+  }
+
+  if (!rootId) return;
+
+  // 2. Find or create amenity subfolder
+  let subfolderId: string | null = null;
+  {
+    const { data } = await supabase
+      .from('document_folders')
+      .select('id')
+      .eq('community_id', opts.communityId)
+      .eq('parent_id', rootId)
+      .eq('name', opts.amenityName)
+      .single();
+
+    if (data) {
+      subfolderId = data.id;
+    } else {
+      const { data: created } = await supabase
+        .from('document_folders')
+        .insert({
+          community_id: opts.communityId,
+          name: opts.amenityName,
+          parent_id: rootId,
+          sort_order: 0,
+          created_by: opts.memberId,
+        })
+        .select('id')
+        .single();
+      subfolderId = created?.id ?? null;
+    }
+  }
+
+  if (!subfolderId) return;
+
+  // 3. Insert document row linked to the signed agreement (no file_path)
+  await supabase.from('documents').insert({
+    community_id: opts.communityId,
+    title: `${opts.amenityName} Agreement - ${opts.signerName} - ${opts.reservationDate}`,
+    category: 'other',
+    folder_id: subfolderId,
+    file_path: null,
+    file_size: null,
+    visibility: 'private',
+    is_public: false,
+    uploaded_by: opts.memberId,
+    signed_agreement_id: opts.signedAgreementId,
+  });
+}
 
 interface ReservationDialogProps {
   amenity: Amenity;
@@ -316,7 +406,7 @@ export function ReservationDialog({
 
     // Insert signed agreement if applicable
     if (hasAgreement && reservationData) {
-      const { error: agreementError } = await supabase
+      const { data: agreementData, error: agreementError } = await supabase
         .from('signed_agreements')
         .insert({
           reservation_id: reservationData.id,
@@ -328,7 +418,9 @@ export function ReservationDialog({
           filled_text: filledAgreement,
           field_answers: fieldAnswers,
           signed_at: new Date().toISOString(),
-        });
+        })
+        .select('id')
+        .single();
 
       if (agreementError) {
         console.error('Agreement insert error:', agreementError);
@@ -348,6 +440,19 @@ export function ReservationDialog({
           p_reference_id: reservationData.id,
           p_reference_type: 'reservation',
         });
+
+        // Sync e-signed agreement to Documents > Agreements > {amenity name}
+        if (agreementData) {
+          syncESignedAgreementToFolder({
+            supabase,
+            communityId: community.id,
+            memberId: reserveMemberId,
+            amenityName: amenity.name,
+            signerName: signatureName.trim(),
+            reservationDate: format(startDate, 'MMM d, yyyy'),
+            signedAgreementId: agreementData.id,
+          }).catch((err) => console.error('Failed to sync agreement to documents:', err));
+        }
       }
     }
 
