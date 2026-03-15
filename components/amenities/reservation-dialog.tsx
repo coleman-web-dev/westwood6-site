@@ -55,6 +55,7 @@ import {
   partitionFieldsByPhase,
 } from '@/lib/utils/agreement-template';
 import { formatAgreementHtml } from '@/lib/utils/format-agreement';
+import { generateAgreementPdf, agreementPdfFilename } from '@/lib/utils/generate-agreement-pdf';
 import type { Amenity, Member, Unit } from '@/lib/types/database';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -67,6 +68,10 @@ async function syncESignedAgreementToFolder(opts: {
   signerName: string;
   reservationDate: string;
   signedAgreementId: string;
+  communityName: string;
+  communityAddress: string;
+  filledText: string;
+  signedAt: string;
 }) {
   const { supabase } = opts;
 
@@ -132,14 +137,47 @@ async function syncESignedAgreementToFolder(opts: {
 
   if (!subfolderId) return;
 
-  // 3. Insert document row linked to the signed agreement (no file_path)
+  // 3. Generate PDF and upload to Storage
+  let filePath: string | null = null;
+  let fileSize: number | null = null;
+  try {
+    const pdfBlob = generateAgreementPdf({
+      communityName: opts.communityName,
+      communityAddress: opts.communityAddress,
+      amenityName: opts.amenityName,
+      filledText: opts.filledText,
+      signerName: opts.signerName,
+      signedAt: opts.signedAt,
+    });
+
+    const filename = agreementPdfFilename({
+      amenityName: opts.amenityName,
+      signerName: opts.signerName,
+    });
+    filePath = `${opts.communityId}/agreements/${Date.now()}_${filename}`;
+    fileSize = pdfBlob.size;
+
+    const { error: uploadError } = await supabase.storage
+      .from('hoa-documents')
+      .upload(filePath, pdfBlob, { contentType: 'application/pdf' });
+
+    if (uploadError) {
+      console.error('Agreement PDF upload failed:', uploadError);
+      filePath = null;
+      fileSize = null;
+    }
+  } catch (err) {
+    console.error('Agreement PDF generation failed:', err);
+  }
+
+  // 4. Insert document row (with file_path if PDF was generated, null otherwise)
   await supabase.from('documents').insert({
     community_id: opts.communityId,
     title: `${opts.amenityName} Agreement - ${opts.signerName} - ${opts.reservationDate}`,
     category: 'other',
     folder_id: subfolderId,
-    file_path: null,
-    file_size: null,
+    file_path: filePath,
+    file_size: fileSize,
     visibility: 'private',
     is_public: false,
     uploaded_by: opts.memberId,
@@ -451,6 +489,10 @@ export function ReservationDialog({
             signerName: signatureName.trim(),
             reservationDate: format(startDate, 'MMM d, yyyy'),
             signedAgreementId: agreementData.id,
+            communityName: community.name,
+            communityAddress: community.address ?? '',
+            filledText: filledAgreement,
+            signedAt: format(new Date(), 'MMMM d, yyyy'),
           }).catch((err) => console.error('Failed to sync agreement to documents:', err));
         }
       }

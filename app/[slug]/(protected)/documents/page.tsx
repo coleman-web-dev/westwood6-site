@@ -5,13 +5,14 @@ import { Plus, FolderPlus, Loader2, X, Search } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
+  rectIntersection,
   PointerSensor,
   KeyboardSensor,
   useSensor,
   useSensors,
   DragOverlay,
 } from '@dnd-kit/core';
-import type { DragStartEvent, DragEndEvent } from '@dnd-kit/core';
+import type { CollisionDetection, DragStartEvent, DragEndEvent } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
@@ -22,7 +23,16 @@ import { UploadDocumentDialog } from '@/components/documents/upload-document-dia
 import { FolderSidebar } from '@/components/documents/folder-sidebar';
 import { DroppableTab } from '@/components/documents/droppable-tab';
 import { toast } from 'sonner';
+import { logAuditEvent } from '@/lib/audit';
 import type { Document, DocumentFolder } from '@/lib/types/database';
+
+// Use rectIntersection for doc→folder drops (prevents accidental moves),
+// closestCenter for folder reordering (needs proximity-based detection).
+const customCollision: CollisionDetection = (args) => {
+  const activeId = String(args.active.id);
+  if (activeId.startsWith('doc-')) return rectIntersection(args);
+  return closestCenter(args);
+};
 
 export default function DocumentsPage() {
   const { community, member, isBoard, canRead, canWrite } = useCommunity();
@@ -187,6 +197,8 @@ export default function DocumentsPage() {
       const doc = documents.find((d) => d.id === docId);
       if (!doc || doc.folder_id === folderId) return;
 
+      const previousFolderId = doc.folder_id;
+
       // Optimistic update
       setDocuments((prev) =>
         prev.map((d) => (d.id === docId ? { ...d, folder_id: folderId } : d))
@@ -202,7 +214,38 @@ export default function DocumentsPage() {
         toast.error('Failed to move document.');
         fetchDocuments();
       } else {
-        toast.success('Document moved.');
+        const destFolder = folders.find((f) => f.id === folderId);
+        const prevFolder = previousFolderId ? folders.find((f) => f.id === previousFolderId) : null;
+        logAuditEvent({
+          communityId: community.id,
+          actorId: member?.user_id,
+          actorEmail: member?.email,
+          action: 'document_moved',
+          targetType: 'document',
+          targetId: docId,
+          metadata: { title: doc.title, from_folder: prevFolder?.name ?? 'none', to_folder: destFolder?.name ?? 'unknown' },
+        });
+        toast.success(`Moved to ${destFolder?.name ?? 'folder'}.`, {
+          duration: 10000,
+          action: {
+            label: 'Undo',
+            onClick: async () => {
+              setDocuments((prev) =>
+                prev.map((d) => (d.id === docId ? { ...d, folder_id: previousFolderId } : d))
+              );
+              const { error: undoError } = await supabase
+                .from('documents')
+                .update({ folder_id: previousFolderId })
+                .eq('id', docId);
+              if (undoError) {
+                toast.error('Failed to undo move.');
+                fetchDocuments();
+              } else {
+                toast.success('Move undone.');
+              }
+            },
+          },
+        });
       }
       return;
     }
@@ -289,7 +332,7 @@ export default function DocumentsPage() {
 
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={customCollision}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >

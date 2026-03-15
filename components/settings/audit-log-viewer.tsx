@@ -53,6 +53,7 @@ const ACTION_LABELS: Record<string, string> = {
   deposit_marked_paid: 'Deposit marked paid',
   deposit_returned: 'Deposit returned',
   fee_marked_paid: 'Fee marked paid',
+  agreement_inspection_completed: 'Agreement inspection completed',
 
   // Voting
   ballot_created: 'Ballot created',

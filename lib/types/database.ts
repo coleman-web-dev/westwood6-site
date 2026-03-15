@@ -258,6 +258,7 @@ export interface Document {
   vendor_document_id: string | null;
   signed_agreement_id: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 export interface MaintenanceRequest {

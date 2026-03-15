@@ -27,6 +27,7 @@ import { ScrollArea } from '@/components/shared/ui/scroll-area';
 import { ClipboardCheck, Loader2, ChevronDown, FileSignature } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { logAuditEvent } from '@/lib/audit';
 import {
   buildSystemContext,
   fillAgreementTemplateHtml,
@@ -34,6 +35,7 @@ import {
   partitionFieldsByPhase,
 } from '@/lib/utils/agreement-template';
 import { formatAgreementHtml, formatAgreementPlainText } from '@/lib/utils/format-agreement';
+import { generateAgreementPdf, agreementPdfFilename } from '@/lib/utils/generate-agreement-pdf';
 import type { AgreementField, SignedAgreement, Reservation } from '@/lib/types/database';
 
 interface CompleteAgreementDialogProps {
@@ -160,6 +162,52 @@ export function CompleteAgreementDialog({
       setSubmitting(false);
       return;
     }
+
+    // Regenerate PDF with all fields filled (replaces pre-event version)
+    try {
+      const amenityName = agreement.amenities?.name ?? 'Unknown';
+      const pdfBlob = generateAgreementPdf({
+        communityName: community.name,
+        communityAddress: community.address ?? '',
+        amenityName,
+        filledText: updatedFilledText,
+        signerName: agreement.signer_name,
+        signedAt: format(new Date(agreement.signed_at), 'MMMM d, yyyy'),
+      });
+
+      const filename = agreementPdfFilename({ amenityName, signerName: agreement.signer_name });
+      const filePath = `${community.id}/agreements/${Date.now()}_${filename}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('hoa-documents')
+        .upload(filePath, pdfBlob, { contentType: 'application/pdf' });
+
+      if (!uploadError) {
+        // Update the document row with the new PDF path
+        await supabase
+          .from('documents')
+          .update({ file_path: filePath, file_size: pdfBlob.size })
+          .eq('signed_agreement_id', agreement.id);
+      }
+    } catch (err) {
+      console.error('Failed to regenerate agreement PDF:', err);
+      // Non-critical: inspection is still saved
+    }
+
+    // Audit log
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member.user_id,
+      actorEmail: member.email,
+      action: 'agreement_inspection_completed',
+      targetType: 'signed_agreement',
+      targetId: agreement.id,
+      metadata: {
+        amenity: agreement.amenities?.name,
+        signer: agreement.signer_name,
+        reservation_id: agreement.reservation_id,
+      },
+    });
 
     // Notify the unit's household about inspection completion
     const { data: unitMembers } = await supabase
