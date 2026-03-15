@@ -14,6 +14,8 @@ interface SignedAgreementRow {
   signer_name: string;
   signed_at: string;
   post_event_completed: boolean;
+  is_paper: boolean;
+  paper_agreement_path: string | null;
   amenities: { name: string };
   reservations: { start_datetime: string };
 }
@@ -27,13 +29,23 @@ export function SignedAgreementsSection({ unitId }: SignedAgreementsSectionProps
   const [loading, setLoading] = useState(true);
   const [viewingReservationId, setViewingReservationId] = useState<string | null>(null);
 
+  async function handleViewPaperAgreement(path: string) {
+    const supabase = createClient();
+    const { data } = await supabase.storage
+      .from('hoa-documents')
+      .createSignedUrl(path, 300);
+    if (data?.signedUrl) {
+      window.open(data.signedUrl, '_blank');
+    }
+  }
+
   useEffect(() => {
     const supabase = createClient();
 
     async function fetchAgreements() {
       const { data } = await supabase
         .from('signed_agreements')
-        .select('id, reservation_id, signer_name, signed_at, post_event_completed, amenities(name), reservations(start_datetime)')
+        .select('id, reservation_id, signer_name, signed_at, post_event_completed, is_paper, paper_agreement_path, amenities(name), reservations(start_datetime)')
         .eq('unit_id', unitId)
         .order('signed_at', { ascending: false })
         .limit(20);
@@ -76,6 +88,11 @@ export function SignedAgreementsSection({ unitId }: SignedAgreementsSectionProps
                 <span className="text-label text-text-primary-light dark:text-text-primary-dark truncate">
                   {a.amenities?.name ?? 'Agreement'}
                 </span>
+                {a.is_paper && (
+                  <Badge variant="outline" className="text-[10px] border-blue-400/50 text-blue-600 dark:text-blue-400 shrink-0">
+                    Paper
+                  </Badge>
+                )}
                 {!a.post_event_completed && a.reservations?.start_datetime && new Date(a.reservations.start_datetime) < new Date() && (
                   <Badge variant="outline" className="text-[10px] border-amber-400/50 text-amber-600 dark:text-amber-400 shrink-0">
                     Pending inspection
@@ -91,14 +108,25 @@ export function SignedAgreementsSection({ unitId }: SignedAgreementsSectionProps
                 )}
               </p>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setViewingReservationId(a.reservation_id)}
-            >
-              <FileSignature className="h-4 w-4 mr-1" />
-              View
-            </Button>
+            {a.is_paper && a.paper_agreement_path ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleViewPaperAgreement(a.paper_agreement_path!)}
+              >
+                <FileSignature className="h-4 w-4 mr-1" />
+                View
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setViewingReservationId(a.reservation_id)}
+              >
+                <FileSignature className="h-4 w-4 mr-1" />
+                View
+              </Button>
+            )}
           </div>
         ))}
       </div>

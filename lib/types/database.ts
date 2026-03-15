@@ -359,8 +359,8 @@ export interface Reservation {
   id: string;
   amenity_id: string;
   community_id: string;
-  unit_id: string;
-  reserved_by: string;
+  unit_id: string | null;
+  reserved_by: string | null;
   start_datetime: string;
   end_datetime: string;
   status: ReservationStatus;
@@ -377,6 +377,16 @@ export interface Reservation {
   deposit_stripe_payment_intent: string | null;
   admin_notes: string | null;
   created_at: string;
+  // Manual reservation fields
+  is_manual: boolean;
+  manual_contact_name: string | null;
+  manual_contact_phone: string | null;
+  manual_contact_email: string | null;
+  created_by: string | null;
+  fee_paid: boolean;
+  fee_paid_at: string | null;
+  payment_method: string | null;
+  check_number: string | null;
 }
 
 export interface Event {
@@ -479,8 +489,8 @@ export interface SignedAgreement {
   reservation_id: string;
   amenity_id: string;
   community_id: string;
-  unit_id: string;
-  signer_member_id: string;
+  unit_id: string | null;
+  signer_member_id: string | null;
   signer_name: string;
   filled_text: string;
   field_answers: Record<string, string>;
@@ -491,6 +501,9 @@ export interface SignedAgreement {
   post_event_field_answers: Record<string, string> | null;
   post_event_completed_by: string | null;
   post_event_completed_at: string | null;
+  // Paper agreement fields
+  paper_agreement_path: string | null;
+  is_paper: boolean;
 }
 
 export type NotificationType =

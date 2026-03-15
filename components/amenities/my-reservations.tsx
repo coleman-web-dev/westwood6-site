@@ -20,9 +20,9 @@ interface MyReservationsProps {
 
 type ReservationWithAmenity = Reservation & {
   amenities: { name: string };
-  units: { unit_number: string };
+  units: { unit_number: string } | null;
   // PostgREST returns object (not array) due to UNIQUE(reservation_id) constraint
-  signed_agreements: { id: string; post_event_completed: boolean } | null;
+  signed_agreements: { id: string; post_event_completed: boolean; is_paper: boolean; paper_agreement_path: string | null } | null;
 };
 
 const STATUS_BADGE: Record<ReservationStatus, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
@@ -59,7 +59,7 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
     async function fetch() {
       let query = supabase
         .from('reservations')
-        .select('*, amenities(name), units(unit_number), signed_agreements(id, post_event_completed)')
+        .select('*, amenities(name), units(unit_number), signed_agreements(id, post_event_completed, is_paper, paper_agreement_path)')
         .order('start_datetime', { ascending: false })
         .limit(20);
 
@@ -94,8 +94,8 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
         // Fetch financial standing for pending reservations
         const pendingUnitIds = [...new Set(
           ((data as ReservationWithAmenity[]) ?? [])
-            .filter((r) => r.status === 'pending')
-            .map((r) => r.unit_id)
+            .filter((r) => r.status === 'pending' && r.unit_id)
+            .map((r) => r.unit_id as string)
         )];
 
         if (pendingUnitIds.length > 0) {
@@ -160,6 +160,39 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
     );
   }
 
+  async function handleFeePaid(reservationId: string) {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('reservations')
+      .update({ fee_paid: true, fee_paid_at: new Date().toISOString() })
+      .eq('id', reservationId);
+
+    if (error) {
+      toast.error('Failed to update fee status.');
+      return;
+    }
+
+    toast.success('Rental fee marked as paid.');
+    setReservations((prev) =>
+      prev.map((r) =>
+        r.id === reservationId ? { ...r, fee_paid: true, fee_paid_at: new Date().toISOString() } : r
+      )
+    );
+  }
+
+  async function handleViewPaperAgreement(filePath: string) {
+    const supabase = createClient();
+    const { data } = await supabase.storage
+      .from('hoa-documents')
+      .createSignedUrl(filePath, 60);
+
+    if (data?.signedUrl) {
+      window.open(data.signedUrl, '_blank');
+    } else {
+      toast.error('Failed to open agreement.');
+    }
+  }
+
   async function handlePayDeposit(reservation: ReservationWithAmenity) {
     setPayingDepositId(reservation.id);
 
@@ -211,22 +244,24 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
       )
     );
 
-    // Notify the member's household
-    const { data: unitMembers } = await supabase
-      .from('members')
-      .select('id')
-      .eq('unit_id', reservation.unit_id)
-      .eq('community_id', community.id);
+    // Notify the member's household (only if unit assigned)
+    if (reservation.unit_id) {
+      const { data: unitMembers } = await supabase
+        .from('members')
+        .select('id')
+        .eq('unit_id', reservation.unit_id)
+        .eq('community_id', community.id);
 
-    await supabase.rpc('create_member_notifications', {
-      p_community_id: community.id,
-      p_type: 'reservation_approved',
-      p_title: `${reservation.amenities?.name ?? 'Amenity'} reservation approved`,
-      p_body: `Your reservation for ${reservation.amenities?.name ?? 'the amenity'} has been approved.`,
-      p_reference_id: reservation.id,
-      p_reference_type: 'reservation',
-      p_member_ids: (unitMembers ?? []).map((m) => m.id),
-    }).catch(() => {});
+      await supabase.rpc('create_member_notifications', {
+        p_community_id: community.id,
+        p_type: 'reservation_approved',
+        p_title: `${reservation.amenities?.name ?? 'Amenity'} reservation approved`,
+        p_body: `Your reservation for ${reservation.amenities?.name ?? 'the amenity'} has been approved.`,
+        p_reference_id: reservation.id,
+        p_reference_type: 'reservation',
+        p_member_ids: (unitMembers ?? []).map((m) => m.id),
+      }).catch(() => {});
+    }
   }
 
   async function handleDeny(reservation: ReservationWithAmenity) {
@@ -248,22 +283,24 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
       )
     );
 
-    // Notify the member's household
-    const { data: unitMembers } = await supabase
-      .from('members')
-      .select('id')
-      .eq('unit_id', reservation.unit_id)
-      .eq('community_id', community.id);
+    // Notify the member's household (only if unit assigned)
+    if (reservation.unit_id) {
+      const { data: unitMembers } = await supabase
+        .from('members')
+        .select('id')
+        .eq('unit_id', reservation.unit_id)
+        .eq('community_id', community.id);
 
-    await supabase.rpc('create_member_notifications', {
-      p_community_id: community.id,
-      p_type: 'reservation_denied',
-      p_title: `${reservation.amenities?.name ?? 'Amenity'} reservation denied`,
-      p_body: `Your reservation for ${reservation.amenities?.name ?? 'the amenity'} has been denied.`,
-      p_reference_id: reservation.id,
-      p_reference_type: 'reservation',
-      p_member_ids: (unitMembers ?? []).map((m) => m.id),
-    }).catch(() => {});
+      await supabase.rpc('create_member_notifications', {
+        p_community_id: community.id,
+        p_type: 'reservation_denied',
+        p_title: `${reservation.amenities?.name ?? 'Amenity'} reservation denied`,
+        p_body: `Your reservation for ${reservation.amenities?.name ?? 'the amenity'} has been denied.`,
+        p_reference_id: reservation.id,
+        p_reference_type: 'reservation',
+        p_member_ids: (unitMembers ?? []).map((m) => m.id),
+      }).catch(() => {});
+    }
   }
 
   async function handleInspect(reservation: ReservationWithAmenity) {
@@ -289,7 +326,7 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
     const supabase = createClient();
     let query = supabase
       .from('reservations')
-      .select('*, amenities(name), units(unit_number), signed_agreements(id, post_event_completed)')
+      .select('*, amenities(name), units(unit_number), signed_agreements(id, post_event_completed, is_paper, paper_agreement_path)')
       .order('start_datetime', { ascending: false })
       .limit(20);
 
@@ -349,13 +386,32 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
                   </span>
                 )}
                 <Badge variant={badge.variant}>{badge.label}</Badge>
+                {r.is_manual && (
+                  <Badge variant="outline" className="text-[10px]">Manual</Badge>
+                )}
+                {r.is_manual && r.payment_method && (
+                  <Badge variant="outline" className="text-[10px]">
+                    {r.payment_method === 'check' && r.check_number
+                      ? `Check #${r.check_number}`
+                      : r.payment_method.charAt(0).toUpperCase() + r.payment_method.slice(1)}
+                  </Badge>
+                )}
               </div>
-              {isBoard && r.units && (
+              {isBoard && r.is_manual && (
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                    Unit {r.units.unit_number}{unitOwnerMap[r.unit_id] ? ` - ${unitOwnerMap[r.unit_id]}` : ''}
+                    {r.manual_contact_name}
+                    {r.manual_contact_phone ? ` · ${r.manual_contact_phone}` : ''}
+                    {r.units ? ` · Unit ${r.units.unit_number}` : ''}
                   </p>
-                  {r.status === 'pending' && unitStandingMap[r.unit_id] !== undefined && (
+                </div>
+              )}
+              {isBoard && !r.is_manual && r.units && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                    Unit {r.units.unit_number}{r.unit_id && unitOwnerMap[r.unit_id] ? ` - ${unitOwnerMap[r.unit_id]}` : ''}
+                  </p>
+                  {r.status === 'pending' && r.unit_id && unitStandingMap[r.unit_id] !== undefined && (
                     unitStandingMap[r.unit_id] ? (
                       <span className="inline-flex items-center gap-1 text-[10px] font-medium text-red-600 dark:text-red-400">
                         <AlertTriangle className="h-3 w-3" />
@@ -368,7 +424,7 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
                       </span>
                     )
                   )}
-                  {r.status === 'pending' && (
+                  {r.status === 'pending' && r.unit_id && (
                     <a
                       href={`/${community.slug}/household?unit=${r.unit_id}&back=amenities`}
                       className="inline-flex items-center gap-0.5 text-[10px] font-medium text-secondary-400 hover:text-secondary-400/80 transition-colors"
@@ -386,6 +442,7 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
                 {r.fee_amount > 0 && (
                   <span className="ml-2 tabular-nums">
                     ${(r.fee_amount / 100).toFixed(2)}
+                    {r.is_manual && (r.fee_paid ? ' (paid)' : ' (unpaid)')}
                   </span>
                 )}
                 {r.deposit_amount > 0 && (
@@ -458,6 +515,17 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
                 </Button>
               )}
 
+              {/* Fee paid management (board, manual reservations) */}
+              {isBoard && r.is_manual && r.fee_amount > 0 && !r.fee_paid && r.status !== 'cancelled' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleFeePaid(r.id)}
+                >
+                  Mark Fee Paid
+                </Button>
+              )}
+
               {/* Deposit management (board only) */}
               {isBoard && r.deposit_amount > 0 && !r.deposit_paid && r.status !== 'cancelled' && (
                 <Button
@@ -503,14 +571,25 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
                       </Button>
                     </>
                   )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setViewingAgreementId(r.id)}
-                  >
-                    <FileSignature className="h-4 w-4 mr-1" />
-                    Agreement
-                  </Button>
+                  {r.signed_agreements.is_paper && r.signed_agreements.paper_agreement_path ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleViewPaperAgreement(r.signed_agreements!.paper_agreement_path!)}
+                    >
+                      <FileSignature className="h-4 w-4 mr-1" />
+                      Paper Agreement
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setViewingAgreementId(r.id)}
+                    >
+                      <FileSignature className="h-4 w-4 mr-1" />
+                      Agreement
+                    </Button>
+                  )}
                 </>
               )}
             </div>
@@ -521,7 +600,7 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
       {/* Deposit return dialog */}
       <DepositReturnDialog
         reservation={returningReservation}
-        unitOwnerName={returningReservation ? unitOwnerMap[returningReservation.unit_id] ?? '' : ''}
+        unitOwnerName={returningReservation?.unit_id ? unitOwnerMap[returningReservation.unit_id] ?? '' : ''}
         open={returningReservation !== null}
         onOpenChange={(open) => { if (!open) setReturningReservation(null); }}
         onSuccess={handleDepositReturnSuccess}

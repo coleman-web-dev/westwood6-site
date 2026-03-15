@@ -18,7 +18,7 @@ import type { Reservation } from '@/lib/types/database';
 
 type ReservationWithDetails = Reservation & {
   amenities: { name: string };
-  units: { unit_number: string };
+  units: { unit_number: string } | null;
 };
 
 interface DepositReturnDialogProps {
@@ -188,7 +188,7 @@ export function DepositReturnDialog({
             <div className="flex justify-between text-body">
               <span className="text-text-secondary-light dark:text-text-secondary-dark">Unit</span>
               <span className="text-text-primary-light dark:text-text-primary-dark">
-                Unit {reservation.units.unit_number}
+                {reservation.units ? `Unit ${reservation.units.unit_number}` : 'Manual reservation'}
                 {unitOwnerName ? ` - ${unitOwnerName}` : ''}
               </span>
             </div>

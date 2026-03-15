@@ -5,10 +5,19 @@ import { useSearchParams } from 'next/navigation';
 import { startOfMonth, endOfMonth, addMonths, startOfDay, endOfDay } from 'date-fns';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
+import { format } from 'date-fns';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/shared/ui/dialog';
 import { AmenitySelector } from '@/components/amenities/amenity-selector';
 import { AmenityCalendar } from '@/components/amenities/amenity-calendar';
 import { TimeSlotPicker } from '@/components/amenities/time-slot-picker';
 import { ReservationDialog } from '@/components/amenities/reservation-dialog';
+import { ManualReservationDialog } from '@/components/amenities/manual-reservation-dialog';
 import { MyReservations } from '@/components/amenities/my-reservations';
 import { Button } from '@/components/shared/ui/button';
 import { toast } from 'sonner';
@@ -34,8 +43,11 @@ export default function AmenitiesPage() {
   const [blockedRanges, setBlockedRanges] = useState<BlockedDateRange[]>([]);
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [manualDialogOpen, setManualDialogOpen] = useState(false);
   const [bookingMode, setBookingMode] = useState<'full_day' | 'time_slot'>('full_day');
   const [refreshKey, setRefreshKey] = useState(0);
+  // Board: show choice menu for online vs manual reservation
+  const [choiceMenuOpen, setChoiceMenuOpen] = useState(false);
 
   // Fetch blocked dates for the visible month
   const fetchBlockedDates = useCallback(
@@ -72,7 +84,11 @@ export default function AmenitiesPage() {
 
     if (selectedAmenity?.booking_type === 'full_day') {
       setBookingMode('full_day');
-      setDialogOpen(true);
+      if (isBoard) {
+        setChoiceMenuOpen(true);
+      } else {
+        setDialogOpen(true);
+      }
     }
   }
 
@@ -80,7 +96,11 @@ export default function AmenitiesPage() {
   function handleSlotSelect(start: Date, end: Date) {
     setSelectedSlot({ start, end });
     setBookingMode('time_slot');
-    setDialogOpen(true);
+    if (isBoard) {
+      setChoiceMenuOpen(true);
+    } else {
+      setDialogOpen(true);
+    }
   }
 
   // Handle "Reserve Full Day" for 'both' booking type
@@ -88,7 +108,11 @@ export default function AmenitiesPage() {
     if (!selectedDate) return;
     setSelectedSlot(null);
     setBookingMode('full_day');
-    setDialogOpen(true);
+    if (isBoard) {
+      setChoiceMenuOpen(true);
+    } else {
+      setDialogOpen(true);
+    }
   }
 
   // Handle month navigation
@@ -240,6 +264,48 @@ export default function AmenitiesPage() {
         />
       </div>
 
+      {/* Board: Choice between online and manual reservation */}
+      {isBoard && selectedAmenity && (
+        <Dialog open={choiceMenuOpen} onOpenChange={setChoiceMenuOpen}>
+          <DialogContent className="sm:max-w-xs">
+            <DialogHeader>
+              <DialogTitle>Reservation Type</DialogTitle>
+              <DialogDescription>
+                {format(dialogStart, 'EEEE, MMMM d, yyyy')}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col gap-2 py-2">
+              <Button
+                variant="outline"
+                className="justify-start h-auto py-3 px-4"
+                onClick={() => {
+                  setChoiceMenuOpen(false);
+                  setDialogOpen(true);
+                }}
+              >
+                <div className="text-left">
+                  <p className="text-body font-medium text-text-primary-light dark:text-text-primary-dark">Online Reservation</p>
+                  <p className="text-meta text-text-muted-light dark:text-text-muted-dark">Member books with e-signature</p>
+                </div>
+              </Button>
+              <Button
+                variant="outline"
+                className="justify-start h-auto py-3 px-4"
+                onClick={() => {
+                  setChoiceMenuOpen(false);
+                  setManualDialogOpen(true);
+                }}
+              >
+                <div className="text-left">
+                  <p className="text-body font-medium text-text-primary-light dark:text-text-primary-dark">Block Date (Manual)</p>
+                  <p className="text-meta text-text-muted-light dark:text-text-muted-dark">Paper agreement, check/cash payment</p>
+                </div>
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {/* Reservation dialog */}
       {selectedAmenity && (
         <ReservationDialog
@@ -248,6 +314,19 @@ export default function AmenitiesPage() {
           endDate={dialogEnd}
           open={dialogOpen}
           onOpenChange={setDialogOpen}
+          onSuccess={handleReservationSuccess}
+          bookingMode={bookingMode}
+        />
+      )}
+
+      {/* Manual reservation dialog (board only) */}
+      {isBoard && selectedAmenity && (
+        <ManualReservationDialog
+          amenity={selectedAmenity}
+          startDate={dialogStart}
+          endDate={dialogEnd}
+          open={manualDialogOpen}
+          onOpenChange={setManualDialogOpen}
           onSuccess={handleReservationSuccess}
           bookingMode={bookingMode}
         />
