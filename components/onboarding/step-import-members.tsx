@@ -53,17 +53,22 @@ export function StepImportMembers({
     try {
       const supabase = createClient();
 
-      const rows = parsedMembers.map((m) => ({
-        community_id: community.id,
-        first_name: m.first_name,
-        last_name: m.last_name,
-        email: m.email || null,
-        unit_id: m.unit_number ? unitIds[m.unit_number] ?? null : null,
-        member_role: m.role,
-        system_role: 'resident' as const,
-        is_approved: true,
-        show_in_directory: true,
-      }));
+      const rows = parsedMembers.map((m) => {
+        const hasMailing = !!m.mailing_address;
+        return {
+          community_id: community.id,
+          first_name: m.first_name,
+          last_name: m.last_name,
+          email: m.email || null,
+          unit_id: m.unit_number ? unitIds[m.unit_number] ?? null : null,
+          member_role: m.role,
+          system_role: 'resident' as const,
+          is_approved: true,
+          show_in_directory: true,
+          use_unit_address: !hasMailing,
+          mailing_address_line1: hasMailing ? m.mailing_address : null,
+        };
+      });
 
       const { data: inserted, error } = await supabase
         .from('members')
@@ -99,6 +104,7 @@ export function StepImportMembers({
         <code className="text-meta">email</code>,{' '}
         <code className="text-meta">unit_number</code>,{' '}
         <code className="text-meta">role</code> (owner/member/tenant).
+        Optional: <code className="text-meta">mailing_address</code> (for absentee owners).
       </p>
 
       <CSVUpload

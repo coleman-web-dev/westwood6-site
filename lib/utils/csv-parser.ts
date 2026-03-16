@@ -11,6 +11,7 @@ export interface ParsedMember {
   email: string;
   unit_number: string;
   role: 'owner' | 'member' | 'tenant';
+  mailing_address: string;
 }
 
 export interface ParsedVendor {
@@ -148,12 +149,15 @@ export function parseMembersCSV(
       );
     }
 
+    const mailingAddress = (row.mailing_address ?? '').trim();
+
     data.push({
       first_name: firstName,
       last_name: lastName,
       email,
       unit_number: unitNumber,
       role,
+      mailing_address: mailingAddress,
     });
   }
 

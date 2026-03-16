@@ -180,6 +180,12 @@ export interface Member {
   show_in_directory: boolean;
   is_approved: boolean;
   stripe_customer_id?: string | null;
+  mailing_address_line1: string | null;
+  mailing_address_line2: string | null;
+  mailing_city: string | null;
+  mailing_state: string | null;
+  mailing_zip: string | null;
+  use_unit_address: boolean;
   created_at: string;
 }
 
