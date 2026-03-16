@@ -147,6 +147,11 @@ export interface Community {
     can_submit_requests: boolean;
     can_view_directory: boolean;
     can_report_violations: boolean;
+    violation_settings?: {
+      auto_escalation_enabled: boolean;
+      default_deadline_days: number;
+      escalation_notice_type: NoticeType;
+    };
   };
   created_at: string;
   archived_at: string | null;
@@ -327,6 +332,7 @@ export interface Invoice {
   assessment_id: string | null;
   amount_paid: number;
   late_fee_amount: number;
+  violation_id: string | null;
   created_at: string;
 }
 
@@ -769,6 +775,23 @@ export interface Violation {
   severity: ViolationSeverity;
   resolution_notes: string | null;
   resolved_at: string | null;
+  compliance_deadline: string | null;
+  auto_escalated_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ViolationTemplate {
+  id: string;
+  community_id: string;
+  name: string;
+  title: string;
+  description: string | null;
+  category: ViolationCategory;
+  severity: ViolationSeverity;
+  default_fine_amount: number | null;
+  default_deadline_days: number | null;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 }

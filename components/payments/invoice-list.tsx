@@ -525,6 +525,11 @@ export function InvoiceList({
                     <Badge variant={STATUS_BADGE_VARIANT[invoice.status]} className="text-meta shrink-0">
                       {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
                     </Badge>
+                    {invoice.violation_id && (
+                      <Badge variant="outline" className="text-[10px] shrink-0 text-red-600 dark:text-red-400 border-red-300 dark:border-red-700">
+                        Violation Fine
+                      </Badge>
+                    )}
                     {subscriptionActive && (invoice.status === 'pending' || invoice.status === 'overdue') && (
                       <span className="text-meta text-green-600 dark:text-green-400 flex items-center gap-1">
                         <CreditCard className="h-3 w-3" />

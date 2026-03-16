@@ -24,7 +24,7 @@ import { VendorsManager } from '@/components/settings/vendors-manager';
 
 import { StripeMigrationSection } from '@/components/settings/stripe-migration-section';
 import { InsuranceReminderSettings } from '@/components/settings/insurance-reminder-settings';
-import type { PaymentFrequency, BulletinSettings, LateFeeSettings, VotingConfig } from '@/lib/types/database';
+import type { PaymentFrequency, BulletinSettings, LateFeeSettings, VotingConfig, NoticeType } from '@/lib/types/database';
 import { VOTING_CONFIG_DEFAULTS } from '@/lib/types/database';
 
 export function CommunitySettings() {
@@ -55,6 +55,9 @@ export function CommunitySettings() {
   const [reminderDaysAfter, setReminderDaysAfter] = useState(7);
   const [arcEnabled, setArcEnabled] = useState(false);
   const [votingConfig, setVotingConfig] = useState<VotingConfig>(VOTING_CONFIG_DEFAULTS);
+  const [autoEscalationEnabled, setAutoEscalationEnabled] = useState(false);
+  const [defaultDeadlineDays, setDefaultDeadlineDays] = useState(14);
+  const [escalationNoticeType, setEscalationNoticeType] = useState<NoticeType>('final_notice');
   const [saving, setSaving] = useState(false);
 
   // Load current values from community context
@@ -87,6 +90,10 @@ export function CommunitySettings() {
       setArcEnabled(!!community.theme?.arc_enabled);
       const vc = community.theme?.voting_config as VotingConfig | undefined;
       setVotingConfig({ ...VOTING_CONFIG_DEFAULTS, ...vc });
+      const vs = community.tenant_permissions?.violation_settings;
+      setAutoEscalationEnabled(vs?.auto_escalation_enabled ?? false);
+      setDefaultDeadlineDays(vs?.default_deadline_days ?? 14);
+      setEscalationNoticeType(vs?.escalation_notice_type ?? 'final_notice');
     }
   }, [community]);
 
@@ -117,7 +124,10 @@ export function CommunitySettings() {
       reminderDaysBefore !== ((community.theme?.payment_settings?.reminder_days_before as number) ?? 7) ||
       reminderDaysAfter !== ((community.theme?.payment_settings?.reminder_days_after as number) ?? 7) ||
       arcEnabled !== (!!community.theme?.arc_enabled) ||
-      JSON.stringify(votingConfig) !== JSON.stringify({ ...VOTING_CONFIG_DEFAULTS, ...(community.theme?.voting_config as VotingConfig | undefined) })
+      JSON.stringify(votingConfig) !== JSON.stringify({ ...VOTING_CONFIG_DEFAULTS, ...(community.theme?.voting_config as VotingConfig | undefined) }) ||
+      autoEscalationEnabled !== (community.tenant_permissions?.violation_settings?.auto_escalation_enabled ?? false) ||
+      defaultDeadlineDays !== (community.tenant_permissions?.violation_settings?.default_deadline_days ?? 14) ||
+      escalationNoticeType !== (community.tenant_permissions?.violation_settings?.escalation_notice_type ?? 'final_notice')
     );
   }, [
     name, address, phone, email,
@@ -127,6 +137,7 @@ export function CommunitySettings() {
     lateFeesEnabled, gracePeriodDays, feeType, feeAmount, maxFee,
     autoGenerateInvoices, autoMarkOverdue, autoNotifyNewInvoices,
     reminderDaysBefore, reminderDaysAfter, arcEnabled, votingConfig,
+    autoEscalationEnabled, defaultDeadlineDays, escalationNoticeType,
     community,
   ]);
 
@@ -156,6 +167,11 @@ export function CommunitySettings() {
           can_submit_requests: canSubmitRequests,
           can_view_directory: canViewDirectory,
           can_report_violations: canReportViolations,
+          violation_settings: {
+            auto_escalation_enabled: autoEscalationEnabled,
+            default_deadline_days: defaultDeadlineDays,
+            escalation_notice_type: escalationNoticeType,
+          },
         },
         theme: {
           ...community.theme,
@@ -371,6 +387,75 @@ export function CommunitySettings() {
               onCheckedChange={setCanReportViolations}
             />
           </div>
+        </div>
+      </div>
+
+      {/* Violation Settings */}
+      <div className="bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark rounded-panel p-card-padding">
+        <h2 className="text-card-title text-text-primary-light dark:text-text-primary-dark mb-1">
+          Violation Settings
+        </h2>
+        <p className="text-meta text-text-muted-light dark:text-text-muted-dark mb-4">
+          Configure auto-escalation for violations past their compliance deadline.
+        </p>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-body text-text-primary-light dark:text-text-primary-dark">
+                Auto-escalation
+              </p>
+              <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                Automatically escalate violations past their compliance deadline
+              </p>
+            </div>
+            <Switch
+              checked={autoEscalationEnabled}
+              onCheckedChange={setAutoEscalationEnabled}
+            />
+          </div>
+
+          <Collapsible open={autoEscalationEnabled}>
+            <CollapsibleContent>
+              <div className="space-y-4 pt-2">
+                <div className="space-y-1.5">
+                  <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                    Default Deadline (days)
+                  </Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={defaultDeadlineDays}
+                    onChange={(e) => setDefaultDeadlineDays(parseInt(e.target.value, 10) || 14)}
+                    className="max-w-[120px]"
+                  />
+                  <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                    Suggested deadline when creating violations
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                    Escalation Notice Type
+                  </Label>
+                  <Select value={escalationNoticeType} onValueChange={(v) => setEscalationNoticeType(v as NoticeType)}>
+                    <SelectTrigger className="max-w-[200px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="courtesy">Courtesy</SelectItem>
+                      <SelectItem value="first_notice">First Notice</SelectItem>
+                      <SelectItem value="second_notice">Second Notice</SelectItem>
+                      <SelectItem value="final_notice">Final Notice</SelectItem>
+                      <SelectItem value="hearing_notice">Hearing Notice</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                    Notice type sent when auto-escalating
+                  </p>
+                </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         </div>
       </div>
 

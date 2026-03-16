@@ -1,6 +1,7 @@
 'use client';
 
 import { Badge } from '@/components/shared/ui/badge';
+import { CalendarClock } from 'lucide-react';
 import type { ViolationStatus, ViolationSeverity } from '@/lib/types/database';
 import type { ViolationWithUnit } from '@/app/[slug]/(protected)/violations/page';
 
@@ -111,6 +112,24 @@ export function ViolationList({ violations, loading, onSelect }: ViolationListPr
                     day: 'numeric',
                   })}
                 </p>
+                {v.compliance_deadline && !['resolved', 'dismissed'].includes(v.status) && (() => {
+                  const deadline = new Date(v.compliance_deadline + 'T00:00:00');
+                  const now = new Date();
+                  now.setHours(0, 0, 0, 0);
+                  const daysLeft = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                  const isPastDue = daysLeft < 0;
+                  const isApproaching = daysLeft >= 0 && daysLeft <= 3;
+                  return (
+                    <span className={`text-meta inline-flex items-center gap-1 ${
+                      isPastDue ? 'text-red-600 dark:text-red-400 font-semibold' :
+                      isApproaching ? 'text-amber-600 dark:text-amber-400' :
+                      'text-text-muted-light dark:text-text-muted-dark'
+                    }`}>
+                      <CalendarClock className="h-3 w-3" />
+                      {isPastDue ? 'Overdue' : `Due ${deadline.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`}
+                    </span>
+                  );
+                })()}
               </div>
             </div>
           </div>

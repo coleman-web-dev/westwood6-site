@@ -4,11 +4,12 @@ import { useState, useCallback, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Button } from '@/components/shared/ui/button';
-import { ShieldAlert } from 'lucide-react';
+import { ShieldAlert, Settings2 } from 'lucide-react';
 import { ViolationList } from '@/components/violations/violation-list';
 import { CreateViolationDialog } from '@/components/violations/create-violation-dialog';
 import { ViolationDetailDialog } from '@/components/violations/violation-detail-dialog';
-import type { Violation, ViolationStatus, Unit } from '@/lib/types/database';
+import { ViolationTemplatesManager } from '@/components/violations/violation-templates-manager';
+import type { Violation, ViolationStatus, Unit, ViolationTemplate } from '@/lib/types/database';
 
 export type ViolationWithUnit = Violation & { units?: { unit_number: string } | null };
 
@@ -28,7 +29,9 @@ export default function ViolationsPage() {
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [templates, setTemplates] = useState<ViolationTemplate[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
   const [selectedViolation, setSelectedViolation] = useState<ViolationWithUnit | null>(null);
 
   const canReportViolations = !isBoard && !!community.tenant_permissions?.can_report_violations;
@@ -53,6 +56,17 @@ export default function ViolationsPage() {
 
   const canWriteViolations = canWrite('violations');
 
+  const fetchTemplates = useCallback(async () => {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from('violation_templates')
+      .select('*')
+      .eq('community_id', community.id)
+      .eq('is_active', true)
+      .order('name');
+    setTemplates((data as ViolationTemplate[]) || []);
+  }, [community.id]);
+
   const fetchUnits = useCallback(async () => {
     if (!canWriteViolations) return;
     const supabase = createClient();
@@ -68,7 +82,8 @@ export default function ViolationsPage() {
   useEffect(() => {
     fetchViolations();
     fetchUnits();
-  }, [fetchViolations, fetchUnits]);
+    fetchTemplates();
+  }, [fetchViolations, fetchUnits, fetchTemplates]);
 
   const filtered = statusFilter === 'all'
     ? violations
@@ -83,11 +98,19 @@ export default function ViolationsPage() {
             {isBoard ? 'Violations' : 'My Violations'}
           </h1>
         </div>
-        {showCreateButton && (
-          <Button onClick={() => setCreateOpen(true)}>
-            Report Violation
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {isBoard && (
+            <Button variant="outline" size="sm" onClick={() => setTemplatesOpen(true)}>
+              <Settings2 className="h-4 w-4 mr-1" />
+              Templates
+            </Button>
+          )}
+          {showCreateButton && (
+            <Button onClick={() => setCreateOpen(true)}>
+              Report Violation
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Status filter tabs (board only) */}
@@ -121,9 +144,17 @@ export default function ViolationsPage() {
           open={createOpen}
           onOpenChange={setCreateOpen}
           units={units}
+          templates={templates}
           communityId={community.id}
           communitySlug={community.slug}
           onCreated={fetchViolations}
+        />
+      )}
+
+      {isBoard && (
+        <ViolationTemplatesManager
+          open={templatesOpen}
+          onOpenChange={setTemplatesOpen}
         />
       )}
 

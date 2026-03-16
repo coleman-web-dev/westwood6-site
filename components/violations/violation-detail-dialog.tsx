@@ -25,8 +25,11 @@ import {
 import { toast } from 'sonner';
 import { logAuditEvent } from '@/lib/audit';
 import { NoticeHistory } from '@/components/violations/notice-history';
+import { IssueFineDialog } from '@/components/violations/issue-fine-dialog';
 import { sendViolationNoticeEmail } from '@/lib/actions/violation-actions';
-import type { ViolationStatus, ViolationNotice, NoticeType, DeliveryMethod } from '@/lib/types/database';
+import { CalendarClock, DollarSign } from 'lucide-react';
+import { Input } from '@/components/shared/ui/input';
+import type { ViolationStatus, ViolationNotice, NoticeType, DeliveryMethod, Invoice } from '@/lib/types/database';
 import type { ViolationWithUnit } from '@/app/[slug]/(protected)/violations/page';
 
 const STATUS_LABELS: Record<ViolationStatus, string> = {
@@ -70,11 +73,15 @@ export function ViolationDetailDialog({
   const [sendingNotice, setSendingNotice] = useState(false);
   const [noticeType, setNoticeType] = useState<NoticeType>('courtesy');
   const [noticeNotes, setNoticeNotes] = useState('');
+  const [complianceDeadline, setComplianceDeadline] = useState('');
+  const [fines, setFines] = useState<Invoice[]>([]);
+  const [fineDialogOpen, setFineDialogOpen] = useState(false);
 
   useEffect(() => {
     if (violation) {
       setStatus(violation.status);
       setResolutionNotes(violation.resolution_notes ?? '');
+      setComplianceDeadline(violation.compliance_deadline ?? '');
     }
   }, [violation]);
 
@@ -89,11 +96,23 @@ export function ViolationDetailDialog({
     setNotices((data as ViolationNotice[]) || []);
   }, [violation]);
 
+  const fetchFines = useCallback(async () => {
+    if (!violation) return;
+    const supabase = createClient();
+    const { data } = await supabase
+      .from('invoices')
+      .select('*')
+      .eq('violation_id', violation.id)
+      .order('created_at', { ascending: false });
+    setFines((data as Invoice[]) || []);
+  }, [violation]);
+
   useEffect(() => {
     if (violation && open) {
       fetchNotices();
+      fetchFines();
     }
-  }, [violation, open, fetchNotices]);
+  }, [violation, open, fetchNotices, fetchFines]);
 
   async function handleSave() {
     if (!violation) return;
@@ -104,6 +123,7 @@ export function ViolationDetailDialog({
     const updates: Record<string, unknown> = {
       status,
       resolution_notes: resolutionNotes.trim() || null,
+      compliance_deadline: complianceDeadline || null,
     };
 
     if (status === 'resolved' && violation.status !== 'resolved') {
@@ -200,6 +220,7 @@ export function ViolationDetailDialog({
   if (!violation) return null;
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
         <DialogHeader>
@@ -220,6 +241,31 @@ export function ViolationDetailDialog({
               {violation.severity.charAt(0).toUpperCase() + violation.severity.slice(1)}
             </Badge>
           </div>
+
+          {/* Compliance deadline */}
+          {violation.compliance_deadline && (() => {
+            const deadline = new Date(violation.compliance_deadline + 'T00:00:00');
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+            const daysLeft = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+            const isPastDue = daysLeft < 0 && !['resolved', 'dismissed'].includes(violation.status);
+            const isApproaching = daysLeft >= 0 && daysLeft <= 3 && !['resolved', 'dismissed'].includes(violation.status);
+            return (
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-inner-card text-label ${
+                isPastDue ? 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300' :
+                isApproaching ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300' :
+                'bg-surface-light-2 dark:bg-surface-dark-2 text-text-secondary-light dark:text-text-secondary-dark'
+              }`}>
+                <CalendarClock className="h-4 w-4 shrink-0" />
+                <span>
+                  {isPastDue ? 'OVERDUE' : 'Compliance deadline'}:{' '}
+                  {deadline.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                  {isPastDue && ` (${Math.abs(daysLeft)} days past due)`}
+                  {isApproaching && ` (${daysLeft} days remaining)`}
+                </span>
+              </div>
+            );
+          })()}
 
           {/* Description */}
           {violation.description && (
@@ -290,6 +336,17 @@ export function ViolationDetailDialog({
 
               <div className="space-y-1.5">
                 <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                  Compliance Deadline
+                </label>
+                <Input
+                  type="date"
+                  value={complianceDeadline}
+                  onChange={(e) => setComplianceDeadline(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
                   Resolution Notes
                 </label>
                 <Textarea
@@ -350,6 +407,90 @@ export function ViolationDetailDialog({
             </div>
           )}
 
+          {/* Fines section (board) */}
+          {isBoard && (
+            <div className="border-t border-stroke-light dark:border-stroke-dark pt-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-card-title text-text-primary-light dark:text-text-primary-dark">
+                  Fines
+                </h4>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFineDialogOpen(true)}
+                >
+                  <DollarSign className="h-3.5 w-3.5 mr-1" />
+                  Issue Fine
+                </Button>
+              </div>
+              {fines.length > 0 ? (
+                <div className="space-y-2">
+                  {fines.map((f) => (
+                    <div
+                      key={f.id}
+                      className="flex items-center justify-between px-3 py-2 rounded-inner-card bg-surface-light-2 dark:bg-surface-dark-2"
+                    >
+                      <div>
+                        <p className="text-label text-text-primary-light dark:text-text-primary-dark">
+                          {f.title}
+                        </p>
+                        <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                          Due {new Date(f.due_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-label text-text-primary-light dark:text-text-primary-dark">
+                          ${(f.amount / 100).toFixed(2)}
+                        </p>
+                        <Badge variant={f.status === 'paid' ? 'secondary' : f.status === 'overdue' ? 'destructive' : 'default'} className="text-[10px]">
+                          {f.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                  No fines issued.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Fines display (resident read-only) */}
+          {!isBoard && fines.length > 0 && (
+            <div className="border-t border-stroke-light dark:border-stroke-dark pt-4 space-y-3">
+              <h4 className="text-card-title text-text-primary-light dark:text-text-primary-dark">
+                Fines
+              </h4>
+              <div className="space-y-2">
+                {fines.map((f) => (
+                  <div
+                    key={f.id}
+                    className="flex items-center justify-between px-3 py-2 rounded-inner-card bg-surface-light-2 dark:bg-surface-dark-2"
+                  >
+                    <div>
+                      <p className="text-label text-text-primary-light dark:text-text-primary-dark">
+                        {f.title}
+                      </p>
+                      <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                        Due {new Date(f.due_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-label text-text-primary-light dark:text-text-primary-dark">
+                        ${(f.amount / 100).toFixed(2)}
+                      </p>
+                      <Badge variant={f.status === 'paid' ? 'secondary' : f.status === 'overdue' ? 'destructive' : 'default'} className="text-[10px]">
+                        {f.status}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Notice history */}
           {notices.length > 0 && (
             <div className="border-t border-stroke-light dark:border-stroke-dark pt-4">
@@ -372,5 +513,15 @@ export function ViolationDetailDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {isBoard && violation && (
+      <IssueFineDialog
+        open={fineDialogOpen}
+        onOpenChange={setFineDialogOpen}
+        violation={violation}
+        onFineIssued={() => { fetchFines(); onUpdated(); }}
+      />
+    )}
+    </>
   );
 }

@@ -29,7 +29,7 @@ import {
   sendViolationNoticeEmail,
   notifyHouseholdOfViolation,
 } from '@/lib/actions/violation-actions';
-import type { Unit, ViolationCategory, ViolationSeverity } from '@/lib/types/database';
+import type { Unit, ViolationCategory, ViolationSeverity, ViolationTemplate } from '@/lib/types/database';
 
 const MAX_FILES = 5;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -39,6 +39,7 @@ interface CreateViolationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   units: Unit[];
+  templates?: ViolationTemplate[];
   communityId: string;
   communitySlug: string;
   onCreated: () => void;
@@ -48,6 +49,7 @@ export function CreateViolationDialog({
   open,
   onOpenChange,
   units,
+  templates = [],
   communityId,
   communitySlug,
   onCreated,
@@ -59,8 +61,23 @@ export function CreateViolationDialog({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [severity, setSeverity] = useState<ViolationSeverity>('warning');
+  const [complianceDeadline, setComplianceDeadline] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
+
+  function handleTemplateSelect(templateId: string) {
+    const template = templates.find((t) => t.id === templateId);
+    if (!template) return;
+    setTitle(template.title);
+    setDescription(template.description ?? '');
+    setCategory(template.category);
+    setSeverity(template.severity);
+    if (template.default_deadline_days) {
+      const deadline = new Date();
+      deadline.setDate(deadline.getDate() + template.default_deadline_days);
+      setComplianceDeadline(deadline.toISOString().split('T')[0]);
+    }
+  }
 
   // Residents auto-select their own unit; board picks from dropdown
   const isResidentReporting = !isBoard;
@@ -146,6 +163,7 @@ export function CreateViolationDialog({
         description: description.trim() || null,
         severity,
         photo_urls: photoUrls,
+        compliance_deadline: complianceDeadline || null,
       })
       .select('id')
       .single();
@@ -194,6 +212,7 @@ export function CreateViolationDialog({
     setUnitId('');
     setCategory('other');
     setSeverity('warning');
+    setComplianceDeadline('');
     setFiles([]);
     onOpenChange(false);
     onCreated();
@@ -207,6 +226,27 @@ export function CreateViolationDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
+          {/* Template selector (board only) */}
+          {isBoard && templates.length > 0 && (
+            <div className="space-y-1.5">
+              <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                Use Template
+              </Label>
+              <Select onValueChange={handleTemplateSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a template (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {templates.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* Unit selector: board picks, residents see their unit */}
           {isResidentReporting ? (
             unit && (
@@ -301,6 +341,24 @@ export function CreateViolationDialog({
               className="resize-none"
             />
           </div>
+
+          {/* Compliance deadline (board only) */}
+          {isBoard && (
+            <div className="space-y-1.5">
+              <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                Compliance Deadline
+              </Label>
+              <Input
+                type="date"
+                value={complianceDeadline}
+                onChange={(e) => setComplianceDeadline(e.target.value)}
+                min={new Date().toISOString().split('T')[0]}
+              />
+              <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                Date by which the violation must be corrected
+              </p>
+            </div>
+          )}
 
           {/* Photo upload */}
           <div className="space-y-1.5">
