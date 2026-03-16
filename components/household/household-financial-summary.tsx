@@ -187,7 +187,7 @@ export function HouseholdFinancialSummary({ unitId, communityId }: HouseholdFina
       )}
 
       <Link
-        href={`/${community.slug}/payments`}
+        href={`/${community.slug}/payments?tab=ledger&unit=${unitId}`}
         className="inline-flex items-center gap-1 text-label text-secondary-500 hover:text-secondary-600 dark:hover:text-secondary-400"
       >
         View Full Ledger

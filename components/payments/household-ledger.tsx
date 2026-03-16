@@ -4,28 +4,39 @@ import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Badge } from '@/components/shared/ui/badge';
+import { Button } from '@/components/shared/ui/button';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/shared/ui/select';
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/shared/ui/popover';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/shared/ui/command';
+import { Check, ChevronsUpDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { Invoice, Payment, WalletTransaction, Unit, LedgerEntry } from '@/lib/types/database';
 
 interface HouseholdLedgerProps {
   refreshKey: number;
+  initialUnitId?: string;
 }
 
-export function HouseholdLedger({ refreshKey }: HouseholdLedgerProps) {
+export function HouseholdLedger({ refreshKey, initialUnitId }: HouseholdLedgerProps) {
   const { community, unit, isBoard } = useCommunity();
   const [entries, setEntries] = useState<LedgerEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Board: unit selector
   const [allUnits, setAllUnits] = useState<Unit[]>([]);
-  const [selectedUnitId, setSelectedUnitId] = useState<string>(unit?.id ?? '');
+  const [selectedUnitId, setSelectedUnitId] = useState<string>(initialUnitId ?? unit?.id ?? '');
   const [unitOwnerMap, setUnitOwnerMap] = useState<Record<string, string>>({});
+  const [comboboxOpen, setComboboxOpen] = useState(false);
 
   // Load units for board
   useEffect(() => {
@@ -56,7 +67,7 @@ export function HouseholdLedger({ refreshKey }: HouseholdLedgerProps) {
       }
       setUnitOwnerMap(ownerMap);
 
-      if (!selectedUnitId && units.length > 0) {
+      if (!selectedUnitId && !initialUnitId && units.length > 0) {
         setSelectedUnitId(units[0].id);
       }
     }
@@ -178,22 +189,60 @@ export function HouseholdLedger({ refreshKey }: HouseholdLedgerProps) {
 
   return (
     <div className="space-y-4">
-      {/* Board: unit selector */}
+      {/* Board: searchable unit selector */}
       {isBoard && allUnits.length > 0 && (
-        <div className="max-w-xs">
-          <Select value={selectedUnitId} onValueChange={setSelectedUnitId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select a unit" />
-            </SelectTrigger>
-            <SelectContent>
-              {allUnits.map((u) => (
-                <SelectItem key={u.id} value={u.id}>
-                  Unit {u.unit_number}
-                  {unitOwnerMap[u.id] ? ` - ${unitOwnerMap[u.id]}` : ''}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="max-w-sm">
+          <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={comboboxOpen}
+                className="w-full justify-between font-normal"
+              >
+                {selectedUnitId
+                  ? (() => {
+                      const u = allUnits.find((u) => u.id === selectedUnitId);
+                      return u
+                        ? `Unit ${u.unit_number}${unitOwnerMap[u.id] ? ` - ${unitOwnerMap[u.id]}` : ''}`
+                        : 'Select a unit';
+                    })()
+                  : 'Select a unit'}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+              <Command>
+                <CommandInput placeholder="Search units..." />
+                <CommandList>
+                  <CommandEmpty>No unit found.</CommandEmpty>
+                  <CommandGroup>
+                    {allUnits.map((u) => {
+                      const label = `Unit ${u.unit_number}${unitOwnerMap[u.id] ? ` - ${unitOwnerMap[u.id]}` : ''}`;
+                      return (
+                        <CommandItem
+                          key={u.id}
+                          value={label}
+                          onSelect={() => {
+                            setSelectedUnitId(u.id);
+                            setComboboxOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              'mr-2 h-4 w-4',
+                              selectedUnitId === u.id ? 'opacity-100' : 'opacity-0',
+                            )}
+                          />
+                          {label}
+                        </CommandItem>
+                      );
+                    })}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </div>
       )}
 

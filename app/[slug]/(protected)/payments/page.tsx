@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { Plus, DollarSign, ClipboardList, Bell, AlertTriangle } from 'lucide-react';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { Plus, DollarSign, ClipboardList, Bell, AlertTriangle, X, Filter } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Button } from '@/components/shared/ui/button';
@@ -36,6 +36,8 @@ import type { Invoice, Payment, Unit, Assessment } from '@/lib/types/database';
 export default function PaymentsPage() {
   const { community, member, unit, isBoard } = useCommunity();
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [unitOwnerMap, setUnitOwnerMap] = useState<Record<string, string>>({});
@@ -48,7 +50,13 @@ export default function PaymentsPage() {
   const [assessmentDialogOpen, setAssessmentDialogOpen] = useState(false);
   const [specialAssessmentDialogOpen, setSpecialAssessmentDialogOpen] = useState(false);
   const [walletDialogOpen, setWalletDialogOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('invoices');
+  const initialTab = searchParams.get('tab');
+  const urlUnitId = searchParams.get('unit');
+  const [activeTab, setActiveTab] = useState(
+    initialTab && ['invoices', 'history', 'ledger', 'assessments'].includes(initialTab)
+      ? initialTab
+      : 'invoices',
+  );
   const [refreshKey, setRefreshKey] = useState(0);
   const [stripeEnabled, setStripeEnabled] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
@@ -209,6 +217,18 @@ export default function PaymentsPage() {
   );
   const totalOutstanding = outstandingInvoices.reduce((sum, inv) => sum + inv.amount, 0);
 
+  // When navigating from household page with a unit filter, scope data to that unit
+  const filteredInvoices = useMemo(() => {
+    if (!urlUnitId || !isBoard) return invoices;
+    return invoices.filter((inv) => inv.unit_id === urlUnitId);
+  }, [invoices, urlUnitId, isBoard]);
+
+  const filteredPayments = useMemo(() => {
+    if (!urlUnitId || !isBoard) return payments;
+    const unitInvoiceIds = new Set(filteredInvoices.map((inv) => inv.id));
+    return payments.filter((pmt) => unitInvoiceIds.has(pmt.invoice_id));
+  }, [payments, urlUnitId, isBoard, filteredInvoices]);
+
   const delinquentUnitIds = useMemo(() => {
     const ids = new Set<string>();
     for (const inv of invoices) {
@@ -231,6 +251,18 @@ export default function PaymentsPage() {
       toast.error(result.error || 'Failed to send reminders');
     }
   }
+
+  function clearUnitFilter() {
+    router.replace(pathname);
+  }
+
+  const filterUnitLabel = urlUnitId && isBoard
+    ? (() => {
+        const u = allUnits.find((u) => u.id === urlUnitId);
+        const owner = unitOwnerMap[urlUnitId];
+        return u ? `Unit ${u.unit_number}${owner ? ` - ${owner}` : ''}` : 'Selected unit';
+      })()
+    : null;
 
   function handleDialogSuccess() {
     fetchData();
@@ -273,6 +305,23 @@ export default function PaymentsPage() {
           </div>
         )}
       </div>
+
+      {/* Unit filter banner */}
+      {filterUnitLabel && (
+        <div className="flex items-center gap-2 rounded-inner-card bg-secondary-50 dark:bg-secondary-950/30 border border-secondary-200 dark:border-secondary-800 px-3 py-2">
+          <Filter className="h-4 w-4 text-secondary-500 shrink-0" />
+          <span className="text-body text-text-primary-light dark:text-text-primary-dark">
+            Filtered to <span className="font-semibold">{filterUnitLabel}</span>
+          </span>
+          <button
+            onClick={clearUnitFilter}
+            className="ml-auto inline-flex items-center gap-1 text-label text-secondary-500 hover:text-secondary-600 dark:hover:text-secondary-400"
+          >
+            <X className="h-3.5 w-3.5" />
+            Clear
+          </button>
+        </div>
+      )}
 
       {/* Summary cards */}
       <div className="grid gap-4 sm:grid-cols-2">
@@ -336,7 +385,7 @@ export default function PaymentsPage() {
 
         <TabsContent value="invoices">
           <InvoiceList
-            invoices={invoices}
+            invoices={filteredInvoices}
             loading={loading}
             onInvoiceUpdated={handleInvoiceUpdated}
             unitOwnerMap={isBoard ? unitOwnerMap : undefined}
@@ -349,14 +398,14 @@ export default function PaymentsPage() {
 
         <TabsContent value="history">
           <PaymentHistory
-            payments={payments}
-            invoices={invoices}
+            payments={filteredPayments}
+            invoices={filteredInvoices}
             loading={loading}
           />
         </TabsContent>
 
         <TabsContent value="ledger">
-          <HouseholdLedger refreshKey={refreshKey} />
+          <HouseholdLedger refreshKey={refreshKey} initialUnitId={urlUnitId ?? undefined} />
         </TabsContent>
 
         {isBoard && (
