@@ -54,16 +54,18 @@ export function HouseholdLedger({ refreshKey, initialUnitId }: HouseholdLedgerPr
       const units = (unitData as Unit[]) ?? [];
       setAllUnits(units);
 
-      const { data: owners } = await supabase
+      const { data: memberRows } = await supabase
         .from('members')
-        .select('unit_id, first_name, last_name')
-        .eq('community_id', community.id)
-        .eq('member_role', 'owner')
-        .is('parent_member_id', null);
+        .select('unit_id, first_name, last_name, member_role')
+        .eq('community_id', community.id);
 
       const ownerMap: Record<string, string> = {};
-      for (const o of (owners ?? []) as { unit_id: string | null; first_name: string; last_name: string }[]) {
-        if (o.unit_id) ownerMap[o.unit_id] = `${o.first_name} ${o.last_name}`;
+      for (const m of (memberRows ?? []) as { unit_id: string | null; first_name: string; last_name: string; member_role: string }[]) {
+        if (!m.unit_id) continue;
+        // Prefer owners, but fill in any member if no owner found
+        if (!ownerMap[m.unit_id] || m.member_role === 'owner') {
+          ownerMap[m.unit_id] = `${m.first_name} ${m.last_name}`;
+        }
       }
       setUnitOwnerMap(ownerMap);
 
@@ -212,9 +214,9 @@ export function HouseholdLedger({ refreshKey, initialUnitId }: HouseholdLedgerPr
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-              <Command>
-                <CommandInput placeholder="Search units..." />
-                <CommandList>
+              <Command filter={(value, search) => value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0}>
+                <CommandInput placeholder="Search units..." className="h-9" />
+                <CommandList className="max-h-[200px]">
                   <CommandEmpty>No unit found.</CommandEmpty>
                   <CommandGroup>
                     {allUnits.map((u) => {

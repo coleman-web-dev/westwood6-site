@@ -19,10 +19,10 @@ import {
 } from '@/components/shared/ui/alert-dialog';
 import { toast } from 'sonner';
 import { logAuditEvent } from '@/lib/audit';
-import { Eye, EyeOff, Trash2, UserPlus, StickyNote, Mail } from 'lucide-react';
+import { Eye, EyeOff, Trash2, UserPlus, StickyNote, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import { MemberNotesDialog } from '@/components/household/member-notes-dialog';
-import { EditMailingAddressDialog } from '@/components/household/edit-mailing-address-dialog';
+import { EditMemberDialog } from '@/components/household/edit-member-dialog';
 import type { Member, MemberRole } from '@/lib/types/database';
 
 const ROLE_BADGE_VARIANT: Record<MemberRole, 'secondary' | 'outline' | 'default'> = {
@@ -59,7 +59,7 @@ export function MemberList({
   const { isBoard, community, member: currentMember } = useCommunity();
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [notesForMember, setNotesForMember] = useState<{ id: string; name: string } | null>(null);
-  const [editAddressMember, setEditAddressMember] = useState<Member | null>(null);
+  const [editMember, setEditMember] = useState<Member | null>(null);
 
   async function handleRemove(memberId: string) {
     setRemovingId(memberId);
@@ -191,51 +191,59 @@ export function MemberList({
                         Notes
                       </button>
                     )}
-                    {isBoard && (
-                      <button
-                        onClick={() => setEditAddressMember(m)}
-                        className="inline-flex items-center gap-1 text-secondary-500 hover:text-secondary-600 dark:hover:text-secondary-400"
-                      >
-                        <Mail className="h-3 w-3" />
-                        {m.use_unit_address === false ? 'Alt. address' : 'Address'}
-                      </button>
+                    {m.use_unit_address === false && (
+                      <span className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                        Alt. address
+                      </span>
                     )}
                   </div>
                 </div>
 
-                {canRemove && (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive hover:text-destructive shrink-0"
-                        disabled={removingId === m.id}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        <span className="sr-only">Remove {m.first_name}</span>
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Remove Member</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Are you sure you want to remove {m.first_name} {m.last_name} from your household?
-                          This action cannot be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => handleRemove(m.id)}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                <div className="flex items-center gap-1 shrink-0">
+                  {(isBoard || isSelf) && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setEditMember(m)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                      <span className="sr-only">Edit {m.first_name}</span>
+                    </Button>
+                  )}
+                  {canRemove && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive hover:text-destructive"
+                          disabled={removingId === m.id}
                         >
-                          {removingId === m.id ? 'Removing...' : 'Remove'}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                )}
+                          <Trash2 className="h-4 w-4" />
+                          <span className="sr-only">Remove {m.first_name}</span>
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Remove Member</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to remove {m.first_name} {m.last_name} from your household?
+                            This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleRemove(m.id)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            {removingId === m.id ? 'Removing...' : 'Remove'}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
+                </div>
               </div>
             </div>
           );
@@ -253,12 +261,12 @@ export function MemberList({
         />
       )}
 
-      {/* Mailing address dialog (board-only) */}
-      {editAddressMember && (
-        <EditMailingAddressDialog
-          open={!!editAddressMember}
-          onOpenChange={(open) => { if (!open) setEditAddressMember(null); }}
-          member={editAddressMember}
+      {/* Edit member dialog */}
+      {editMember && (
+        <EditMemberDialog
+          open={!!editMember}
+          onOpenChange={(open) => { if (!open) setEditMember(null); }}
+          member={editMember}
           onSaved={onMemberRemoved}
         />
       )}

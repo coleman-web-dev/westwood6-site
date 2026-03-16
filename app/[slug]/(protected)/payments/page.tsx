@@ -101,18 +101,19 @@ export default function PaymentsPage() {
 
     const { data: paymentData } = await paymentQuery;
 
-    // Fetch unit owners for display (board only)
+    // Fetch unit members for display (board only) - prefer owners, fall back to any member
     const ownerMap: Record<string, string> = {};
     if (isBoard) {
-      const { data: owners } = await supabase
+      const { data: memberRows } = await supabase
         .from('members')
-        .select('unit_id, first_name, last_name')
-        .eq('community_id', community.id)
-        .eq('member_role', 'owner')
-        .is('parent_member_id', null);
+        .select('unit_id, first_name, last_name, member_role')
+        .eq('community_id', community.id);
 
-      for (const o of (owners ?? []) as { unit_id: string | null; first_name: string; last_name: string }[]) {
-        if (o.unit_id) ownerMap[o.unit_id] = `${o.first_name} ${o.last_name}`;
+      for (const m of (memberRows ?? []) as { unit_id: string | null; first_name: string; last_name: string; member_role: string }[]) {
+        if (!m.unit_id) continue;
+        if (!ownerMap[m.unit_id] || m.member_role === 'owner') {
+          ownerMap[m.unit_id] = `${m.first_name} ${m.last_name}`;
+        }
       }
     }
 

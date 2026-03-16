@@ -240,9 +240,9 @@ export default function HouseholdPage() {
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-            <Command>
-              <CommandInput placeholder="Search units..." />
-              <CommandList>
+            <Command filter={(value, search) => value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0}>
+              <CommandInput placeholder="Search units..." className="h-9" />
+              <CommandList className="max-h-[200px]">
                 <CommandEmpty>No units found.</CommandEmpty>
                 <CommandGroup>
                   {allUnits.map((u) => {
