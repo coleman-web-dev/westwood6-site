@@ -36,17 +36,11 @@ import {
   CommandGroup,
   CommandItem,
 } from '@/components/shared/ui/command';
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogFooter,
-  AlertDialogTitle,
-  AlertDialogDescription,
-} from '@/components/shared/ui/alert-dialog';
 import { Check, ChevronsUpDown, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useDialogUnsavedChanges } from '@/lib/hooks/use-dialog-unsaved-changes';
+import { DialogUnsavedChangesAlert } from '@/components/shared/dialog-unsaved-changes-alert';
 import type { Amenity, Unit } from '@/lib/types/database';
 
 interface ManualReservationDialogProps {
@@ -185,27 +179,15 @@ export function ManualReservationDialog({
   const [agreementFile, setAgreementFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Close guard
-  const formTouched = useRef(false);
-  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
-
-  function touch() {
-    formTouched.current = true;
-  }
-
-  function handleOpenChange(newOpen: boolean) {
-    if (!newOpen && formTouched.current) {
-      setConfirmCloseOpen(true);
-      return;
-    }
-    onOpenChange(newOpen);
-  }
-
-  function handleConfirmClose() {
-    setConfirmCloseOpen(false);
-    formTouched.current = false;
-    onOpenChange(false);
-  }
+  const {
+    touch,
+    handleOpenChange,
+    confirmCloseOpen,
+    handleConfirmClose,
+    setConfirmCloseOpen,
+    resetTouched,
+    dialogContentGuardProps,
+  } = useDialogUnsavedChanges({ onOpenChange });
 
   // Reset form when dialog opens
   useEffect(() => {
@@ -222,7 +204,7 @@ export function ManualReservationDialog({
       setFeePaid(true);
       setDepositPaid(true);
       setAgreementFile(null);
-      formTouched.current = false;
+      resetTouched();
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   }, [open]);
@@ -367,7 +349,7 @@ export function ManualReservationDialog({
 
     setSubmitting(false);
     toast.success('Manual reservation created.');
-    formTouched.current = false;
+    resetTouched();
     onOpenChange(false);
     onSuccess();
   }
@@ -377,18 +359,7 @@ export function ManualReservationDialog({
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent
           className="max-h-[85vh] overflow-y-auto sm:max-w-md"
-          onInteractOutside={(e) => {
-            if (formTouched.current) {
-              e.preventDefault();
-              setConfirmCloseOpen(true);
-            }
-          }}
-          onEscapeKeyDown={(e) => {
-            if (formTouched.current) {
-              e.preventDefault();
-              setConfirmCloseOpen(true);
-            }
-          }}
+          {...dialogContentGuardProps}
         >
           <DialogHeader>
             <DialogTitle>Block Date - {amenity.name}</DialogTitle>
@@ -678,25 +649,13 @@ export function ManualReservationDialog({
         </DialogContent>
       </Dialog>
 
-      {/* Confirm-close guard */}
-      <AlertDialog open={confirmCloseOpen} onOpenChange={setConfirmCloseOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Discard reservation?</AlertDialogTitle>
-            <AlertDialogDescription>
-              You have unsaved changes. If you close now, your progress will be lost.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <Button variant="outline" onClick={() => setConfirmCloseOpen(false)}>
-              Keep editing
-            </Button>
-            <Button variant="destructive" onClick={handleConfirmClose}>
-              Discard
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DialogUnsavedChangesAlert
+        open={confirmCloseOpen}
+        onOpenChange={setConfirmCloseOpen}
+        onDiscard={handleConfirmClose}
+        title="Discard reservation?"
+        description="You have unsaved changes. If you close now, your progress will be lost."
+      />
     </>
   );
 }

@@ -621,3 +621,70 @@ export async function queueViolationNotice(
     },
   });
 }
+
+/**
+ * Queue ballot notification emails for all community members.
+ * Variants: 'opened' (voting started), 'closed' (voting ended), 'results_published'.
+ */
+export async function queueBallotNotification(
+  communityId: string,
+  communitySlug: string,
+  ballotTitle: string,
+  ballotType: string,
+  variant: 'opened' | 'closed' | 'results_published',
+  closesAt?: string,
+) {
+  const supabase = createAdminClient();
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://duesiq.com';
+
+  const { data: community } = await supabase
+    .from('communities')
+    .select('name')
+    .eq('id', communityId)
+    .single();
+
+  const { data: members } = await supabase
+    .from('members')
+    .select('id, email, first_name, last_name')
+    .eq('community_id', communityId)
+    .eq('is_approved', true)
+    .not('email', 'is', null);
+
+  if (!members || members.length === 0) return;
+
+  const communityName = community?.name || 'Your Community';
+
+  const VARIANT_SUBJECTS: Record<string, string> = {
+    opened: `Voting Open: ${ballotTitle}`,
+    closed: `Voting Closed: ${ballotTitle}`,
+    results_published: `Results Available: ${ballotTitle}`,
+  };
+
+  const formattedClosesAt = closesAt
+    ? new Date(closesAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+    : undefined;
+
+  const ballotTypeLabel = ballotType.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+
+  const items: QueueEmailParams[] = members.map((m) => ({
+    communityId,
+    recipientMemberId: m.id,
+    recipientEmail: m.email!,
+    recipientName: `${m.first_name} ${m.last_name}`,
+    category: 'voting_notice' as EmailCategory,
+    priority: 'normal' as EmailPriority,
+    subject: `${communityName}: ${VARIANT_SUBJECTS[variant]}`,
+    templateId: 'ballot-notification',
+    templateData: {
+      communityName,
+      ballotTitle,
+      ballotType: ballotTypeLabel,
+      variant,
+      closesAt: formattedClosesAt,
+      dashboardUrl: `${baseUrl}/${communitySlug}/voting`,
+      unsubscribeUrl: buildUnsubscribeUrl(m.id, 'voting_notice', communitySlug),
+    },
+  }));
+
+  return queueBulkEmails(items);
+}

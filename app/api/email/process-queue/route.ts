@@ -10,6 +10,7 @@ import { WeeklyDigestEmail } from '@/lib/email/templates/weekly-digest';
 import { ViolationNoticeEmail } from '@/lib/email/templates/violation-notice';
 import { EventNotificationEmail } from '@/lib/email/templates/event-notification';
 import { ReservationBoardNotificationEmail } from '@/lib/email/templates/reservation-board-notification';
+import { BallotNotificationEmail } from '@/lib/email/templates/ballot-notification';
 import { resolveSender } from '@/lib/email/resolve-sender';
 import type { EmailQueueItem, EmailSettings } from '@/lib/types/database';
 
@@ -39,6 +40,8 @@ function renderTemplate(templateId: string, data: Record<string, unknown>): Reac
       return EventNotificationEmail(d);
     case 'reservation-board-notification':
       return ReservationBoardNotificationEmail(d);
+    case 'ballot-notification':
+      return BallotNotificationEmail(d);
     default:
       console.error(`Unknown template: ${templateId}`);
       return null;

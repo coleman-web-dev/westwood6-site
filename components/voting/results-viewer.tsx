@@ -17,6 +17,7 @@ import { Badge } from '@/components/shared/ui/badge';
 import { CheckCircle2, Award, Loader2, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { logAuditEvent } from '@/lib/audit';
+import { sendBallotEmails } from '@/lib/actions/email-actions';
 import { QuorumTracker } from './quorum-tracker';
 import type { Ballot, BallotOption, BallotResultCache, QuorumStatus } from '@/lib/types/database';
 
@@ -109,6 +110,15 @@ export function ResultsViewer({ open, onOpenChange, ballot, onUpdated }: Results
         p_reference_id: ballot.id,
         p_reference_type: 'ballot',
       });
+
+      // Queue results published email notifications (fire-and-forget)
+      sendBallotEmails(
+        community.id,
+        community.slug,
+        ballot.title,
+        ballot.ballot_type,
+        'results_published',
+      ).catch((err) => console.error('Failed to queue ballot results emails:', err));
 
       onUpdated?.();
     }
@@ -219,6 +229,39 @@ export function ResultsViewer({ open, onOpenChange, ballot, onUpdated }: Results
                 );
               })}
             </div>
+
+            {/* Approval threshold verdict */}
+            {ballot.approval_threshold !== null && (ballot.tally_method === 'yes_no' || ballot.tally_method === 'yes_no_abstain') && (() => {
+              const yesResult = results.find((r) => r.option?.label === 'Yes');
+              const noResult = results.find((r) => r.option?.label === 'No');
+              const yesVotes = yesResult?.vote_count ?? 0;
+              const noVotes = noResult?.vote_count ?? 0;
+              const substantiveTotal = yesVotes + noVotes;
+              const yesPct = substantiveTotal > 0 ? Math.round((yesVotes / substantiveTotal) * 100) : 0;
+              const thresholdPct = Math.round(ballot.approval_threshold * 100);
+              const passed = yesPct >= thresholdPct && (quorum?.quorum_met ?? false);
+              return (
+                <div className={`rounded-inner-card border-2 p-3 ${
+                  passed
+                    ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-950/30'
+                    : 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/30'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-body font-medium text-text-primary-light dark:text-text-primary-dark">
+                      Requires {thresholdPct}% approval
+                    </span>
+                    <span className={`text-body font-semibold ${passed ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
+                      {passed ? 'Passed' : 'Failed'} ({yesPct}%)
+                    </span>
+                  </div>
+                  {!(quorum?.quorum_met ?? false) && (
+                    <p className="text-meta text-red-500 mt-1">
+                      Quorum was not met. Results may not be valid.
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Summary */}
             <div className="rounded-inner-card bg-surface-light-2 dark:bg-surface-dark-2 p-3 space-y-1 text-body">

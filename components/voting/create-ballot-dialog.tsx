@@ -24,7 +24,11 @@ import {
 import { ChevronLeft, ChevronRight, Plus, Trash2, GripVertical, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import { logAuditEvent } from '@/lib/audit';
-import type { BallotType, BallotTallyMethod, Ballot } from '@/lib/types/database';
+import { useDialogUnsavedChanges } from '@/lib/hooks/use-dialog-unsaved-changes';
+import { DialogUnsavedChangesAlert } from '@/components/shared/dialog-unsaved-changes-alert';
+import { AlertCircle } from 'lucide-react';
+import type { BallotType, BallotTallyMethod, Ballot, VotingConfig } from '@/lib/types/database';
+import { VOTING_CONFIG_DEFAULTS } from '@/lib/types/database';
 
 const BALLOT_TYPE_LABELS: Record<BallotType, string> = {
   board_election: 'Board of Directors Election',
@@ -56,6 +60,7 @@ export function CreateBallotDialog({
   editBallot,
 }: CreateBallotDialogProps) {
   const { community, member } = useCommunity();
+  const votingConfig: VotingConfig = { ...VOTING_CONFIG_DEFAULTS, ...(community?.theme?.voting_config as Partial<VotingConfig> | undefined) };
   const isEditing = !!editBallot;
 
   // Step state
@@ -84,7 +89,7 @@ export function CreateBallotDialog({
   const [opensAt, setOpensAt] = useState(editBallot?.opens_at ? editBallot.opens_at.slice(0, 16) : '');
   const [closesAt, setClosesAt] = useState(editBallot?.closes_at ? editBallot.closes_at.slice(0, 16) : '');
   const [quorumThreshold, setQuorumThreshold] = useState(
-    editBallot ? String(Math.round(editBallot.quorum_threshold * 100)) : '20',
+    editBallot ? String(Math.round(editBallot.quorum_threshold * 100)) : String(votingConfig.default_quorum_percent),
   );
   const [approvalThreshold, setApprovalThreshold] = useState(
     editBallot?.approval_threshold ? String(Math.round(editBallot.approval_threshold * 100)) : '',
@@ -92,19 +97,33 @@ export function CreateBallotDialog({
   const [isSecretBallot, setIsSecretBallot] = useState(editBallot?.is_secret_ballot ?? false);
   const [maxSelections, setMaxSelections] = useState(String(editBallot?.max_selections ?? 1));
 
-  // Board elections must be secret ballot
-  const secretBallotLocked = ballotType === 'board_election';
+  // Board elections must be secret ballot when config requires it
+  const secretBallotLocked = ballotType === 'board_election' && votingConfig.secret_ballot_for_elections;
 
-  // When ballot type changes, auto-set related fields
+  const {
+    touch,
+    handleOpenChange,
+    confirmCloseOpen,
+    handleConfirmClose,
+    setConfirmCloseOpen,
+    resetTouched,
+    dialogContentGuardProps,
+  } = useDialogUnsavedChanges({ onOpenChange, onDiscard: resetForm });
+
+  // When ballot type changes, auto-set related fields from voting config
   function handleBallotTypeChange(type: BallotType) {
+    touch();
     setBallotType(type);
     if (type === 'board_election') {
-      setIsSecretBallot(true);
+      setIsSecretBallot(votingConfig.secret_ballot_for_elections);
       setTallyMethod('plurality');
     } else if (type === 'amendment') {
       setTallyMethod('yes_no');
-      setApprovalThreshold('67');
-    } else if (type === 'budget_approval' || type === 'special_assessment') {
+      setApprovalThreshold(String(votingConfig.amendment_approval_threshold));
+    } else if (type === 'special_assessment') {
+      setTallyMethod('yes_no');
+      setApprovalThreshold(String(votingConfig.special_assessment_threshold));
+    } else if (type === 'budget_approval') {
       setTallyMethod('yes_no');
     }
   }
@@ -128,6 +147,7 @@ export function CreateBallotDialog({
   }
 
   function handleTallyMethodChange(method: BallotTallyMethod) {
+    touch();
     setTallyMethod(method);
     if (method === 'yes_no' || method === 'yes_no_abstain') {
       setOptions(getDefaultOptionsForTally(method));
@@ -314,6 +334,7 @@ export function CreateBallotDialog({
     }
 
     setSubmitting(false);
+    resetTouched();
     resetForm();
     onOpenChange(false);
     onSuccess();
@@ -331,7 +352,7 @@ export function CreateBallotDialog({
     ]);
     setOpensAt('');
     setClosesAt('');
-    setQuorumThreshold('20');
+    setQuorumThreshold(String(votingConfig.default_quorum_percent));
     setApprovalThreshold('');
     setIsSecretBallot(false);
     setMaxSelections('1');
@@ -340,8 +361,9 @@ export function CreateBallotDialog({
   const isYesNo = tallyMethod === 'yes_no' || tallyMethod === 'yes_no_abstain';
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+    <>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto" {...dialogContentGuardProps}>
         <DialogHeader>
           <DialogTitle>
             {isEditing ? 'Edit Ballot' : 'Create Ballot'} {step > 1 && `(Step ${step} of 3)`}
@@ -355,7 +377,7 @@ export function CreateBallotDialog({
 
         {/* ── Step 1: Basic Info ── */}
         {step === 1 && (
-          <div className="space-y-4 py-2">
+          <div className="space-y-4 py-2" onChangeCapture={touch}>
             <div className="space-y-1.5">
               <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
                 Title <span className="text-red-500">*</span>
@@ -440,7 +462,7 @@ export function CreateBallotDialog({
 
         {/* ── Step 2: Options ── */}
         {step === 2 && (
-          <div className="space-y-4 py-2">
+          <div className="space-y-4 py-2" onChangeCapture={touch}>
             {isYesNo && (
               <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
                 Options are preset for {tallyMethod === 'yes_no' ? 'Yes/No' : 'Yes/No/Abstain'} voting.
@@ -497,7 +519,7 @@ export function CreateBallotDialog({
 
         {/* ── Step 3: Schedule & Rules ── */}
         {step === 3 && (
-          <div className="space-y-4 py-2">
+          <div className="space-y-4 py-2" onChangeCapture={touch}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
@@ -520,6 +542,23 @@ export function CreateBallotDialog({
                 />
               </div>
             </div>
+
+            {/* Notice period warning */}
+            {opensAt && (ballotType === 'board_election' || ballotType === 'recall') && (() => {
+              const noticeDays = votingConfig.election_notice_days;
+              const daysUntilOpen = Math.ceil((new Date(opensAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+              if (daysUntilOpen < noticeDays) {
+                return (
+                  <div className="flex gap-2 rounded-inner-card border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-3">
+                    <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                    <p className="text-meta text-amber-700 dark:text-amber-300">
+                      Your community requires {noticeDays} days notice for elections. This ballot opens in {daysUntilOpen} day{daysUntilOpen !== 1 ? 's' : ''}, which may not meet the notice requirement.
+                    </p>
+                  </div>
+                );
+              }
+              return null;
+            })()}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
@@ -634,5 +673,12 @@ export function CreateBallotDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <DialogUnsavedChangesAlert
+      open={confirmCloseOpen}
+      onOpenChange={setConfirmCloseOpen}
+      onDiscard={handleConfirmClose}
+    />
+    </>
   );
 }

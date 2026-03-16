@@ -26,6 +26,8 @@ import { Switch } from '@/components/shared/ui/switch';
 import { toast } from 'sonner';
 import { logAuditEvent } from '@/lib/audit';
 import { sendAnnouncementEmails } from '@/lib/actions/email-actions';
+import { useDialogUnsavedChanges } from '@/lib/hooks/use-dialog-unsaved-changes';
+import { DialogUnsavedChangesAlert } from '@/components/shared/dialog-unsaved-changes-alert';
 import type { Announcement, AnnouncementPriority } from '@/lib/types/database';
 
 interface CreateAnnouncementDialogProps {
@@ -49,6 +51,16 @@ export function CreateAnnouncementDialog({
   const [submitting, setSubmitting] = useState(false);
 
   const isEditing = editingAnnouncement !== null;
+
+  const {
+    touch,
+    handleOpenChange,
+    confirmCloseOpen,
+    handleConfirmClose,
+    setConfirmCloseOpen,
+    resetTouched,
+    dialogContentGuardProps,
+  } = useDialogUnsavedChanges({ onOpenChange, onDiscard: resetForm });
 
   // Pre-fill form when editing
   useEffect(() => {
@@ -148,14 +160,16 @@ export function CreateAnnouncementDialog({
       ).catch((err) => console.error('Failed to queue announcement emails:', err));
     }
 
+    resetTouched();
     resetForm();
     onOpenChange(false);
     onSuccess();
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+    <>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-md" {...dialogContentGuardProps}>
         <DialogHeader>
           <DialogTitle>
             {isEditing ? 'Edit Announcement' : 'New Announcement'}
@@ -167,7 +181,7 @@ export function CreateAnnouncementDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        <div className="space-y-4 py-2" onChangeCapture={touch}>
           {/* Title */}
           <div className="space-y-1.5">
             <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
@@ -202,7 +216,7 @@ export function CreateAnnouncementDialog({
             </label>
             <Select
               value={priority}
-              onValueChange={(val) => setPriority(val as AnnouncementPriority)}
+              onValueChange={(val) => { touch(); setPriority(val as AnnouncementPriority); }}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select priority" />
@@ -225,7 +239,7 @@ export function CreateAnnouncementDialog({
                 Visible to anyone visiting your community page.
               </p>
             </div>
-            <Switch checked={isPublic} onCheckedChange={setIsPublic} />
+            <Switch checked={isPublic} onCheckedChange={(v) => { touch(); setIsPublic(v); }} />
           </div>
         </div>
 
@@ -248,5 +262,12 @@ export function CreateAnnouncementDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <DialogUnsavedChangesAlert
+      open={confirmCloseOpen}
+      onOpenChange={setConfirmCloseOpen}
+      onDiscard={handleConfirmClose}
+    />
+    </>
   );
 }

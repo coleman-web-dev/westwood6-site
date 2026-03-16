@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import {
   Dialog,
@@ -11,15 +11,6 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/shared/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogFooter,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogCancel,
-} from '@/components/shared/ui/alert-dialog';
 import { Button } from '@/components/shared/ui/button';
 import { Input } from '@/components/shared/ui/input';
 import { Textarea } from '@/components/shared/ui/textarea';
@@ -35,6 +26,8 @@ import { Collapsible, CollapsibleContent } from '@/components/shared/ui/collapsi
 import { toast } from 'sonner';
 import { AMENITY_ICON_LIST } from '@/lib/amenity-icons';
 import { AgreementWizardDialog } from '@/components/amenities/agreement-wizard-dialog';
+import { useDialogUnsavedChanges } from '@/lib/hooks/use-dialog-unsaved-changes';
+import { DialogUnsavedChangesAlert } from '@/components/shared/dialog-unsaved-changes-alert';
 import { FileText, Sparkles, Trash2 } from 'lucide-react';
 import type { Amenity, AgreementField, BookingType } from '@/lib/types/database';
 
@@ -156,29 +149,16 @@ export function AmenityDialog({
   const [wizardOpen, setWizardOpen] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
-  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
-  const formTouched = useRef(false);
 
-  // Mark form as touched when any input changes
-  function touch() {
-    formTouched.current = true;
-  }
-
-  // Guard dialog close: show confirmation if form has been touched
-  function handleOpenChange(newOpen: boolean) {
-    if (!newOpen && formTouched.current) {
-      setConfirmCloseOpen(true);
-      return;
-    }
-    onOpenChange(newOpen);
-  }
-
-  function handleConfirmClose() {
-    setConfirmCloseOpen(false);
-    formTouched.current = false;
-    resetForm();
-    onOpenChange(false);
-  }
+  const {
+    touch,
+    handleOpenChange,
+    confirmCloseOpen,
+    handleConfirmClose,
+    setConfirmCloseOpen,
+    resetTouched,
+    dialogContentGuardProps,
+  } = useDialogUnsavedChanges({ onOpenChange, onDiscard: resetForm });
 
   // Pre-fill when editing, reset when creating
   useEffect(() => {
@@ -229,7 +209,7 @@ export function AmenityDialog({
     setAgreementEnabled(false);
     setAgreementTemplate('');
     setAgreementFields([]);
-    formTouched.current = false;
+    resetTouched();
   }
 
   // Auto-adjust max booking when min changes
@@ -353,7 +333,7 @@ export function AmenityDialog({
         toast.success('Amenity created.');
       }
 
-      formTouched.current = false;
+      resetTouched();
       resetForm();
       onOpenChange(false);
       onSuccess();
@@ -369,15 +349,7 @@ export function AmenityDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         className="sm:max-w-xl max-h-[85vh] overflow-y-auto"
-        onInteractOutside={(e) => {
-          if (formTouched.current) e.preventDefault();
-        }}
-        onEscapeKeyDown={(e) => {
-          if (formTouched.current) {
-            e.preventDefault();
-            setConfirmCloseOpen(true);
-          }
-        }}
+        {...dialogContentGuardProps}
       >
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit Amenity' : 'New Amenity'}</DialogTitle>
@@ -879,23 +851,11 @@ export function AmenityDialog({
       }}
     />
 
-    {/* Unsaved changes confirmation */}
-    <AlertDialog open={confirmCloseOpen} onOpenChange={setConfirmCloseOpen}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Unsaved changes</AlertDialogTitle>
-          <AlertDialogDescription>
-            You have unsaved changes. Are you sure you want to close without saving?
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Keep editing</AlertDialogCancel>
-          <Button variant="destructive" onClick={handleConfirmClose}>
-            Discard changes
-          </Button>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <DialogUnsavedChangesAlert
+      open={confirmCloseOpen}
+      onOpenChange={setConfirmCloseOpen}
+      onDiscard={handleConfirmClose}
+    />
     </>
   );
 }

@@ -1,6 +1,6 @@
 'use server';
 
-import { queueAnnouncementNotification, queueWelcomeInvite, queueEventNotification } from '@/lib/email/queue';
+import { queueAnnouncementNotification, queueWelcomeInvite, queueEventNotification, queueBallotNotification } from '@/lib/email/queue';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
@@ -115,6 +115,28 @@ export async function sendEventNotificationEmails(
   } catch (error) {
     console.error('Failed to queue event notification emails:', error);
     return { success: false, error: 'Failed to queue event emails' };
+  }
+}
+
+export async function sendBallotEmails(
+  communityId: string,
+  communitySlug: string,
+  ballotTitle: string,
+  ballotType: string,
+  variant: 'opened' | 'closed' | 'results_published',
+  closesAt?: string,
+) {
+  const auth = await requireBoardAuth(communityId);
+  if (!auth.authorized) {
+    return { success: false, error: auth.error };
+  }
+
+  try {
+    await queueBallotNotification(communityId, communitySlug, ballotTitle, ballotType, variant, closesAt);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to queue ballot notification emails:', error);
+    return { success: false, error: 'Failed to queue ballot emails' };
   }
 }
 

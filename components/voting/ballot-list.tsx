@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { logAuditEvent } from '@/lib/audit';
+import { sendBallotEmails } from '@/lib/actions/email-actions';
 import { BallotStatusBadge } from './ballot-status-badge';
 import { QuorumTracker } from './quorum-tracker';
 import type { Ballot, BallotEligibility } from '@/lib/types/database';
@@ -120,6 +121,16 @@ export function BallotList({
           p_reference_id: ballot.id,
           p_reference_type: 'ballot',
         });
+
+        // Queue ballot opened email notifications (fire-and-forget)
+        sendBallotEmails(
+          community.id,
+          community.slug,
+          ballot.title,
+          ballot.ballot_type,
+          'opened',
+          ballot.closes_at,
+        ).catch((err) => console.error('Failed to queue ballot opened emails:', err));
       }
     } else if (action === 'close') {
       const { data, error } = await supabase.rpc('close_and_tally_ballot', { p_ballot_id: ballot.id });
@@ -146,6 +157,15 @@ export function BallotList({
           p_reference_id: ballot.id,
           p_reference_type: 'ballot',
         });
+
+        // Queue ballot closed email notifications (fire-and-forget)
+        sendBallotEmails(
+          community.id,
+          community.slug,
+          ballot.title,
+          ballot.ballot_type,
+          'closed',
+        ).catch((err) => console.error('Failed to queue ballot closed emails:', err));
       }
     } else if (action === 'cancel') {
       await supabase.from('ballots').update({ status: 'cancelled' }).eq('id', ballot.id);

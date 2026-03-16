@@ -5,13 +5,15 @@ import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Button } from '@/components/shared/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/shared/ui/tabs';
-import { Vote, Plus } from 'lucide-react';
+import { Vote, Plus, ShieldCheck } from 'lucide-react';
 import { BallotList } from '@/components/voting/ballot-list';
 import { CreateBallotDialog } from '@/components/voting/create-ballot-dialog';
 import { VoteDialog } from '@/components/voting/vote-dialog';
 import { ResultsViewer } from '@/components/voting/results-viewer';
+import { ProxyManager } from '@/components/voting/proxy-manager';
 import { VotingUpsell } from '@/components/voting/voting-upsell';
-import type { Ballot } from '@/lib/types/database';
+import type { Ballot, VotingConfig } from '@/lib/types/database';
+import { VOTING_CONFIG_DEFAULTS } from '@/lib/types/database';
 
 export default function VotingPage() {
   const { community, isBoard } = useCommunity();
@@ -23,6 +25,8 @@ export default function VotingPage() {
   const [editBallot, setEditBallot] = useState<Ballot | null>(null);
   const [voteBallot, setVoteBallot] = useState<Ballot | null>(null);
   const [resultsBallot, setResultsBallot] = useState<Ballot | null>(null);
+  const [proxyOpen, setProxyOpen] = useState(false);
+  const votingConfig: VotingConfig = { ...VOTING_CONFIG_DEFAULTS, ...(community?.theme?.voting_config as Partial<VotingConfig> | undefined) };
 
   const fetchBallots = useCallback(async () => {
     const supabase = createClient();
@@ -81,12 +85,20 @@ export default function VotingPage() {
             Voting
           </h1>
         </div>
-        {isBoard && (
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus className="h-4 w-4 mr-1" />
-            Create Ballot
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {votingConfig.proxy_voting_allowed && (
+            <Button variant="outline" onClick={() => setProxyOpen(true)}>
+              <ShieldCheck className="h-4 w-4 mr-1" />
+              Proxy
+            </Button>
+          )}
+          {isBoard && (
+            <Button onClick={() => setCreateOpen(true)}>
+              <Plus className="h-4 w-4 mr-1" />
+              Create Ballot
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}
@@ -172,6 +184,9 @@ export default function VotingPage() {
           onUpdated={fetchBallots}
         />
       )}
+
+      {/* Proxy Manager */}
+      <ProxyManager open={proxyOpen} onOpenChange={setProxyOpen} />
     </div>
   );
 }

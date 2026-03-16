@@ -69,6 +69,32 @@ export interface BulletinSettings {
   commenting: 'board_only' | 'all_households';
 }
 
+export interface VotingConfig {
+  default_quorum_percent: number;
+  election_notice_days: number;
+  meeting_notice_days: number;
+  proxy_voting_allowed: boolean;
+  proxy_voting_for_elections: boolean;
+  proxy_validity_days: number;
+  secret_ballot_for_elections: boolean;
+  amendment_approval_threshold: number;
+  special_assessment_threshold: number;
+  electronic_voting_allowed: boolean;
+}
+
+export const VOTING_CONFIG_DEFAULTS: VotingConfig = {
+  default_quorum_percent: 30,
+  election_notice_days: 60,
+  meeting_notice_days: 14,
+  proxy_voting_allowed: true,
+  proxy_voting_for_elections: false,
+  proxy_validity_days: 90,
+  secret_ballot_for_elections: true,
+  amendment_approval_threshold: 67,
+  special_assessment_threshold: 67,
+  electronic_voting_allowed: true,
+};
+
 export type EmailSendingMode = 'default' | 'custom_domain' | 'subdomain';
 
 export interface EmailSettings {

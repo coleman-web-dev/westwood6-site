@@ -24,7 +24,8 @@ import { VendorsManager } from '@/components/settings/vendors-manager';
 
 import { StripeMigrationSection } from '@/components/settings/stripe-migration-section';
 import { InsuranceReminderSettings } from '@/components/settings/insurance-reminder-settings';
-import type { PaymentFrequency, BulletinSettings, LateFeeSettings } from '@/lib/types/database';
+import type { PaymentFrequency, BulletinSettings, LateFeeSettings, VotingConfig } from '@/lib/types/database';
+import { VOTING_CONFIG_DEFAULTS } from '@/lib/types/database';
 
 export function CommunitySettings() {
   const { community, member } = useCommunity();
@@ -52,6 +53,7 @@ export function CommunitySettings() {
   const [reminderDaysBefore, setReminderDaysBefore] = useState(7);
   const [reminderDaysAfter, setReminderDaysAfter] = useState(7);
   const [arcEnabled, setArcEnabled] = useState(false);
+  const [votingConfig, setVotingConfig] = useState<VotingConfig>(VOTING_CONFIG_DEFAULTS);
   const [saving, setSaving] = useState(false);
 
   // Load current values from community context
@@ -81,6 +83,8 @@ export function CommunitySettings() {
       setReminderDaysBefore((community.theme?.payment_settings?.reminder_days_before as number) ?? 7);
       setReminderDaysAfter((community.theme?.payment_settings?.reminder_days_after as number) ?? 7);
       setArcEnabled(!!community.theme?.arc_enabled);
+      const vc = community.theme?.voting_config as VotingConfig | undefined;
+      setVotingConfig({ ...VOTING_CONFIG_DEFAULTS, ...vc });
     }
   }, [community]);
 
@@ -109,7 +113,8 @@ export function CommunitySettings() {
       autoNotifyNewInvoices !== (!!community.theme?.payment_settings?.auto_notify_new_invoices) ||
       reminderDaysBefore !== ((community.theme?.payment_settings?.reminder_days_before as number) ?? 7) ||
       reminderDaysAfter !== ((community.theme?.payment_settings?.reminder_days_after as number) ?? 7) ||
-      arcEnabled !== (!!community.theme?.arc_enabled)
+      arcEnabled !== (!!community.theme?.arc_enabled) ||
+      JSON.stringify(votingConfig) !== JSON.stringify({ ...VOTING_CONFIG_DEFAULTS, ...(community.theme?.voting_config as VotingConfig | undefined) })
     );
   }, [
     name, address, phone, email,
@@ -118,7 +123,7 @@ export function CommunitySettings() {
     bulletinPosting, bulletinCommenting,
     lateFeesEnabled, gracePeriodDays, feeType, feeAmount, maxFee,
     autoGenerateInvoices, autoMarkOverdue, autoNotifyNewInvoices,
-    reminderDaysBefore, reminderDaysAfter, arcEnabled,
+    reminderDaysBefore, reminderDaysAfter, arcEnabled, votingConfig,
     community,
   ]);
 
@@ -171,6 +176,7 @@ export function CommunitySettings() {
             commenting: bulletinCommenting,
           },
           arc_enabled: arcEnabled,
+          voting_config: votingConfig,
         },
       })
       .eq('id', community.id);
@@ -678,6 +684,180 @@ export function CommunitySettings() {
               </div>
             </CollapsibleContent>
           </Collapsible>
+        </div>
+      </div>
+
+      {/* Voting Rules */}
+      <div className="bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark rounded-panel p-card-padding">
+        <h2 className="text-card-title text-text-primary-light dark:text-text-primary-dark mb-1">
+          Voting Rules
+        </h2>
+        <p className="text-meta text-text-muted-light dark:text-text-muted-dark mb-4">
+          Configure voting defaults based on your state statutes and community bylaws.
+          Florida HOA defaults are pre-filled.
+        </p>
+
+        <div className="space-y-4">
+          {/* Quorum & Thresholds */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                Default quorum (%)
+              </Label>
+              <Input
+                type="number"
+                min={1}
+                max={100}
+                value={votingConfig.default_quorum_percent}
+                onChange={(e) => setVotingConfig(prev => ({ ...prev, default_quorum_percent: Number(e.target.value) }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                Amendment approval (%)
+              </Label>
+              <Input
+                type="number"
+                min={1}
+                max={100}
+                value={votingConfig.amendment_approval_threshold}
+                onChange={(e) => setVotingConfig(prev => ({ ...prev, amendment_approval_threshold: Number(e.target.value) }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                Special assessment approval (%)
+              </Label>
+              <Input
+                type="number"
+                min={1}
+                max={100}
+                value={votingConfig.special_assessment_threshold}
+                onChange={(e) => setVotingConfig(prev => ({ ...prev, special_assessment_threshold: Number(e.target.value) }))}
+              />
+            </div>
+          </div>
+
+          <div className="border-t border-stroke-light dark:border-stroke-dark" />
+
+          {/* Notice Periods */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                Election notice period (days)
+              </Label>
+              <Input
+                type="number"
+                min={1}
+                max={120}
+                value={votingConfig.election_notice_days}
+                onChange={(e) => setVotingConfig(prev => ({ ...prev, election_notice_days: Number(e.target.value) }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                Meeting notice period (days)
+              </Label>
+              <Input
+                type="number"
+                min={1}
+                max={60}
+                value={votingConfig.meeting_notice_days}
+                onChange={(e) => setVotingConfig(prev => ({ ...prev, meeting_notice_days: Number(e.target.value) }))}
+              />
+            </div>
+          </div>
+
+          <div className="border-t border-stroke-light dark:border-stroke-dark" />
+
+          {/* Proxy Voting */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-body text-text-primary-light dark:text-text-primary-dark">
+                Allow proxy voting
+              </p>
+              <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                Members can authorize another member to vote on their behalf
+              </p>
+            </div>
+            <Switch
+              checked={votingConfig.proxy_voting_allowed}
+              onCheckedChange={(v) => setVotingConfig(prev => ({ ...prev, proxy_voting_allowed: v }))}
+            />
+          </div>
+
+          <Collapsible open={votingConfig.proxy_voting_allowed}>
+            <CollapsibleContent className="overflow-hidden transition-all data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+              <div className="border-t border-stroke-light dark:border-stroke-dark mt-4" />
+              <div className="space-y-4 pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-body text-text-primary-light dark:text-text-primary-dark">
+                      Allow proxy for board elections
+                    </p>
+                    <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                      Florida statute prohibits proxy voting for board elections by default
+                    </p>
+                  </div>
+                  <Switch
+                    checked={votingConfig.proxy_voting_for_elections}
+                    onCheckedChange={(v) => setVotingConfig(prev => ({ ...prev, proxy_voting_for_elections: v }))}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                    Proxy validity period (days)
+                  </Label>
+                  <div className="max-w-xs">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={votingConfig.proxy_validity_days}
+                      onChange={(e) => setVotingConfig(prev => ({ ...prev, proxy_validity_days: Number(e.target.value) }))}
+                    />
+                  </div>
+                </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
+          <div className="border-t border-stroke-light dark:border-stroke-dark" />
+
+          {/* Secret Ballot */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-body text-text-primary-light dark:text-text-primary-dark">
+                Secret ballot for elections
+              </p>
+              <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                Florida requires secret ballots for contested board elections
+              </p>
+            </div>
+            <Switch
+              checked={votingConfig.secret_ballot_for_elections}
+              onCheckedChange={(v) => setVotingConfig(prev => ({ ...prev, secret_ballot_for_elections: v }))}
+            />
+          </div>
+
+          <div className="border-t border-stroke-light dark:border-stroke-dark" />
+
+          {/* Electronic Voting */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-body text-text-primary-light dark:text-text-primary-dark">
+                Allow electronic voting
+              </p>
+              <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                Members can cast votes through the portal instead of in person
+              </p>
+            </div>
+            <Switch
+              checked={votingConfig.electronic_voting_allowed}
+              onCheckedChange={(v) => setVotingConfig(prev => ({ ...prev, electronic_voting_allowed: v }))}
+            />
+          </div>
         </div>
       </div>
 

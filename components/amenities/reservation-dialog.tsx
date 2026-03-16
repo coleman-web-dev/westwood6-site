@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
@@ -37,14 +37,8 @@ import {
   CommandGroup,
   CommandItem,
 } from '@/components/shared/ui/command';
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogFooter,
-  AlertDialogTitle,
-  AlertDialogDescription,
-} from '@/components/shared/ui/alert-dialog';
+import { useDialogUnsavedChanges } from '@/lib/hooks/use-dialog-unsaved-changes';
+import { DialogUnsavedChangesAlert } from '@/components/shared/dialog-unsaved-changes-alert';
 import { Check, ChevronsUpDown, ChevronLeft, FileSignature } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -226,27 +220,15 @@ export function ReservationDialog({
   const [signatureName, setSignatureName] = useState('');
   const [eSignConsent, setESignConsent] = useState(false);
 
-  // Dirty state tracking for close guard
-  const formTouched = useRef(false);
-  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
-
-  function touch() {
-    formTouched.current = true;
-  }
-
-  function handleOpenChange(newOpen: boolean) {
-    if (!newOpen && formTouched.current) {
-      setConfirmCloseOpen(true);
-      return;
-    }
-    onOpenChange(newOpen);
-  }
-
-  function handleConfirmClose() {
-    setConfirmCloseOpen(false);
-    formTouched.current = false;
-    onOpenChange(false);
-  }
+  const {
+    touch,
+    handleOpenChange,
+    confirmCloseOpen,
+    handleConfirmClose,
+    setConfirmCloseOpen,
+    resetTouched,
+    dialogContentGuardProps,
+  } = useDialogUnsavedChanges({ onOpenChange });
 
   // Reset step when dialog opens/closes
   useEffect(() => {
@@ -256,7 +238,7 @@ export function ReservationDialog({
       setFilledAgreement('');
       setSignatureName('');
       setESignConsent(false);
-      formTouched.current = false;
+      resetTouched();
     }
   }, [open]);
 
@@ -546,7 +528,7 @@ export function ReservationDialog({
     setFieldAnswers({});
     setSignatureName('');
     setStep(1);
-    formTouched.current = false;
+    resetTouched();
     onOpenChange(false);
     onSuccess();
   }
@@ -560,18 +542,7 @@ export function ReservationDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         className={`max-h-[85vh] overflow-y-auto ${step === 2 ? 'sm:max-w-lg' : 'sm:max-w-md'}`}
-        onInteractOutside={(e) => {
-          if (formTouched.current) {
-            e.preventDefault();
-            setConfirmCloseOpen(true);
-          }
-        }}
-        onEscapeKeyDown={(e) => {
-          if (formTouched.current) {
-            e.preventDefault();
-            setConfirmCloseOpen(true);
-          }
-        }}
+        {...dialogContentGuardProps}
       >
         <DialogHeader>
           <DialogTitle>
@@ -923,25 +894,13 @@ export function ReservationDialog({
       </DialogContent>
     </Dialog>
 
-    {/* Confirm-close guard */}
-    <AlertDialog open={confirmCloseOpen} onOpenChange={setConfirmCloseOpen}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Discard reservation?</AlertDialogTitle>
-          <AlertDialogDescription>
-            You have unsaved changes. If you close now, your progress will be lost.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <Button variant="outline" onClick={() => setConfirmCloseOpen(false)}>
-            Keep editing
-          </Button>
-          <Button variant="destructive" onClick={handleConfirmClose}>
-            Discard
-          </Button>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <DialogUnsavedChangesAlert
+      open={confirmCloseOpen}
+      onOpenChange={setConfirmCloseOpen}
+      onDiscard={handleConfirmClose}
+      title="Discard reservation?"
+      description="You have unsaved changes. If you close now, your progress will be lost."
+    />
     </>
   );
 }
