@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import {
@@ -24,13 +24,23 @@ import {
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
 import { logAuditEvent } from '@/lib/audit';
+import { ImagePlus, X } from 'lucide-react';
+import {
+  sendViolationNoticeEmail,
+  notifyHouseholdOfViolation,
+} from '@/lib/actions/violation-actions';
 import type { Unit, ViolationCategory, ViolationSeverity } from '@/lib/types/database';
+
+const MAX_FILES = 5;
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+const ACCEPTED_TYPES = '.jpg,.jpeg,.png,.webp,.heic';
 
 interface CreateViolationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   units: Unit[];
   communityId: string;
+  communitySlug: string;
   onCreated: () => void;
 }
 
@@ -39,18 +49,77 @@ export function CreateViolationDialog({
   onOpenChange,
   units,
   communityId,
+  communitySlug,
   onCreated,
 }: CreateViolationDialogProps) {
-  const { member } = useCommunity();
+  const { member, unit, isBoard } = useCommunity();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [unitId, setUnitId] = useState('');
   const [category, setCategory] = useState<ViolationCategory>('other');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [severity, setSeverity] = useState<ViolationSeverity>('warning');
+  const [files, setFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
 
+  // Residents auto-select their own unit; board picks from dropdown
+  const isResidentReporting = !isBoard;
+  const effectiveUnitId = isResidentReporting ? unit?.id ?? '' : unitId;
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const selected = Array.from(e.target.files ?? []);
+    const valid = selected.filter((f) => {
+      if (f.size > MAX_FILE_SIZE) {
+        toast.error(`${f.name} exceeds 10 MB limit.`);
+        return false;
+      }
+      return true;
+    });
+    setFiles((prev) => {
+      const combined = [...prev, ...valid].slice(0, MAX_FILES);
+      if (prev.length + valid.length > MAX_FILES) {
+        toast.error(`Maximum ${MAX_FILES} photos allowed.`);
+      }
+      return combined;
+    });
+    // Reset input so re-selecting the same file works
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  function removeFile(index: number) {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function uploadPhotos(supabase: ReturnType<typeof createClient>): Promise<string[]> {
+    if (files.length === 0) return [];
+
+    const urls: string[] = [];
+    for (const file of files) {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-');
+      const filePath = `${communityId}/violations/${Date.now()}_${safeName}`;
+
+      const { error } = await supabase.storage
+        .from('hoa-documents')
+        .upload(filePath, file);
+
+      if (error) {
+        toast.error(`Failed to upload ${file.name}.`);
+        continue;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('hoa-documents')
+        .getPublicUrl(filePath);
+
+      if (urlData?.publicUrl) {
+        urls.push(urlData.publicUrl);
+      }
+    }
+    return urls;
+  }
+
   async function handleCreate() {
-    if (!title.trim() || !unitId) {
+    if (!title.trim() || !effectiveUnitId) {
       toast.error('Please fill in all required fields.');
       return;
     }
@@ -63,19 +132,27 @@ export function CreateViolationDialog({
     setSaving(true);
     const supabase = createClient();
 
-    const { error } = await supabase.from('violations').insert({
-      community_id: communityId,
-      unit_id: unitId,
-      reported_by: member.id,
-      category,
-      title: title.trim(),
-      description: description.trim() || null,
-      severity,
-    });
+    // Upload photos first
+    const photoUrls = await uploadPhotos(supabase);
+
+    const { data: inserted, error } = await supabase
+      .from('violations')
+      .insert({
+        community_id: communityId,
+        unit_id: effectiveUnitId,
+        reported_by: member.id,
+        category,
+        title: title.trim(),
+        description: description.trim() || null,
+        severity,
+        photo_urls: photoUrls,
+      })
+      .select('id')
+      .single();
 
     setSaving(false);
 
-    if (error) {
+    if (error || !inserted) {
       toast.error('Failed to create violation. Please try again.');
       return;
     }
@@ -87,14 +164,37 @@ export function CreateViolationDialog({
       actorEmail: member?.email,
       action: 'violation_created',
       targetType: 'violation',
-      targetId: unitId,
+      targetId: inserted.id,
       metadata: { title: title.trim(), category, severity },
     });
+
+    // Fire-and-forget: notify household + queue email
+    notifyHouseholdOfViolation(
+      communityId,
+      effectiveUnitId,
+      inserted.id,
+      title.trim(),
+      category,
+    ).catch(() => {});
+
+    sendViolationNoticeEmail(
+      communityId,
+      communitySlug,
+      effectiveUnitId,
+      title.trim(),
+      category,
+      severity,
+      'courtesy',
+      description.trim() || undefined,
+    ).catch(() => {});
+
+    // Reset form
     setTitle('');
     setDescription('');
     setUnitId('');
     setCategory('other');
     setSeverity('warning');
+    setFiles([]);
     onOpenChange(false);
     onCreated();
   }
@@ -107,23 +207,37 @@ export function CreateViolationDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          <div className="space-y-1.5">
-            <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-              Unit *
-            </Label>
-            <Select value={unitId} onValueChange={setUnitId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select unit" />
-              </SelectTrigger>
-              <SelectContent>
-                {units.map((u) => (
-                  <SelectItem key={u.id} value={u.id}>
-                    Unit {u.unit_number}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Unit selector: board picks, residents see their unit */}
+          {isResidentReporting ? (
+            unit && (
+              <div className="space-y-1.5">
+                <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                  Unit
+                </Label>
+                <p className="text-body text-text-primary-light dark:text-text-primary-dark">
+                  Unit {unit.unit_number}
+                </p>
+              </div>
+            )
+          ) : (
+            <div className="space-y-1.5">
+              <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                Unit *
+              </Label>
+              <Select value={unitId} onValueChange={setUnitId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  {units.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      Unit {u.unit_number}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
@@ -186,6 +300,54 @@ export function CreateViolationDialog({
               rows={4}
               className="resize-none"
             />
+          </div>
+
+          {/* Photo upload */}
+          <div className="space-y-1.5">
+            <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+              Photos
+            </Label>
+            <div className="flex flex-wrap gap-2">
+              {files.map((file, i) => (
+                <div
+                  key={i}
+                  className="relative h-20 w-20 rounded-inner-card overflow-hidden border border-stroke-light dark:border-stroke-dark"
+                >
+                  <img
+                    src={URL.createObjectURL(file)}
+                    alt={file.name}
+                    className="h-full w-full object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeFile(i)}
+                    className="absolute top-0.5 right-0.5 rounded-full bg-black/60 p-0.5 text-white hover:bg-black/80"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+              {files.length < MAX_FILES && (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex h-20 w-20 items-center justify-center rounded-inner-card border-2 border-dashed border-stroke-light dark:border-stroke-dark text-text-muted-light dark:text-text-muted-dark hover:border-secondary-400/50 transition-colors"
+                >
+                  <ImagePlus className="h-5 w-5" />
+                </button>
+              )}
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ACCEPTED_TYPES}
+              multiple
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+              Up to {MAX_FILES} images, 10 MB each
+            </p>
           </div>
         </div>
 

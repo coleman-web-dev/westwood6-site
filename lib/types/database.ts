@@ -146,6 +146,7 @@ export interface Community {
     can_attend_events: boolean;
     can_submit_requests: boolean;
     can_view_directory: boolean;
+    can_report_violations: boolean;
   };
   created_at: string;
   archived_at: string | null;
@@ -554,7 +555,8 @@ export type NotificationType =
   | 'ballot_closed'
   | 'ballot_results'
   | 'proxy_requested'
-  | 'proxy_granted';
+  | 'proxy_granted'
+  | 'violation_created';
 
 export interface Notification {
   id: string;

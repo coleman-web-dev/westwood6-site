@@ -32,8 +32,12 @@ export function resolvePermissions(
   // super_admin always gets everything
   if (systemRole === 'super_admin') return allPermissions();
 
-  // Residents never get admin permissions
-  if (systemRole === 'resident') return noPermissions();
+  // Residents get read-only access to violations (scoped to own unit by RLS)
+  if (systemRole === 'resident') {
+    const perms = noPermissions();
+    perms.violations = { read: true, write: false };
+    return perms;
+  }
 
   // Board or manager
   if (systemRole === 'board' || systemRole === 'manager') {

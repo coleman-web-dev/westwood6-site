@@ -25,7 +25,9 @@ import {
 import { toast } from 'sonner';
 import { logAuditEvent } from '@/lib/audit';
 import { NoticeHistory } from '@/components/violations/notice-history';
-import type { Violation, ViolationStatus, ViolationNotice, NoticeType, DeliveryMethod } from '@/lib/types/database';
+import { sendViolationNoticeEmail } from '@/lib/actions/violation-actions';
+import type { ViolationStatus, ViolationNotice, NoticeType, DeliveryMethod } from '@/lib/types/database';
+import type { ViolationWithUnit } from '@/app/[slug]/(protected)/violations/page';
 
 const STATUS_LABELS: Record<ViolationStatus, string> = {
   reported: 'Reported',
@@ -48,7 +50,7 @@ const STATUS_VARIANT: Record<ViolationStatus, 'destructive' | 'default' | 'secon
 };
 
 interface ViolationDetailDialogProps {
-  violation: Violation | null;
+  violation: ViolationWithUnit | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdated: () => void;
@@ -175,6 +177,21 @@ export function ViolationDetailDialog({
       targetId: violation.id,
       metadata: { notice_type: noticeType },
     });
+
+    // Queue email to household
+    sendViolationNoticeEmail(
+      community.id,
+      community.slug,
+      violation.unit_id,
+      violation.title,
+      violation.category,
+      violation.severity,
+      noticeType,
+      violation.description ?? undefined,
+    ).catch(() => {
+      // Fire-and-forget; notice is already recorded
+    });
+
     setNoticeNotes('');
     fetchNotices();
     onUpdated();
@@ -188,6 +205,7 @@ export function ViolationDetailDialog({
         <DialogHeader>
           <DialogTitle>{violation.title}</DialogTitle>
           <DialogDescription>
+            {violation.units?.unit_number && `Unit ${violation.units.unit_number} · `}
             {violation.category.charAt(0).toUpperCase() + violation.category.slice(1)} violation
           </DialogDescription>
         </DialogHeader>
@@ -212,6 +230,32 @@ export function ViolationDetailDialog({
               <p className="text-body text-text-primary-light dark:text-text-primary-dark whitespace-pre-line">
                 {violation.description}
               </p>
+            </div>
+          )}
+
+          {/* Photos */}
+          {violation.photo_urls && violation.photo_urls.length > 0 && (
+            <div className="space-y-1.5">
+              <span className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                Photos
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {violation.photo_urls.map((url, i) => (
+                  <a
+                    key={i}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block rounded-inner-card overflow-hidden border border-stroke-light dark:border-stroke-dark hover:opacity-80 transition-opacity"
+                  >
+                    <img
+                      src={url}
+                      alt={`Violation photo ${i + 1}`}
+                      className="h-24 w-24 object-cover"
+                    />
+                  </a>
+                ))}
+              </div>
             </div>
           )}
 

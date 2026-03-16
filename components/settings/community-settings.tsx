@@ -38,6 +38,7 @@ export function CommunitySettings() {
   const [canAttendEvents, setCanAttendEvents] = useState(false);
   const [canSubmitRequests, setCanSubmitRequests] = useState(false);
   const [canViewDirectory, setCanViewDirectory] = useState(false);
+  const [canReportViolations, setCanReportViolations] = useState(false);
   const [allowFlexibleFrequency, setAllowFlexibleFrequency] = useState(false);
   const [defaultFrequency, setDefaultFrequency] = useState<PaymentFrequency>('quarterly');
   const [bulletinPosting, setBulletinPosting] = useState<BulletinSettings['posting']>('board_only');
@@ -67,6 +68,7 @@ export function CommunitySettings() {
       setCanAttendEvents(community.tenant_permissions?.can_attend_events ?? false);
       setCanSubmitRequests(community.tenant_permissions?.can_submit_requests ?? false);
       setCanViewDirectory(community.tenant_permissions?.can_view_directory ?? false);
+      setCanReportViolations(community.tenant_permissions?.can_report_violations ?? false);
       setAllowFlexibleFrequency(community.theme?.payment_settings?.allow_flexible_frequency ?? false);
       setDefaultFrequency(community.theme?.payment_settings?.default_frequency ?? 'quarterly');
       setBulletinPosting(community.theme?.bulletin_settings?.posting ?? 'board_only');
@@ -99,6 +101,7 @@ export function CommunitySettings() {
       canAttendEvents !== (community.tenant_permissions?.can_attend_events ?? false) ||
       canSubmitRequests !== (community.tenant_permissions?.can_submit_requests ?? false) ||
       canViewDirectory !== (community.tenant_permissions?.can_view_directory ?? false) ||
+      canReportViolations !== (community.tenant_permissions?.can_report_violations ?? false) ||
       allowFlexibleFrequency !== (community.theme?.payment_settings?.allow_flexible_frequency ?? false) ||
       defaultFrequency !== (community.theme?.payment_settings?.default_frequency ?? 'quarterly') ||
       bulletinPosting !== (community.theme?.bulletin_settings?.posting ?? 'board_only') ||
@@ -118,7 +121,7 @@ export function CommunitySettings() {
     );
   }, [
     name, address, phone, email,
-    canReserveAmenities, canAttendEvents, canSubmitRequests, canViewDirectory,
+    canReserveAmenities, canAttendEvents, canSubmitRequests, canViewDirectory, canReportViolations,
     allowFlexibleFrequency, defaultFrequency,
     bulletinPosting, bulletinCommenting,
     lateFeesEnabled, gracePeriodDays, feeType, feeAmount, maxFee,
@@ -152,6 +155,7 @@ export function CommunitySettings() {
           can_attend_events: canAttendEvents,
           can_submit_requests: canSubmitRequests,
           can_view_directory: canViewDirectory,
+          can_report_violations: canReportViolations,
         },
         theme: {
           ...community.theme,
@@ -350,6 +354,21 @@ export function CommunitySettings() {
             <Switch
               checked={canViewDirectory}
               onCheckedChange={setCanViewDirectory}
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-body text-text-primary-light dark:text-text-primary-dark">
+                Report violations
+              </p>
+              <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                Residents can submit violation reports for their unit
+              </p>
+            </div>
+            <Switch
+              checked={canReportViolations}
+              onCheckedChange={setCanReportViolations}
             />
           </div>
         </div>

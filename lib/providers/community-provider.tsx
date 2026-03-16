@@ -85,7 +85,13 @@ export function CommunityProvider({
     const resolvedPermissions = resolvePermissions(member, community);
 
     // View mode affects whether permissions are active
-    const activePermissions = viewMode === 'admin' ? resolvedPermissions : noPermissions();
+    // In personal view, preserve resident-level permissions (e.g. violations read)
+    const personalPermissions = (() => {
+      const perms = noPermissions();
+      perms.violations = { read: true, write: false };
+      return perms;
+    })();
+    const activePermissions = viewMode === 'admin' ? resolvedPermissions : personalPermissions;
 
     const configCards = community.theme?.dashboard_cards?.[role];
     const visibleCards = (configCards ?? DEFAULT_CARD_VISIBILITY[role]) as DashboardCardId[];

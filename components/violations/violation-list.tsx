@@ -1,7 +1,8 @@
 'use client';
 
 import { Badge } from '@/components/shared/ui/badge';
-import type { Violation, ViolationStatus, ViolationSeverity } from '@/lib/types/database';
+import type { ViolationStatus, ViolationSeverity } from '@/lib/types/database';
+import type { ViolationWithUnit } from '@/app/[slug]/(protected)/violations/page';
 
 const STATUS_LABELS: Record<ViolationStatus, string> = {
   reported: 'Reported',
@@ -41,9 +42,9 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 interface ViolationListProps {
-  violations: Violation[];
+  violations: ViolationWithUnit[];
   loading: boolean;
-  onSelect: (v: Violation) => void;
+  onSelect: (v: ViolationWithUnit) => void;
 }
 
 export function ViolationList({ violations, loading, onSelect }: ViolationListProps) {
@@ -95,6 +96,11 @@ export function ViolationList({ violations, loading, onSelect }: ViolationListPr
               </div>
 
               <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+                {v.units?.unit_number && (
+                  <p className="text-meta font-semibold text-text-secondary-light dark:text-text-secondary-dark">
+                    Unit {v.units.unit_number}
+                  </p>
+                )}
                 <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
                   {CATEGORY_LABELS[v.category] || v.category}
                 </p>

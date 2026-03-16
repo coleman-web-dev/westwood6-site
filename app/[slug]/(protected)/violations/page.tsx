@@ -10,6 +10,8 @@ import { CreateViolationDialog } from '@/components/violations/create-violation-
 import { ViolationDetailDialog } from '@/components/violations/violation-detail-dialog';
 import type { Violation, ViolationStatus, Unit } from '@/lib/types/database';
 
+export type ViolationWithUnit = Violation & { units?: { unit_number: string } | null };
+
 const STATUS_TABS: { value: string; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'reported', label: 'Reported' },
@@ -22,18 +24,21 @@ const STATUS_TABS: { value: string; label: string }[] = [
 
 export default function ViolationsPage() {
   const { isBoard, canRead, canWrite, community, unit } = useCommunity();
-  const [violations, setViolations] = useState<Violation[]>([]);
+  const [violations, setViolations] = useState<ViolationWithUnit[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
   const [createOpen, setCreateOpen] = useState(false);
-  const [selectedViolation, setSelectedViolation] = useState<Violation | null>(null);
+  const [selectedViolation, setSelectedViolation] = useState<ViolationWithUnit | null>(null);
+
+  const canReportViolations = !isBoard && !!community.tenant_permissions?.can_report_violations;
+  const showCreateButton = canWrite('violations') || canReportViolations;
 
   const fetchViolations = useCallback(async () => {
     const supabase = createClient();
     let query = supabase
       .from('violations')
-      .select('*')
+      .select('*, units(unit_number)')
       .eq('community_id', community.id)
       .order('created_at', { ascending: false });
 
@@ -42,7 +47,7 @@ export default function ViolationsPage() {
     }
 
     const { data } = await query;
-    setViolations((data as Violation[]) || []);
+    setViolations((data as ViolationWithUnit[]) || []);
     setLoading(false);
   }, [community.id, isBoard, unit]);
 
@@ -75,18 +80,18 @@ export default function ViolationsPage() {
         <div className="flex items-center gap-3">
           <ShieldAlert className="h-6 w-6 text-text-primary-light dark:text-text-primary-dark" />
           <h1 className="text-page-title text-text-primary-light dark:text-text-primary-dark">
-            {canRead('violations') ? 'Violations' : 'My Violations'}
+            {isBoard ? 'Violations' : 'My Violations'}
           </h1>
         </div>
-        {canWrite('violations') && (
+        {showCreateButton && (
           <Button onClick={() => setCreateOpen(true)}>
             Report Violation
           </Button>
         )}
       </div>
 
-      {/* Status filter tabs */}
-      {canRead('violations') && (
+      {/* Status filter tabs (board only) */}
+      {isBoard && (
         <div className="flex flex-wrap gap-2">
           {STATUS_TABS.map((tab) => (
             <button
@@ -111,12 +116,13 @@ export default function ViolationsPage() {
         onSelect={setSelectedViolation}
       />
 
-      {canWrite('violations') && (
+      {showCreateButton && (
         <CreateViolationDialog
           open={createOpen}
           onOpenChange={setCreateOpen}
           units={units}
           communityId={community.id}
+          communitySlug={community.slug}
           onCreated={fetchViolations}
         />
       )}

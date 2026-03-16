@@ -12,7 +12,7 @@ import {
   PopoverTrigger,
 } from '@/components/shared/ui/popover';
 import { ScrollArea } from '@/components/shared/ui/scroll-area';
-import { BellIcon, FileSignature, CalendarCheck, CheckCheck, Vote, Users } from 'lucide-react';
+import { BellIcon, FileSignature, CalendarCheck, CheckCheck, Vote, Users, ShieldAlert } from 'lucide-react';
 import { SignedAgreementViewer } from '@/components/amenities/signed-agreement-viewer';
 import type { Notification, NotificationType } from '@/lib/types/database';
 
@@ -28,6 +28,7 @@ const TYPE_ICON: Record<NotificationType, React.ReactNode> = {
   ballot_results: <Vote className="h-4 w-4 text-primary-500" />,
   proxy_requested: <Users className="h-4 w-4 text-secondary-500" />,
   proxy_granted: <Users className="h-4 w-4 text-green-500" />,
+  violation_created: <ShieldAlert className="h-4 w-4 text-red-500" />,
   general: <BellIcon className="h-4 w-4 text-text-muted-light dark:text-text-muted-dark" />,
 };
 
@@ -115,6 +116,13 @@ export function NotificationBell() {
     if (RESERVATION_NOTIFICATION_TYPES.includes(n.type) || n.reference_type === 'reservation') {
       setOpen(false);
       router.push(`/${community.slug}/amenities`);
+      return;
+    }
+
+    // Navigate to violations page for violation notifications
+    if (n.type === 'violation_created' || n.reference_type === 'violation') {
+      setOpen(false);
+      router.push(`/${community.slug}/violations`);
       return;
     }
 
