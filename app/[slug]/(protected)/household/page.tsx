@@ -11,7 +11,9 @@ import { SignedAgreementsSection } from '@/components/household/signed-agreement
 import { HouseholdFinancialSummary } from '@/components/household/household-financial-summary';
 import { HouseholdVotingHistory } from '@/components/household/household-voting-history';
 import { HouseholdPaymentHistory } from '@/components/household/household-payment-history';
-import { Home, FileSignature, Check, ChevronsUpDown, ArrowLeft } from 'lucide-react';
+import { AddUnitDialog } from '@/components/household/add-unit-dialog';
+import { EditUnitDialog } from '@/components/household/edit-unit-dialog';
+import { Home, FileSignature, Check, ChevronsUpDown, ArrowLeft, Plus, Pencil } from 'lucide-react';
 import { Button } from '@/components/shared/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/shared/ui/popover';
 import {
@@ -47,6 +49,9 @@ export default function HouseholdPage() {
   const [loading, setLoading] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [moveOutOpen, setMoveOutOpen] = useState(false);
+  const [addUnitOpen, setAddUnitOpen] = useState(false);
+  const [editUnitOpen, setEditUnitOpen] = useState(false);
+  const [unitsRefreshKey, setUnitsRefreshKey] = useState(0);
 
   const canManage = canManageHousehold || isBoard;
 
@@ -114,7 +119,7 @@ export default function HouseholdPage() {
     }
     loadUnits();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isBoard, community.id]);
+  }, [isBoard, community.id, unitsRefreshKey]);
 
   // Update selectedUnit when selection changes
   useEffect(() => {
@@ -222,83 +227,107 @@ export default function HouseholdPage() {
       </div>
 
       {/* Board: searchable unit selector */}
-      {isBoard && allUnits.length > 0 && (
-        <Popover open={comboOpen} onOpenChange={setComboOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              role="combobox"
-              aria-expanded={comboOpen}
-              className="w-full max-w-md justify-between font-normal"
-            >
-              <span className="truncate">
-                {selectedUnit
-                  ? `Unit ${selectedUnit.unit_number}${selectedUnit.address ? ` - ${selectedUnit.address}` : ''}`
-                  : 'Select a unit'}
-              </span>
-              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-            <Command filter={(value, search) => value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0}>
-              <CommandInput placeholder="Search units..." className="h-9" />
-              <CommandList className="max-h-[200px]">
-                <CommandEmpty>No units found.</CommandEmpty>
-                <CommandGroup>
-                  {allUnits.map((u) => {
-                    const label = `Unit ${u.unit_number}${u.address ? ` - ${u.address}` : ''}`;
-                    const memberNames = unitMembersMap.get(u.id) ?? [];
-                    const searchValue = `${label} ${memberNames.join(' ')}`;
-                    return (
-                      <CommandItem
-                        key={u.id}
-                        value={searchValue}
-                        onSelect={() => {
-                          selectUnit(u.id);
-                          setComboOpen(false);
-                        }}
-                      >
-                        <Check
-                          className={cn(
-                            'mr-2 h-4 w-4',
-                            selectedUnitId === u.id ? 'opacity-100' : 'opacity-0',
-                          )}
-                        />
-                        <div className="min-w-0">
-                          <div className="truncate">{label}</div>
-                          {memberNames.length > 0 && (
-                            <div className="text-meta text-text-muted-light dark:text-text-muted-dark truncate">
-                              {memberNames.join(', ')}
+      {isBoard && (
+        <div className="flex items-center gap-2">
+          {allUnits.length > 0 && (
+            <Popover open={comboOpen} onOpenChange={setComboOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={comboOpen}
+                  className="w-full max-w-md justify-between font-normal"
+                >
+                  <span className="truncate">
+                    {selectedUnit
+                      ? `Unit ${selectedUnit.unit_number}${selectedUnit.address ? ` - ${selectedUnit.address}` : ''}`
+                      : 'Select a unit'}
+                  </span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                <Command filter={(value, search) => value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0}>
+                  <CommandInput placeholder="Search units..." className="h-9" />
+                  <CommandList className="max-h-[200px]">
+                    <CommandEmpty>No units found.</CommandEmpty>
+                    <CommandGroup>
+                      {allUnits.map((u) => {
+                        const label = `Unit ${u.unit_number}${u.address ? ` - ${u.address}` : ''}`;
+                        const memberNames = unitMembersMap.get(u.id) ?? [];
+                        const searchValue = `${label} ${memberNames.join(' ')}`;
+                        return (
+                          <CommandItem
+                            key={u.id}
+                            value={searchValue}
+                            onSelect={() => {
+                              selectUnit(u.id);
+                              setComboOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                'mr-2 h-4 w-4',
+                                selectedUnitId === u.id ? 'opacity-100' : 'opacity-0',
+                              )}
+                            />
+                            <div className="min-w-0">
+                              <div className="truncate">{label}</div>
+                              {memberNames.length > 0 && (
+                                <div className="text-meta text-text-muted-light dark:text-text-muted-dark truncate">
+                                  {memberNames.join(', ')}
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                      </CommandItem>
-                    );
-                  })}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
+                          </CommandItem>
+                        );
+                      })}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          )}
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setAddUnitOpen(true)}
+            title="Add unit"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
       )}
 
       {/* Unit info card */}
       {activeUnit && (
         <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding">
-          <div className="flex items-start gap-3">
-            <div className="rounded-lg bg-primary-100 dark:bg-primary-900/30 p-2.5 shrink-0">
-              <Home className="h-5 w-5 text-primary-600 dark:text-primary-400" />
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className="rounded-lg bg-primary-100 dark:bg-primary-900/30 p-2.5 shrink-0">
+                <Home className="h-5 w-5 text-primary-600 dark:text-primary-400" />
+              </div>
+              <div className="space-y-1">
+                <h2 className="text-card-title text-text-primary-light dark:text-text-primary-dark">
+                  Unit {activeUnit.unit_number}
+                </h2>
+                {activeUnit.address && (
+                  <p className="text-body text-text-secondary-light dark:text-text-secondary-dark">
+                    {activeUnit.address}
+                  </p>
+                )}
+              </div>
             </div>
-            <div className="space-y-1">
-              <h2 className="text-card-title text-text-primary-light dark:text-text-primary-dark">
-                Unit {activeUnit.unit_number}
-              </h2>
-              {activeUnit.address && (
-                <p className="text-body text-text-secondary-light dark:text-text-secondary-dark">
-                  {activeUnit.address}
-                </p>
-              )}
-            </div>
+            {isBoard && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setEditUnitOpen(true)}
+                title="Edit unit"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -361,6 +390,28 @@ export default function HouseholdPage() {
           open={moveOutOpen}
           onOpenChange={setMoveOutOpen}
           onSuccess={handleMoveOutComplete}
+        />
+      )}
+
+      {/* Add unit dialog (board only) */}
+      {isBoard && (
+        <AddUnitDialog
+          open={addUnitOpen}
+          onOpenChange={setAddUnitOpen}
+          onSuccess={(newUnitId) => {
+            setUnitsRefreshKey((k) => k + 1);
+            selectUnit(newUnitId);
+          }}
+        />
+      )}
+
+      {/* Edit unit dialog (board only) */}
+      {isBoard && selectedUnit && (
+        <EditUnitDialog
+          open={editUnitOpen}
+          onOpenChange={setEditUnitOpen}
+          unit={selectedUnit}
+          onSaved={() => setUnitsRefreshKey((k) => k + 1)}
         />
       )}
     </div>
