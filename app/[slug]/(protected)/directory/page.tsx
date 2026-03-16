@@ -5,7 +5,7 @@ import { Search, ArrowUpDown } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { MemberCard } from '@/components/directory/member-card';
-import { ExportCsvButton } from '@/components/documents/export-csv-button';
+import { ExportDirectoryButton } from '@/components/directory/export-directory-button';
 import {
   Select,
   SelectContent,
@@ -38,12 +38,15 @@ type DirectoryMember = Member & { unit: { unit_number: string; address: string |
 const memberColumns: CsvColumn<DirectoryMember>[] = [
   { header: 'First Name', value: (m) => m.first_name },
   { header: 'Last Name', value: (m) => m.last_name },
-  { header: 'Role', value: (m) => m.member_role },
-  { header: 'System Role', value: (m) => m.system_role },
   { header: 'Unit Number', value: (m) => m.unit?.unit_number ?? '' },
-  { header: 'Address', value: (m) => m.unit?.address ?? '' },
-  { header: 'Email', value: (m) => m.email },
+  { header: 'Physical Address', value: (m) => m.unit?.address ?? '' },
+  { header: 'Mailing Address', value: (m) => {
+    if (m.use_unit_address !== false) return m.unit?.address ?? '';
+    const parts = [m.mailing_address_line1, m.mailing_address_line2, m.mailing_city, m.mailing_state, m.mailing_zip].filter(Boolean);
+    return parts.join(', ');
+  }},
   { header: 'Phone', value: (m) => m.phone },
+  { header: 'Email', value: (m) => m.email },
 ];
 
 export default function DirectoryPage() {
@@ -153,8 +156,7 @@ export default function DirectoryPage() {
           Directory
         </h1>
         {isBoard && members.length > 0 && member && (
-          <ExportCsvButton
-            filename="member-directory.csv"
+          <ExportDirectoryButton
             getData={() => members}
             columns={memberColumns}
             saveConfig={{
