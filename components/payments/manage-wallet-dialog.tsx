@@ -24,6 +24,7 @@ import {
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
 import { logAuditEvent } from '@/lib/audit';
+import { postManualWalletCreditAction, postManualWalletDebitAction } from '@/lib/actions/accounting-actions';
 
 interface ManageWalletDialogProps {
   unitId: string;
@@ -96,6 +97,13 @@ export function ManageWalletDialog({
     if (walletError) {
       toast.error('Transaction recorded but balance update failed. Please contact support.');
       return;
+    }
+
+    // GL posting
+    if (type === 'credit') {
+      void postManualWalletCreditAction(community.id, unitId, cents, description.trim());
+    } else {
+      void postManualWalletDebitAction(community.id, unitId, cents, description.trim());
     }
 
     logAuditEvent({

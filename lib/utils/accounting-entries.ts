@@ -355,6 +355,156 @@ export async function postEstoppelFeeReceived(
   });
 }
 
+/** Amenity deposit received: DR Operating Cash, CR Amenity Deposits Payable (liability) */
+export async function postAmenityDepositReceived(
+  communityId: string,
+  reservationId: string,
+  unitId: string,
+  amount: number,
+  amenityName: string,
+) {
+  return createJournalEntry({
+    communityId,
+    description: `Security deposit received: ${amenityName}`,
+    source: 'payment_received',
+    referenceType: 'reservation',
+    referenceId: reservationId,
+    unitId,
+    lines: [
+      { accountCode: '1000', debit: amount, credit: 0, description: 'Operating Cash' },
+      { accountCode: '2200', debit: 0, credit: amount, description: 'Amenity Deposits Payable' },
+    ],
+  });
+}
+
+/** Amenity deposit returned: DR Amenity Deposits Payable, CR Operating Cash */
+export async function postAmenityDepositReturned(
+  communityId: string,
+  reservationId: string,
+  unitId: string,
+  amount: number,
+  amenityName: string,
+) {
+  return createJournalEntry({
+    communityId,
+    description: `Security deposit returned: ${amenityName}`,
+    source: 'refund',
+    referenceType: 'reservation',
+    referenceId: reservationId,
+    unitId,
+    lines: [
+      { accountCode: '2200', debit: amount, credit: 0, description: 'Amenity Deposits Payable' },
+      { accountCode: '1000', debit: 0, credit: amount, description: 'Operating Cash' },
+    ],
+  });
+}
+
+/** Amenity deposit retained (forfeited by resident): DR Amenity Deposits Payable, CR Other Income */
+export async function postAmenityDepositRetained(
+  communityId: string,
+  reservationId: string,
+  unitId: string,
+  amount: number,
+  amenityName: string,
+) {
+  return createJournalEntry({
+    communityId,
+    description: `Security deposit retained: ${amenityName}`,
+    source: 'payment_received',
+    referenceType: 'reservation',
+    referenceId: reservationId,
+    unitId,
+    lines: [
+      { accountCode: '2200', debit: amount, credit: 0, description: 'Amenity Deposits Payable' },
+      { accountCode: '4400', debit: 0, credit: amount, description: 'Other Income (forfeited deposit)' },
+    ],
+  });
+}
+
+/** Event RSVP fee received: DR Operating Cash, CR Amenity Fee Revenue */
+export async function postEventRsvpFeeReceived(
+  communityId: string,
+  rsvpId: string,
+  amount: number,
+  eventTitle: string,
+) {
+  return createJournalEntry({
+    communityId,
+    description: `Event RSVP fee: ${eventTitle}`,
+    source: 'payment_received',
+    referenceType: 'event_rsvp',
+    referenceId: rsvpId,
+    lines: [
+      { accountCode: '1000', debit: amount, credit: 0, description: 'Operating Cash' },
+      { accountCode: '4200', debit: 0, credit: amount, description: 'Amenity Fee Revenue' },
+    ],
+  });
+}
+
+/** Bounced check: reverse original payment, void original invoice AR */
+export async function postBouncedCheckReversal(
+  communityId: string,
+  invoiceId: string,
+  unitId: string,
+  amount: number,
+  description: string,
+) {
+  return createJournalEntry({
+    communityId,
+    description: `Bounced check reversal: ${description}`,
+    source: 'payment_received',
+    referenceType: 'invoice',
+    referenceId: invoiceId,
+    unitId,
+    lines: [
+      { accountCode: '1100', debit: amount, credit: 0, description: 'Accounts Receivable (reinstated)' },
+      { accountCode: '1000', debit: 0, credit: amount, description: 'Operating Cash (reversed)' },
+    ],
+  });
+}
+
+/** Manual wallet credit: DR Operating Cash, CR Wallet Credits */
+export async function postManualWalletCredit(
+  communityId: string,
+  unitId: string,
+  amount: number,
+  description: string,
+) {
+  return createJournalEntry({
+    communityId,
+    description: `Manual wallet credit: ${description || 'Adjustment'}`,
+    source: 'wallet_credit',
+    referenceType: 'wallet',
+    referenceId: unitId,
+    unitId,
+    lines: [
+      { accountCode: '1000', debit: amount, credit: 0, description: 'Operating Cash' },
+      { accountCode: '2110', debit: 0, credit: amount, description: 'Wallet Credits' },
+    ],
+  });
+}
+
+/** Manual wallet debit: DR Wallet Credits, CR Operating Cash */
+export async function postManualWalletDebit(
+  communityId: string,
+  unitId: string,
+  amount: number,
+  description: string,
+) {
+  return createJournalEntry({
+    communityId,
+    description: `Manual wallet debit: ${description || 'Adjustment'}`,
+    source: 'wallet_debit',
+    referenceType: 'wallet',
+    referenceId: unitId,
+    unitId,
+    lines: [
+      { accountCode: '2110', debit: amount, credit: 0, description: 'Wallet Credits' },
+      { accountCode: '1000', debit: 0, credit: amount, description: 'Operating Cash' },
+    ],
+  });
+}
+
 /**
  * Reverse an existing journal entry.
  * Creates a new entry with swapped debits/credits and links them.

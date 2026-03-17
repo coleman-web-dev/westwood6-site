@@ -16,6 +16,7 @@ import { Button } from '@/components/shared/ui/button';
 import { Input } from '@/components/shared/ui/input';
 import { toast } from 'sonner';
 import { logAuditEvent } from '@/lib/audit';
+import { postBouncedCheckReversalAction, postInvoiceVoidedAction } from '@/lib/actions/accounting-actions';
 import type { Invoice } from '@/lib/types/database';
 
 interface BounceInvoiceDialogProps {
@@ -101,6 +102,10 @@ export function BounceInvoiceDialog({
       toast.error('Original invoice voided, but failed to create replacement. Please create manually.');
       return;
     }
+
+    // GL: void the original invoice and reverse the payment
+    void postInvoiceVoidedAction(community.id, invoice.id, invoice.unit_id, invoice.amount, invoice.title);
+    void postBouncedCheckReversalAction(community.id, invoice.id, invoice.unit_id, invoice.amount, invoice.title);
 
     logAuditEvent({
       communityId: community.id,

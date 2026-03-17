@@ -10,6 +10,11 @@ import {
   postInterFundTransfer,
   reverseJournalEntry,
   createJournalEntry,
+  postBouncedCheckReversal,
+  postManualWalletCredit,
+  postManualWalletDebit,
+  postAmenityDepositReturned,
+  postAmenityDepositRetained,
 } from '@/lib/utils/accounting-entries';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
@@ -96,6 +101,89 @@ export async function reverseJournalEntryAction(
   } catch (error) {
     console.error('Failed to reverse journal entry:', error);
     return { success: false, error: 'Failed to reverse entry' };
+  }
+}
+
+/** Post journal entry for bounced check reversal (called from client component) */
+export async function postBouncedCheckReversalAction(
+  communityId: string,
+  invoiceId: string,
+  unitId: string,
+  amount: number,
+  description: string,
+) {
+  try {
+    await postBouncedCheckReversal(communityId, invoiceId, unitId, amount, description);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to post bounced check reversal journal entry:', error);
+    return { success: false };
+  }
+}
+
+/** Post journal entry for manual wallet credit (called from client component) */
+export async function postManualWalletCreditAction(
+  communityId: string,
+  unitId: string,
+  amount: number,
+  description: string,
+) {
+  try {
+    await postManualWalletCredit(communityId, unitId, amount, description);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to post manual wallet credit journal entry:', error);
+    return { success: false };
+  }
+}
+
+/** Post journal entry for manual wallet debit (called from client component) */
+export async function postManualWalletDebitAction(
+  communityId: string,
+  unitId: string,
+  amount: number,
+  description: string,
+) {
+  try {
+    await postManualWalletDebit(communityId, unitId, amount, description);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to post manual wallet debit journal entry:', error);
+    return { success: false };
+  }
+}
+
+/** Post journal entry for amenity deposit return (called from client component) */
+export async function postAmenityDepositReturnedAction(
+  communityId: string,
+  reservationId: string,
+  unitId: string,
+  amount: number,
+  amenityName: string,
+) {
+  try {
+    await postAmenityDepositReturned(communityId, reservationId, unitId, amount, amenityName);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to post amenity deposit returned journal entry:', error);
+    return { success: false };
+  }
+}
+
+/** Post journal entry for retained (forfeited) deposit portion (called from client component) */
+export async function postAmenityDepositRetainedAction(
+  communityId: string,
+  reservationId: string,
+  unitId: string,
+  amount: number,
+  amenityName: string,
+) {
+  try {
+    await postAmenityDepositRetained(communityId, reservationId, unitId, amount, amenityName);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to post amenity deposit retained journal entry:', error);
+    return { success: false };
   }
 }
 

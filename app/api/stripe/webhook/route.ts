@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getStripeClient } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { queuePaymentConfirmation } from '@/lib/email/queue';
-import { postPaymentReceived, postOverpaymentWalletCredit, postEstoppelFeeReceived } from '@/lib/utils/accounting-entries';
+import { postPaymentReceived, postOverpaymentWalletCredit, postEstoppelFeeReceived, postAmenityDepositReceived, postEventRsvpFeeReceived } from '@/lib/utils/accounting-entries';
 import { logAuditEvent } from '@/lib/audit';
 import type Stripe from 'stripe';
 
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
           // Idempotency: check if already paid
           const { data: reservation } = await supabase
             .from('reservations')
-            .select('id, deposit_paid')
+            .select('id, deposit_paid, deposit_amount, unit_id, amenity_id')
             .eq('id', reservationId)
             .single();
 
@@ -81,6 +81,22 @@ export async function POST(req: NextRequest) {
               p_reference_id: reservationId,
               p_reference_type: 'reservation',
             });
+
+            // GL posting: DR Operating Cash, CR Amenity Deposits Payable
+            if (reservation.deposit_amount && reservation.unit_id) {
+              const { data: amenity } = await supabase
+                .from('amenities')
+                .select('name')
+                .eq('id', reservation.amenity_id)
+                .single();
+              void postAmenityDepositReceived(
+                communityId,
+                reservationId,
+                reservation.unit_id,
+                reservation.deposit_amount,
+                amenity?.name || 'Amenity',
+              );
+            }
 
             await logAuditEvent({
               communityId: communityId,
@@ -130,6 +146,12 @@ export async function POST(req: NextRequest) {
                 p_reference_id: rsvp.event_id,
                 p_reference_type: 'event',
               });
+
+              // GL posting: DR Operating Cash, CR Amenity Fee Revenue
+              const rsvpAmount = session.amount_total || 0;
+              if (rsvpAmount > 0) {
+                void postEventRsvpFeeReceived(communityId, rsvpId, rsvpAmount, rsvpEvent.title);
+              }
             }
 
             console.log('RSVP payment confirmed:', rsvpId);

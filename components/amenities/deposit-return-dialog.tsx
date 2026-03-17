@@ -16,6 +16,7 @@ import { Button } from '@/components/shared/ui/button';
 import { Input } from '@/components/shared/ui/input';
 import { toast } from 'sonner';
 import { logAuditEvent } from '@/lib/audit';
+import { postAmenityDepositReturnedAction, postAmenityDepositRetainedAction } from '@/lib/actions/accounting-actions';
 import type { Reservation } from '@/lib/types/database';
 
 type ReservationWithDetails = Reservation & {
@@ -102,6 +103,12 @@ export function DepositReturnDialog({
           toast.success(`$${refundDollars} refunded to card. $${(retainedCents / 100).toFixed(2)} retained.`);
         } else {
           toast.success(`$${refundDollars} refunded to the original payment method.`);
+        }
+        // GL: return portion
+        if (reservation.unit_id) void postAmenityDepositReturnedAction(community.id, reservation.id, reservation.unit_id, refundCents, reservation.amenities.name);
+        // GL: retained portion as income
+        if (retainedCents > 0 && reservation.unit_id) {
+          void postAmenityDepositRetainedAction(community.id, reservation.id, reservation.unit_id, retainedCents, reservation.amenities.name);
         }
         logAuditEvent({
           communityId: community.id,
@@ -208,6 +215,13 @@ export function DepositReturnDialog({
       } else {
         toast.success('Deposit marked as returned via check.');
       }
+    }
+
+    // GL: return portion
+    if (reservation.unit_id) void postAmenityDepositReturnedAction(community.id, reservation.id, reservation.unit_id, refundCents, reservation.amenities.name);
+    // GL: retained portion as income
+    if (retainedCents > 0 && reservation.unit_id) {
+      void postAmenityDepositRetainedAction(community.id, reservation.id, reservation.unit_id, retainedCents, reservation.amenities.name);
     }
 
     logAuditEvent({
