@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import {
@@ -13,14 +13,14 @@ import {
 import { Button } from '@/components/shared/ui/button';
 import { Input } from '@/components/shared/ui/input';
 import { Label } from '@/components/shared/ui/label';
-import { Textarea } from '@/components/shared/ui/textarea';
 import { ScrollArea } from '@/components/shared/ui/scroll-area';
 import { Badge } from '@/components/shared/ui/badge';
 import { Switch } from '@/components/shared/ui/switch';
 import { toast } from 'sonner';
-import { Loader2, Send, Save, X } from 'lucide-react';
+import { Loader2, Send, Save, X, RefreshCw } from 'lucide-react';
 import type { EstoppelRequest, EstoppelSettings, EstoppelField } from '@/lib/types/database';
 import { partitionEstoppelFieldsByPhase, fillEstoppelTemplateHtml } from '@/lib/utils/estoppel-template';
+import { fetchEstoppelSystemFields } from '@/lib/actions/estoppel-actions';
 
 interface EstoppelReviewDialogProps {
   open: boolean;
@@ -49,6 +49,31 @@ export function EstoppelReviewDialog({
   const [eSignConsent, setESignConsent] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
+
+  // System fields: loaded on-demand from the ledger
+  const existingSystemFields = (request.system_fields as Record<string, string>) ?? {};
+  const hasExistingFields = Object.keys(existingSystemFields).length > 0;
+  const [systemFields, setSystemFields] = useState<Record<string, string>>(existingSystemFields);
+  const [systemFieldsLoading, setSystemFieldsLoading] = useState(!hasExistingFields);
+
+  const loadSystemFields = useCallback(async () => {
+    setSystemFieldsLoading(true);
+    try {
+      const fields = await fetchEstoppelSystemFields(communityId, request.unit_id);
+      setSystemFields(fields);
+    } catch (err) {
+      console.error('Failed to fetch system fields:', err);
+      toast.error('Failed to load financial data.');
+    } finally {
+      setSystemFieldsLoading(false);
+    }
+  }, [communityId, request.unit_id]);
+
+  useEffect(() => {
+    if (open && !hasExistingFields) {
+      loadSystemFields();
+    }
+  }, [open, hasExistingFields, loadSystemFields]);
 
   function updateBoardAnswer(key: string, value: string) {
     setBoardAnswers((prev) => ({ ...prev, [key]: value }));
@@ -105,6 +130,7 @@ export function EstoppelReviewDialog({
       .from('estoppel_requests')
       .update({
         board_fields: boardAnswers,
+        system_fields: systemFields,
         status: 'in_review',
         completed_by_name: signatureName || null,
         completed_by_title: signatureTitle || null,
@@ -187,7 +213,6 @@ export function EstoppelReviewDialog({
   }
 
   const requesterFields = request.requester_fields as Record<string, string>;
-  const systemFields = request.system_fields as Record<string, string>;
   const boardFieldKeys = new Set(boardFieldDefs.map((f) => f.key));
 
   // Merge signature fields into board answers for template preview
@@ -236,15 +261,36 @@ export function EstoppelReviewDialog({
               </div>
             </div>
 
-            {/* System-filled Info (read-only) */}
+            {/* System-filled Info (loaded on-demand from ledger) */}
             <div>
-              <h3 className="text-section-title text-text-primary-light dark:text-text-primary-dark mb-2">
-                Financial Status
-                <Badge variant="secondary" className="ml-2 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-[10px]">
-                  Auto-filled
+              <div className="flex items-center gap-2 mb-2">
+                <h3 className="text-section-title text-text-primary-light dark:text-text-primary-dark">
+                  Financial Status
+                </h3>
+                <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-[10px]">
+                  From Ledger
                 </Badge>
-              </h3>
-              {Object.keys(systemFields).length > 0 ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-[11px]"
+                  onClick={loadSystemFields}
+                  disabled={systemFieldsLoading}
+                >
+                  {systemFieldsLoading ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3 w-3" />
+                  )}
+                  <span className="ml-1">Refresh</span>
+                </Button>
+              </div>
+              {systemFieldsLoading ? (
+                <div className="flex items-center gap-2 py-4 text-body text-text-muted-light dark:text-text-muted-dark">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading financial data from ledger...
+                </div>
+              ) : Object.keys(systemFields).length > 0 ? (
                 <div className="grid grid-cols-2 gap-2 text-body">
                   {Object.entries(systemFields).map(([key, value]) => (
                     <div key={key}>

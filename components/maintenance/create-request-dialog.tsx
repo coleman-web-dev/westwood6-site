@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import {
@@ -12,8 +12,16 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/shared/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/shared/ui/select';
 import { Button } from '@/components/shared/ui/button';
 import { Input } from '@/components/shared/ui/input';
+import { Label } from '@/components/shared/ui/label';
 import { Textarea } from '@/components/shared/ui/textarea';
 import { toast } from 'sonner';
 import { logAuditEvent } from '@/lib/audit';
@@ -29,14 +37,34 @@ export function CreateRequestDialog({
   onOpenChange,
   onSuccess,
 }: CreateRequestDialogProps) {
-  const { community, member, unit } = useCommunity();
+  const { community, member, unit, isBoard } = useCommunity();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [selectedUnitId, setSelectedUnitId] = useState('');
+  const [units, setUnits] = useState<Array<{ id: string; unit_number: string }>>([]);
+
+  // Board: fetch units when dialog opens
+  useEffect(() => {
+    if (open && isBoard) {
+      const supabase = createClient();
+      supabase
+        .from('units')
+        .select('id, unit_number')
+        .eq('community_id', community.id)
+        .order('unit_number')
+        .then(({ data }) => {
+          setUnits(data ?? []);
+        });
+    }
+  }, [open, isBoard, community.id]);
+
+  const effectiveUnitId = isBoard ? selectedUnitId : unit?.id ?? '';
 
   function resetForm() {
     setTitle('');
     setDescription('');
+    setSelectedUnitId('');
   }
 
   async function handleSubmit() {
@@ -45,14 +73,17 @@ export function CreateRequestDialog({
       return;
     }
 
-    if (!member || !unit) return;
+    if (!member || !effectiveUnitId) {
+      toast.error(isBoard ? 'Please select a unit.' : 'No unit assigned.');
+      return;
+    }
 
     setSubmitting(true);
     const supabase = createClient();
 
     const { error } = await supabase.from('maintenance_requests').insert({
       community_id: community.id,
-      unit_id: unit.id,
+      unit_id: effectiveUnitId,
       submitted_by: member.id,
       title: title.trim(),
       description: description.trim(),
@@ -73,7 +104,7 @@ export function CreateRequestDialog({
       actorEmail: member?.email,
       action: 'maintenance_created',
       targetType: 'maintenance_request',
-      targetId: unit.id,
+      targetId: effectiveUnitId,
       metadata: { title: title.trim() },
     });
     resetForm();
@@ -92,11 +123,41 @@ export function CreateRequestDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
+          {/* Unit selector: board picks, residents see their unit */}
+          {isBoard ? (
+            <div className="space-y-1.5">
+              <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                Unit *
+              </Label>
+              <Select value={selectedUnitId} onValueChange={setSelectedUnitId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  {units.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      Unit {u.unit_number}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : unit ? (
+            <div className="space-y-1.5">
+              <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                Unit
+              </Label>
+              <p className="text-body text-text-primary-light dark:text-text-primary-dark">
+                Unit {unit.unit_number}
+              </p>
+            </div>
+          ) : null}
+
           {/* Title */}
           <div className="space-y-1.5">
-            <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-              Title
-            </label>
+            <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+              Title *
+            </Label>
             <Input
               placeholder="Brief summary of the issue"
               value={title}
@@ -107,9 +168,9 @@ export function CreateRequestDialog({
 
           {/* Description */}
           <div className="space-y-1.5">
-            <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-              Description
-            </label>
+            <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+              Description *
+            </Label>
             <Textarea
               placeholder="Provide details about the issue, including location and any relevant context..."
               value={description}
@@ -126,7 +187,7 @@ export function CreateRequestDialog({
           </DialogClose>
           <Button
             onClick={handleSubmit}
-            disabled={submitting || !title.trim() || !description.trim()}
+            disabled={submitting || !title.trim() || !description.trim() || !effectiveUnitId}
           >
             {submitting ? 'Submitting...' : 'Submit Request'}
           </Button>

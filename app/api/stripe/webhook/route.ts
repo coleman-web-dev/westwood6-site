@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getStripeClient } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { queuePaymentConfirmation } from '@/lib/email/queue';
-import { postPaymentReceived, postOverpaymentWalletCredit } from '@/lib/utils/accounting-entries';
+import { postPaymentReceived, postOverpaymentWalletCredit, postEstoppelFeeReceived } from '@/lib/utils/accounting-entries';
 import { logAuditEvent } from '@/lib/audit';
-import { buildEstoppelSystemContext } from '@/lib/utils/estoppel-template';
 import type Stripe from 'stripe';
 
 export const runtime = 'nodejs';
@@ -171,123 +170,36 @@ export async function POST(req: NextRequest) {
           const requestType = session.metadata?.request_type || 'standard';
           const deliveryEmail = session.metadata?.delivery_email || '';
           const unitId = session.metadata?.unit_id || null;
+          const feeAmount = session.amount_total || 0;
 
-          // Auto-fill system fields from database
-          let systemFields: Record<string, string> = {};
-
-          const { data: community } = await supabase
-            .from('communities')
-            .select('name, address')
-            .eq('id', communityId)
-            .single();
-
-          if (unitId) {
-            // Look up unit financial data
-            const { data: unit } = await supabase
-              .from('units')
-              .select('id, payment_frequency')
-              .eq('id', unitId)
-              .single();
-
-            // Get active assessment
-            const { data: assessment } = await supabase
-              .from('assessments')
-              .select('annual_amount, default_frequency')
-              .eq('community_id', communityId)
-              .eq('is_active', true)
-              .limit(1)
-              .single();
-
-            // Get invoices for balance calculation
-            const { data: invoices } = await supabase
-              .from('invoices')
-              .select('amount, amount_paid, status, due_date, title')
-              .eq('unit_id', unitId)
-              .in('status', ['pending', 'overdue', 'partial']);
-
-            const currentBalance = (invoices || []).reduce(
-              (sum, inv) => sum + (inv.amount - (inv.amount_paid || 0)),
-              0,
-            );
-
-            // Find the last paid invoice to determine paid_through_date
-            const { data: lastPaidInvoice } = await supabase
-              .from('invoices')
-              .select('due_date')
-              .eq('unit_id', unitId)
-              .eq('status', 'paid')
-              .order('due_date', { ascending: false })
-              .limit(1)
-              .maybeSingle();
-
-            // Get violations
-            const { data: violations } = await supabase
-              .from('violations')
-              .select('title, status, description')
-              .eq('unit_id', unitId)
-              .neq('status', 'resolved');
-
-            const freq = unit?.payment_frequency || assessment?.default_frequency || 'monthly';
-            const annualAmount = assessment?.annual_amount || 0;
-            let assessmentAmount: number | null = null;
-            if (annualAmount) {
-              switch (freq) {
-                case 'monthly': assessmentAmount = Math.round(annualAmount / 12); break;
-                case 'quarterly': assessmentAmount = Math.round(annualAmount / 4); break;
-                case 'semi_annual': assessmentAmount = Math.round(annualAmount / 2); break;
-                case 'annual': assessmentAmount = annualAmount; break;
-              }
-            }
-
-            systemFields = buildEstoppelSystemContext({
-              communityName: community?.name || '',
-              communityAddress: community?.address || '',
-              assessmentAmount,
-              assessmentFrequency: freq,
-              paidThroughDate: lastPaidInvoice?.due_date
-                ? new Date(lastPaidInvoice.due_date).toLocaleDateString('en-US')
-                : null,
-              currentBalance,
-              lateFees: 0,
-              specialAssessments: [],
-              violations: (violations || []).map((v) => ({
-                title: v.title,
-                status: v.status,
-                description: v.description || undefined,
-              })),
-              completionDate: new Date().toLocaleDateString('en-US'),
-            });
-          } else if (community) {
-            // No unit found, minimal system fields
-            systemFields = buildEstoppelSystemContext({
-              communityName: community.name,
-              communityAddress: community.address || '',
-              assessmentAmount: null,
-              assessmentFrequency: null,
-              paidThroughDate: null,
-              currentBalance: 0,
-              lateFees: 0,
-              specialAssessments: [],
-              violations: [],
-              completionDate: new Date().toLocaleDateString('en-US'),
-            });
-          }
-
-          // Insert estoppel request
-          await supabase.from('estoppel_requests').insert({
+          // Insert estoppel request (system fields computed on-demand in review dialog)
+          const { data: newRequest } = await supabase.from('estoppel_requests').insert({
             community_id: communityId,
             requester_fields: requesterFields,
-            system_fields: systemFields,
+            system_fields: {},
             board_fields: {},
             unit_id: unitId || null,
             request_type: requestType,
-            fee_amount: session.amount_total || 0,
+            fee_amount: feeAmount,
             stripe_session_id: session.id,
             stripe_payment_intent: (session.payment_intent as string) || null,
             paid_at: new Date().toISOString(),
             status: 'pending',
             delivery_email: deliveryEmail,
-          });
+          }).select('id').single();
+
+          // Post estoppel fee to general ledger
+          if (newRequest) {
+            const { data: comm } = await supabase
+              .from('communities')
+              .select('theme')
+              .eq('id', communityId)
+              .single();
+            const estTheme = comm?.theme as Record<string, unknown> | null;
+            const estSettings = estTheme?.estoppel_settings as { gl_revenue_account_code?: string } | undefined;
+            const glCode = estSettings?.gl_revenue_account_code || '4600';
+            await postEstoppelFeeReceived(communityId, newRequest.id, feeAmount, glCode);
+          }
 
           // Notify board
           void supabase.rpc('create_board_notifications', {

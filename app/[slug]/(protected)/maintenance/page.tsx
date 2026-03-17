@@ -82,12 +82,10 @@ export default function MaintenancePage() {
         <h1 className="text-page-title text-text-primary-light dark:text-text-primary-dark">
           Maintenance Requests
         </h1>
-        {unit && (
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Request
-          </Button>
-        )}
+        <Button onClick={() => setCreateOpen(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          New Request
+        </Button>
       </div>
 
       {/* Board view with tabs */}

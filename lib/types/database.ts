@@ -381,6 +381,7 @@ export interface EstoppelSettings {
   show_on_landing_page: boolean;
   template: string | null;
   fields: EstoppelField[];
+  gl_revenue_account_code?: string;
 }
 
 export interface EstoppelRequest {

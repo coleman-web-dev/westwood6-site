@@ -68,6 +68,8 @@ export function CommunitySettings() {
   const [estoppelExpeditedFee, setEstoppelExpeditedFee] = useState(50000); // cents ($500)
   const [estoppelDelinquentSurcharge, setEstoppelDelinquentSurcharge] = useState(10000); // cents ($100)
   const [estoppelShowOnLanding, setEstoppelShowOnLanding] = useState(false);
+  const [estoppelGlAccount, setEstoppelGlAccount] = useState('4600');
+  const [revenueAccounts, setRevenueAccounts] = useState<Array<{ code: string; name: string }>>([]);
   const [estoppelWizardOpen, setEstoppelWizardOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -115,6 +117,21 @@ export function CommunitySettings() {
       setEstoppelExpeditedFee(es?.expedited_fee ?? 50000);
       setEstoppelDelinquentSurcharge(es?.delinquent_surcharge ?? 10000);
       setEstoppelShowOnLanding(es?.show_on_landing_page ?? false);
+      setEstoppelGlAccount(es?.gl_revenue_account_code ?? '4600');
+
+      // Fetch revenue accounts for GL picker
+      const supabase = createClient();
+      supabase
+        .from('accounts')
+        .select('code, name')
+        .eq('community_id', community.id)
+        .eq('account_type', 'revenue')
+        .order('code')
+        .then(({ data }) => {
+          if (data && data.length > 0) {
+            setRevenueAccounts(data);
+          }
+        });
     }
   }, [community]);
 
@@ -156,7 +173,8 @@ export function CommunitySettings() {
       estoppelStandardFee !== ((community.theme?.estoppel_settings as EstoppelSettings | undefined)?.standard_fee ?? 25000) ||
       estoppelExpeditedFee !== ((community.theme?.estoppel_settings as EstoppelSettings | undefined)?.expedited_fee ?? 50000) ||
       estoppelDelinquentSurcharge !== ((community.theme?.estoppel_settings as EstoppelSettings | undefined)?.delinquent_surcharge ?? 10000) ||
-      estoppelShowOnLanding !== ((community.theme?.estoppel_settings as EstoppelSettings | undefined)?.show_on_landing_page ?? false)
+      estoppelShowOnLanding !== ((community.theme?.estoppel_settings as EstoppelSettings | undefined)?.show_on_landing_page ?? false) ||
+      estoppelGlAccount !== ((community.theme?.estoppel_settings as EstoppelSettings | undefined)?.gl_revenue_account_code ?? '4600')
     );
   }, [
     name, address, phone, email,
@@ -168,7 +186,7 @@ export function CommunitySettings() {
     autoGenerateInvoices, autoMarkOverdue, autoNotifyNewInvoices,
     reminderDaysBefore, reminderDaysAfter, arcEnabled, votingConfig,
     autoEscalationEnabled, defaultDeadlineDays, escalationNoticeType,
-    estoppelEnabled, estoppelStandardFee, estoppelExpeditedFee, estoppelDelinquentSurcharge, estoppelShowOnLanding,
+    estoppelEnabled, estoppelStandardFee, estoppelExpeditedFee, estoppelDelinquentSurcharge, estoppelShowOnLanding, estoppelGlAccount,
     community,
   ]);
 
@@ -240,6 +258,7 @@ export function CommunitySettings() {
             expedited_fee: estoppelExpeditedFee,
             delinquent_surcharge: estoppelDelinquentSurcharge,
             show_on_landing_page: estoppelShowOnLanding,
+            gl_revenue_account_code: estoppelGlAccount,
           },
         },
       })
@@ -1162,6 +1181,29 @@ export function CommunitySettings() {
                   Per Florida Statute 720.30851. Delinquent surcharge is added automatically when the property has overdue invoices.
                 </p>
 
+                {revenueAccounts.length > 0 && (
+                  <div className="space-y-1">
+                    <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                      GL Revenue Account
+                    </Label>
+                    <Select value={estoppelGlAccount} onValueChange={setEstoppelGlAccount}>
+                      <SelectTrigger className="max-w-xs">
+                        <SelectValue placeholder="Select account" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {revenueAccounts.map((acct) => (
+                          <SelectItem key={acct.code} value={acct.code}>
+                            {acct.code} - {acct.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                      Revenue account where estoppel fees are posted in the general ledger.
+                    </p>
+                  </div>
+                )}
+
                 <div className="border-t border-stroke-light dark:border-stroke-dark" />
 
                 <div className="flex items-center justify-between">
@@ -1209,6 +1251,7 @@ export function CommunitySettings() {
                   expedited_fee: estoppelExpeditedFee,
                   delinquent_surcharge: estoppelDelinquentSurcharge,
                   show_on_landing_page: estoppelShowOnLanding,
+                  gl_revenue_account_code: estoppelGlAccount,
                   template,
                   fields,
                 },

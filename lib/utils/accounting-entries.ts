@@ -335,6 +335,26 @@ export async function postInterFundTransfer(
   });
 }
 
+/** Estoppel fee received: DR Operating Cash, CR configurable revenue account */
+export async function postEstoppelFeeReceived(
+  communityId: string,
+  requestId: string,
+  amount: number,
+  revenueAccountCode = '4600',
+) {
+  return createJournalEntry({
+    communityId,
+    description: 'Estoppel certificate fee received',
+    source: 'payment_received',
+    referenceType: 'estoppel_request',
+    referenceId: requestId,
+    lines: [
+      { accountCode: '1000', debit: amount, credit: 0, description: 'Operating Cash' },
+      { accountCode: revenueAccountCode, debit: 0, credit: amount, description: 'Estoppel Fee Revenue' },
+    ],
+  });
+}
+
 /**
  * Reverse an existing journal entry.
  * Creates a new entry with swapped debits/credits and links them.
