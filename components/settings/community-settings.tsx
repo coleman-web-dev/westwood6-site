@@ -819,13 +819,18 @@ export function CommunitySettings() {
                       {feeType === 'flat' ? 'Fee amount ($)' : 'Fee percentage (%)'}
                     </Label>
                     <Input
-                      type="number"
-                      min={0}
-                      step={feeType === 'flat' ? 0.01 : 1}
-                      value={feeType === 'flat' ? (feeAmount / 100).toFixed(2) : feeAmount}
-                      onChange={(e) => {
+                      type="text"
+                      inputMode="decimal"
+                      placeholder={feeType === 'flat' ? '25.00' : '5'}
+                      defaultValue={feeType === 'flat' ? (feeAmount / 100).toFixed(2) : String(feeAmount)}
+                      key={`fee-${feeType}`}
+                      onBlur={(e) => {
                         const val = Number(e.target.value);
-                        setFeeAmount(feeType === 'flat' ? Math.round(val * 100) : val);
+                        if (!isNaN(val) && val >= 0) {
+                          const cents = feeType === 'flat' ? Math.round(val * 100) : val;
+                          setFeeAmount(cents);
+                          e.target.value = feeType === 'flat' ? (cents / 100).toFixed(2) : String(cents);
+                        }
                       }}
                     />
                   </div>
@@ -835,15 +840,24 @@ export function CommunitySettings() {
                         Max fee ($, optional)
                       </Label>
                       <Input
-                        type="number"
-                        min={0}
-                        step={0.01}
-                        value={maxFee ? (maxFee / 100).toFixed(2) : ''}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setMaxFee(val ? Math.round(Number(val) * 100) : undefined);
-                        }}
+                        type="text"
+                        inputMode="decimal"
                         placeholder="No max"
+                        defaultValue={maxFee ? (maxFee / 100).toFixed(2) : ''}
+                        key={`maxfee-${feeType}`}
+                        onBlur={(e) => {
+                          const val = e.target.value;
+                          if (!val) {
+                            setMaxFee(undefined);
+                          } else {
+                            const num = Number(val);
+                            if (!isNaN(num) && num >= 0) {
+                              const cents = Math.round(num * 100);
+                              setMaxFee(cents);
+                              e.target.value = (cents / 100).toFixed(2);
+                            }
+                          }
+                        }}
                       />
                     </div>
                   )}
