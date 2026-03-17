@@ -381,7 +381,7 @@ export function EmailDomainSetup() {
             <OptionInfoCard mode="custom_domain" slug={community?.slug || 'yourcommunity'} />
           </div>
           <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-            Use your own domain like board@yourdomain.com. Works in Gmail, Outlook, and Apple Mail.
+            Use your own domain like board@{community?.slug || 'yourcommunity'}.com. Works in Gmail, Outlook, and Apple Mail.
           </p>
         </button>
 
