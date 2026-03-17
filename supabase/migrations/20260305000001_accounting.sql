@@ -201,6 +201,7 @@ BEGIN
     (p_community_id, '4300', 'Interest Income', 'revenue', 'operating', false, 'credit', 440),
     (p_community_id, '4400', 'Other Income', 'revenue', 'operating', false, 'credit', 450),
     (p_community_id, '4500', 'Reserve Contribution Revenue', 'revenue', 'reserve', false, 'credit', 460),
+    (p_community_id, '4600', 'Estoppel Fee Revenue', 'revenue', 'operating', false, 'credit', 470),
 
     -- EXPENSES (5000s)
     (p_community_id, '5000', 'Maintenance & Repairs', 'expense', 'operating', false, 'debit', 500),
