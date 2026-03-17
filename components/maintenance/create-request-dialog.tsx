@@ -37,16 +37,19 @@ export function CreateRequestDialog({
   onOpenChange,
   onSuccess,
 }: CreateRequestDialogProps) {
-  const { community, member, unit, isBoard } = useCommunity();
+  const { community, member, unit, isBoard, actualIsBoard } = useCommunity();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [selectedUnitId, setSelectedUnitId] = useState('');
   const [units, setUnits] = useState<Array<{ id: string; unit_number: string }>>([]);
 
-  // Board: fetch units when dialog opens
+  // Show unit picker for board in admin view, or any board member without a unit
+  const needsUnitPicker = isBoard || (actualIsBoard && !unit);
+
+  // Fetch units when dialog opens and unit picker is needed
   useEffect(() => {
-    if (open && isBoard) {
+    if (open && needsUnitPicker) {
       const supabase = createClient();
       supabase
         .from('units')
@@ -57,9 +60,9 @@ export function CreateRequestDialog({
           setUnits(data ?? []);
         });
     }
-  }, [open, isBoard, community.id]);
+  }, [open, needsUnitPicker, community.id]);
 
-  const effectiveUnitId = isBoard ? selectedUnitId : unit?.id ?? '';
+  const effectiveUnitId = needsUnitPicker ? selectedUnitId : unit?.id ?? '';
 
   function resetForm() {
     setTitle('');
@@ -74,7 +77,7 @@ export function CreateRequestDialog({
     }
 
     if (!member || !effectiveUnitId) {
-      toast.error(isBoard ? 'Please select a unit.' : 'No unit assigned.');
+      toast.error(needsUnitPicker ? 'Please select a unit.' : 'No unit assigned.');
       return;
     }
 
@@ -123,8 +126,8 @@ export function CreateRequestDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          {/* Unit selector: board picks, residents see their unit */}
-          {isBoard ? (
+          {/* Unit selector: board picks or board without unit, residents see their unit */}
+          {needsUnitPicker ? (
             <div className="space-y-1.5">
               <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
                 Unit *
