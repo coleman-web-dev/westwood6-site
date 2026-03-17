@@ -563,6 +563,26 @@ export async function POST(req: NextRequest) {
           targetId: duesiqInvoice?.id,
           metadata: { unit_id: unit.id, method: 'stripe_subscription' },
         });
+
+        // Notify unit members about payment failure
+        const { data: unitMembers } = await supabase
+          .from('members')
+          .select('id')
+          .eq('unit_id', unit.id)
+          .eq('is_approved', true);
+
+        if (unitMembers && unitMembers.length > 0) {
+          void supabase.rpc('create_member_notifications', {
+            p_community_id: unit.community_id,
+            p_type: 'payment_failed',
+            p_title: 'Payment failed',
+            p_body: 'Your automatic payment could not be processed. Please update your payment method or make a manual payment.',
+            p_reference_id: duesiqInvoice?.id ?? null,
+            p_reference_type: 'invoice',
+            p_member_ids: unitMembers.map((m: { id: string }) => m.id),
+          });
+        }
+
         console.log('Subscription payment failed for unit:', unit.id);
         break;
       }

@@ -113,6 +113,23 @@ export function ReviewArcRequestDialog({
       targetId: request.id,
       metadata: { status, previous_status: request.status, title: request.title },
     });
+
+    // Notify submitter of decision
+    if (['approved', 'approved_with_conditions', 'denied'].includes(status) && request.status !== status) {
+      const isApproved = status === 'approved' || status === 'approved_with_conditions';
+      const notifType = isApproved ? 'arc_request_approved' : 'arc_request_denied';
+      const label = isApproved ? 'approved' : 'denied';
+      void supabase.rpc('create_member_notifications', {
+        p_community_id: community.id,
+        p_type: notifType,
+        p_title: `ARC request ${label}: ${request.title}`,
+        p_body: conditions.trim() ? `Conditions: ${conditions.trim()}` : null,
+        p_reference_id: request.id,
+        p_reference_type: 'arc_request',
+        p_member_ids: [request.submitted_by],
+      });
+    }
+
     onOpenChange(false);
     onUpdated();
   }

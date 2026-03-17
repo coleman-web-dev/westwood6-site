@@ -104,6 +104,25 @@ export function CreateInvoiceDialog({
     // Post accounting journal entry (silently skips if not set up)
     await postInvoiceCreatedAction(community.id, inserted.id, unitId, amountCents, title.trim());
 
+    // Notify unit members about new invoice
+    const { data: unitMembers } = await supabase
+      .from('members')
+      .select('id')
+      .eq('unit_id', unitId)
+      .eq('is_approved', true);
+
+    if (unitMembers && unitMembers.length > 0) {
+      void supabase.rpc('create_member_notifications', {
+        p_community_id: community.id,
+        p_type: 'invoice_created',
+        p_title: `New invoice: ${title.trim()}`,
+        p_body: `Amount due: $${(amountCents / 100).toFixed(2)} by ${new Date(dueDate + 'T00:00:00').toLocaleDateString()}.`,
+        p_reference_id: inserted.id,
+        p_reference_type: 'invoice',
+        p_member_ids: unitMembers.map((m: { id: string }) => m.id),
+      });
+    }
+
     // Auto-apply wallet balance
     const result = await applyWalletToInvoice(
       supabase,

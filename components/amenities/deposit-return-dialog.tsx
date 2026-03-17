@@ -125,6 +125,26 @@ export function DepositReturnDialog({
             amenity: reservation.amenities.name,
           },
         });
+        // Notify unit members about deposit return
+        if (reservation.unit_id) {
+          const supabase = createClient();
+          const { data: unitMembers } = await supabase
+            .from('members')
+            .select('id')
+            .eq('unit_id', reservation.unit_id)
+            .eq('community_id', community.id);
+          if (unitMembers && unitMembers.length > 0) {
+            void supabase.rpc('create_member_notifications', {
+              p_community_id: community.id,
+              p_type: 'deposit_returned',
+              p_title: `Deposit returned: ${reservation.amenities.name}`,
+              p_body: `$${(refundCents / 100).toFixed(2)} has been refunded to your card.`,
+              p_reference_id: reservation.id,
+              p_reference_type: 'reservation',
+              p_member_ids: unitMembers.map((m: { id: string }) => m.id),
+            });
+          }
+        }
         onOpenChange(false);
         onSuccess();
         return;
@@ -239,6 +259,27 @@ export function DepositReturnDialog({
         amenity: reservation.amenities.name,
       },
     });
+
+    // Notify unit members about deposit return
+    if (reservation.unit_id) {
+      const { data: unitMembers } = await supabase
+        .from('members')
+        .select('id')
+        .eq('unit_id', reservation.unit_id)
+        .eq('community_id', community.id);
+      if (unitMembers && unitMembers.length > 0) {
+        const methodLabel = method === 'wallet' ? 'household wallet' : 'check';
+        void supabase.rpc('create_member_notifications', {
+          p_community_id: community.id,
+          p_type: 'deposit_returned',
+          p_title: `Deposit returned: ${reservation.amenities.name}`,
+          p_body: `$${(refundCents / 100).toFixed(2)} has been returned via ${methodLabel}.`,
+          p_reference_id: reservation.id,
+          p_reference_type: 'reservation',
+          p_member_ids: unitMembers.map((m: { id: string }) => m.id),
+        });
+      }
+    }
 
     onOpenChange(false);
     onSuccess();

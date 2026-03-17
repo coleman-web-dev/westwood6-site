@@ -12,7 +12,7 @@ import {
   PopoverTrigger,
 } from '@/components/shared/ui/popover';
 import { ScrollArea } from '@/components/shared/ui/scroll-area';
-import { BellIcon, FileSignature, CalendarCheck, CheckCheck, Vote, Users, ShieldAlert, ClipboardList, Wrench } from 'lucide-react';
+import { BellIcon, FileSignature, CalendarCheck, CheckCheck, Vote, Users, ShieldAlert, ClipboardList, Wrench, CreditCard, Receipt, CircleCheck, CircleX, Wallet } from 'lucide-react';
 import { SignedAgreementViewer } from '@/components/amenities/signed-agreement-viewer';
 import type { Notification, NotificationType } from '@/lib/types/database';
 
@@ -31,6 +31,13 @@ const TYPE_ICON: Record<NotificationType, React.ReactNode> = {
   violation_created: <ShieldAlert className="h-4 w-4 text-red-500" />,
   arc_request_submitted: <ClipboardList className="h-4 w-4 text-secondary-500" />,
   maintenance_request_submitted: <Wrench className="h-4 w-4 text-secondary-500" />,
+  payment_failed: <CreditCard className="h-4 w-4 text-red-500" />,
+  invoice_created: <Receipt className="h-4 w-4 text-secondary-500" />,
+  arc_request_approved: <CircleCheck className="h-4 w-4 text-green-500" />,
+  arc_request_denied: <CircleX className="h-4 w-4 text-red-500" />,
+  maintenance_request_updated: <Wrench className="h-4 w-4 text-amber-500" />,
+  maintenance_request_completed: <Wrench className="h-4 w-4 text-green-500" />,
+  deposit_returned: <Wallet className="h-4 w-4 text-green-500" />,
   general: <BellIcon className="h-4 w-4 text-text-muted-light dark:text-text-muted-dark" />,
 };
 
@@ -129,16 +136,30 @@ export function NotificationBell() {
     }
 
     // Navigate to ARC requests page
-    if (n.type === 'arc_request_submitted' || n.reference_type === 'arc_request') {
+    if (n.type === 'arc_request_submitted' || n.type === 'arc_request_approved' || n.type === 'arc_request_denied' || n.reference_type === 'arc_request') {
       setOpen(false);
       router.push(`/${community.slug}/arc-requests`);
       return;
     }
 
     // Navigate to maintenance page
-    if (n.type === 'maintenance_request_submitted' || n.reference_type === 'maintenance_request') {
+    if (n.type === 'maintenance_request_submitted' || n.type === 'maintenance_request_updated' || n.type === 'maintenance_request_completed' || n.reference_type === 'maintenance_request') {
       setOpen(false);
       router.push(`/${community.slug}/maintenance`);
+      return;
+    }
+
+    // Navigate to payments page for payment/invoice notifications
+    if (n.type === 'payment_failed' || n.type === 'invoice_created' || n.reference_type === 'invoice') {
+      setOpen(false);
+      router.push(`/${community.slug}/payments`);
+      return;
+    }
+
+    // Navigate to amenities page for deposit return notifications
+    if (n.type === 'deposit_returned') {
+      setOpen(false);
+      router.push(`/${community.slug}/amenities`);
       return;
     }
 

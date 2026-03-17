@@ -116,6 +116,23 @@ export function RequestDetailDialog({
       targetId: request.id,
       metadata: { title: request.title, status, previous_status: request.status },
     });
+
+    // Notify submitter of status change
+    if (status !== request.status) {
+      const isCompleted = status === 'resolved' || status === 'closed';
+      const notifType = isCompleted ? 'maintenance_request_completed' : 'maintenance_request_updated';
+      const statusLabel = status.replace('_', ' ');
+      void supabase.rpc('create_member_notifications', {
+        p_community_id: community.id,
+        p_type: notifType,
+        p_title: `Maintenance request ${statusLabel}: ${request.title}`,
+        p_body: adminNotes.trim() || null,
+        p_reference_id: request.id,
+        p_reference_type: 'maintenance_request',
+        p_member_ids: [request.submitted_by],
+      });
+    }
+
     toast.success('Request updated.');
     onOpenChange(false);
     onUpdated();

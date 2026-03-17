@@ -623,7 +623,14 @@ export type NotificationType =
   | 'proxy_granted'
   | 'violation_created'
   | 'arc_request_submitted'
-  | 'maintenance_request_submitted';
+  | 'maintenance_request_submitted'
+  | 'payment_failed'
+  | 'invoice_created'
+  | 'arc_request_approved'
+  | 'arc_request_denied'
+  | 'maintenance_request_updated'
+  | 'maintenance_request_completed'
+  | 'deposit_returned';
 
 export interface Notification {
   id: string;
