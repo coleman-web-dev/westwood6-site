@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { DashboardCardShell } from './dashboard-card-shell';
 import { Badge } from '@/components/shared/ui/badge';
-import { CalendarDays } from 'lucide-react';
+import { CalendarDays, Megaphone } from 'lucide-react';
 import type { Announcement, Event } from '@/lib/types/database';
 
 type FeedItem =
@@ -71,56 +72,77 @@ export function AnnouncementsCard() {
           ))}
         </div>
       ) : items.length === 0 ? (
-        <p className="text-body text-text-muted-light dark:text-text-muted-dark">No announcements yet.</p>
+        <div className="flex flex-col items-center gap-2 py-4 text-center">
+          <Megaphone className="h-8 w-8 text-text-muted-light dark:text-text-muted-dark" />
+          <p className="text-body text-text-muted-light dark:text-text-muted-dark">No announcements yet.</p>
+        </div>
       ) : (
-        <ul className="space-y-3">
-          {items.map((item) => {
-            if (item.type === 'announcement') {
-              const a = item.data;
+        <div className="space-y-3">
+          <ul className="space-y-3">
+            {items.map((item) => {
+              if (item.type === 'announcement') {
+                const a = item.data;
+                return (
+                  <li key={`a-${a.id}`}>
+                    <Link
+                      href={`/${community.slug}/announcements`}
+                      className="flex items-start gap-2 group"
+                    >
+                      {a.priority !== 'normal' && (
+                        <Badge variant={a.priority === 'urgent' ? 'destructive' : 'secondary'} className="text-meta mt-0.5 shrink-0">
+                          {a.priority}
+                        </Badge>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-body font-medium truncate group-hover:text-secondary-500 dark:group-hover:text-secondary-400 transition-colors">{a.title}</p>
+                        <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                          {new Date(a.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </Link>
+                  </li>
+                );
+              }
+
+              const e = item.data;
               return (
-                <li key={`a-${a.id}`} className="flex items-start gap-2">
-                  {a.priority !== 'normal' && (
-                    <Badge variant={a.priority === 'urgent' ? 'destructive' : 'secondary'} className="text-meta mt-0.5 shrink-0">
-                      {a.priority}
+                <li key={`e-${e.id}`}>
+                  <Link
+                    href={`/${community.slug}/events`}
+                    className="flex items-start gap-2 group"
+                  >
+                    <Badge variant="outline" className="text-meta mt-0.5 shrink-0 gap-1">
+                      <CalendarDays className="h-3 w-3" />
+                      Event
                     </Badge>
-                  )}
-                  <div className="min-w-0">
-                    <p className="text-body font-medium truncate">{a.title}</p>
-                    <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                      {new Date(a.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
+                    {item.pinned && (
+                      <Badge variant="secondary" className="text-meta mt-0.5 shrink-0">
+                        Pinned
+                      </Badge>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-body font-medium truncate group-hover:text-secondary-500 dark:group-hover:text-secondary-400 transition-colors">{e.title}</p>
+                      <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                        {new Date(e.start_datetime).toLocaleDateString(undefined, {
+                          weekday: 'short',
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                        {e.location ? ` · ${e.location}` : ''}
+                      </p>
+                    </div>
+                  </Link>
                 </li>
               );
-            }
-
-            const e = item.data;
-            return (
-              <li key={`e-${e.id}`} className="flex items-start gap-2">
-                <Badge variant="outline" className="text-meta mt-0.5 shrink-0 gap-1">
-                  <CalendarDays className="h-3 w-3" />
-                  Event
-                </Badge>
-                {item.pinned && (
-                  <Badge variant="secondary" className="text-meta mt-0.5 shrink-0">
-                    Pinned
-                  </Badge>
-                )}
-                <div className="min-w-0">
-                  <p className="text-body font-medium truncate">{e.title}</p>
-                  <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                    {new Date(e.start_datetime).toLocaleDateString(undefined, {
-                      weekday: 'short',
-                      month: 'short',
-                      day: 'numeric',
-                    })}
-                    {e.location ? ` · ${e.location}` : ''}
-                  </p>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+            })}
+          </ul>
+          <Link
+            href={`/${community.slug}/announcements`}
+            className="block text-center text-label text-secondary-500 dark:text-secondary-400 hover:text-secondary-600 dark:hover:text-secondary-300 transition-colors"
+          >
+            View all announcements
+          </Link>
+        </div>
       )}
     </DashboardCardShell>
   );

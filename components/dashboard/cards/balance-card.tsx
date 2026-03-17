@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { DashboardCardShell } from './dashboard-card-shell';
 
 export function BalanceCard() {
-  const { unit } = useCommunity();
+  const { community, unit } = useCommunity();
   const [balance, setBalance] = useState<number | null>(null);
   const [walletCredit, setWalletCredit] = useState<number>(0);
   const [loading, setLoading] = useState(true);
@@ -48,18 +49,34 @@ export function BalanceCard() {
       {loading ? (
         <div className="animate-pulse h-8 w-24 rounded bg-muted" />
       ) : (
-        <div>
-          <p className="text-metric-xl tabular-nums">
-            ${((balance ?? 0) / 100).toFixed(2)}
-          </p>
-          <p className="text-meta text-text-secondary-light dark:text-text-secondary-dark mt-1">
-            Outstanding balance
-          </p>
-          {walletCredit > 0 && (
-            <p className="text-meta text-primary-600 dark:text-primary-400 mt-1 tabular-nums">
-              Credit: ${(walletCredit / 100).toFixed(2)}
+        <div className="space-y-3">
+          <div>
+            <p className="text-metric-xl tabular-nums">
+              ${((balance ?? 0) / 100).toFixed(2)}
             </p>
+            <p className="text-meta text-text-secondary-light dark:text-text-secondary-dark mt-1">
+              Outstanding balance
+            </p>
+            {walletCredit > 0 && (
+              <p className="text-meta text-primary-600 dark:text-primary-400 mt-1 tabular-nums">
+                Credit: ${(walletCredit / 100).toFixed(2)}
+              </p>
+            )}
+          </div>
+          {(balance ?? 0) > 0 && (
+            <Link
+              href={`/${community.slug}/payments`}
+              className="inline-block text-label text-secondary-500 dark:text-secondary-400 hover:text-secondary-600 dark:hover:text-secondary-300 transition-colors font-semibold"
+            >
+              Pay now &rarr;
+            </Link>
           )}
+          <Link
+            href={`/${community.slug}/payments`}
+            className="block text-center text-label text-secondary-500 dark:text-secondary-400 hover:text-secondary-600 dark:hover:text-secondary-300 transition-colors"
+          >
+            View invoices &amp; payments
+          </Link>
         </div>
       )}
     </DashboardCardShell>

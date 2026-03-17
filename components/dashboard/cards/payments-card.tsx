@@ -1,13 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { DashboardCardShell } from './dashboard-card-shell';
+import { CreditCard } from 'lucide-react';
 import type { Payment } from '@/lib/types/database';
 
 export function PaymentsCard() {
-  const { unit } = useCommunity();
+  const { community, unit } = useCommunity();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -38,20 +40,31 @@ export function PaymentsCard() {
           {[1, 2].map((i) => <div key={i} className="animate-pulse h-5 rounded bg-muted" />)}
         </div>
       ) : payments.length === 0 ? (
-        <p className="text-body text-text-muted-light dark:text-text-muted-dark">No payments yet.</p>
+        <div className="flex flex-col items-center gap-2 py-4 text-center">
+          <CreditCard className="h-8 w-8 text-text-muted-light dark:text-text-muted-dark" />
+          <p className="text-body text-text-muted-light dark:text-text-muted-dark">No recent payments.</p>
+        </div>
       ) : (
-        <ul className="space-y-3">
-          {payments.map((p) => (
-            <li key={p.id} className="flex items-center justify-between">
-              <p className="text-meta text-text-secondary-light dark:text-text-secondary-dark">
-                {new Date(p.created_at).toLocaleDateString()}
-              </p>
-              <p className="text-body font-medium tabular-nums">
-                ${(p.amount / 100).toFixed(2)}
-              </p>
-            </li>
-          ))}
-        </ul>
+        <div className="space-y-3">
+          <ul className="space-y-3">
+            {payments.map((p) => (
+              <li key={p.id} className="flex items-center justify-between">
+                <p className="text-meta text-text-secondary-light dark:text-text-secondary-dark">
+                  {new Date(p.created_at).toLocaleDateString()}
+                </p>
+                <p className="text-body font-medium tabular-nums">
+                  ${(p.amount / 100).toFixed(2)}
+                </p>
+              </li>
+            ))}
+          </ul>
+          <Link
+            href={`/${community.slug}/payments`}
+            className="block text-center text-label text-secondary-500 dark:text-secondary-400 hover:text-secondary-600 dark:hover:text-secondary-300 transition-colors"
+          >
+            View all payments
+          </Link>
+        </div>
       )}
     </DashboardCardShell>
   );

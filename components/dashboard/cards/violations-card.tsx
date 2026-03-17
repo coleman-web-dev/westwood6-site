@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { DashboardCardShell } from './dashboard-card-shell';
+import { ShieldCheck } from 'lucide-react';
 
 interface SeverityCount {
   severity: string;
@@ -60,24 +62,35 @@ export function ViolationsCard() {
           {[1, 2].map((i) => <div key={i} className="animate-pulse h-5 rounded bg-muted" />)}
         </div>
       ) : total === 0 ? (
-        <p className="text-body text-text-muted-light dark:text-text-muted-dark">No open violations.</p>
+        <div className="flex flex-col items-center gap-2 py-4 text-center">
+          <ShieldCheck className="h-8 w-8 text-text-muted-light dark:text-text-muted-dark" />
+          <p className="text-body text-text-muted-light dark:text-text-muted-dark">No open violations.</p>
+        </div>
       ) : (
-        <div className="space-y-2">
-          <p className="text-metric-xl tabular-nums text-text-primary-light dark:text-text-primary-dark">
-            {total}
-          </p>
-          <div className="flex flex-wrap gap-3">
-            {counts.map((c) => (
-              <div key={c.severity} className="flex items-center gap-1.5">
-                <span className={`text-body font-semibold tabular-nums ${SEVERITY_COLORS[c.severity] || ''}`}>
-                  {c.count}
-                </span>
-                <span className="text-meta text-text-muted-light dark:text-text-muted-dark capitalize">
-                  {c.severity}
-                </span>
-              </div>
-            ))}
+        <div className="space-y-3">
+          <div className="space-y-2">
+            <p className="text-metric-xl tabular-nums text-text-primary-light dark:text-text-primary-dark">
+              {total}
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {counts.map((c) => (
+                <div key={c.severity} className="flex items-center gap-1.5">
+                  <span className={`text-body font-semibold tabular-nums ${SEVERITY_COLORS[c.severity] || ''}`}>
+                    {c.count}
+                  </span>
+                  <span className="text-meta text-text-muted-light dark:text-text-muted-dark capitalize">
+                    {c.severity}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
+          <Link
+            href={`/${community.slug}/violations`}
+            className="block text-center text-label text-secondary-500 dark:text-secondary-400 hover:text-secondary-600 dark:hover:text-secondary-300 transition-colors"
+          >
+            View violations
+          </Link>
         </div>
       )}
     </DashboardCardShell>
