@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { createClient } from '@/lib/supabase/client';  // still used for invoice insert
 import { useCommunity } from '@/lib/providers/community-provider';
 import {
   Dialog,
@@ -15,18 +15,11 @@ import {
 import { Button } from '@/components/shared/ui/button';
 import { Input } from '@/components/shared/ui/input';
 import { Textarea } from '@/components/shared/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/shared/ui/select';
 import { toast } from 'sonner';
 import { applyWalletToInvoice } from '@/lib/utils/apply-wallet-to-invoices';
 import { postInvoiceCreatedAction, postWalletAppliedAction } from '@/lib/actions/accounting-actions';
 import { logAuditEvent } from '@/lib/audit';
-import type { Unit } from '@/lib/types/database';
+import { UnitPicker } from '@/components/shared/unit-picker';
 
 interface CreateInvoiceDialogProps {
   open: boolean;
@@ -40,7 +33,6 @@ export function CreateInvoiceDialog({
   onSuccess,
 }: CreateInvoiceDialogProps) {
   const { community, member } = useCommunity();
-  const [units, setUnits] = useState<Unit[]>([]);
   const [unitId, setUnitId] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -48,25 +40,6 @@ export function CreateInvoiceDialog({
   const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
-
-  // Fetch active units for the community
-  useEffect(() => {
-    if (!open) return;
-
-    async function loadUnits() {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from('units')
-        .select('*')
-        .eq('community_id', community.id)
-        .eq('status', 'active')
-        .order('unit_number', { ascending: true });
-
-      setUnits((data as Unit[]) ?? []);
-    }
-
-    loadUnits();
-  }, [open, community.id]);
 
   function resetForm() {
     setUnitId('');
@@ -182,18 +155,12 @@ export function CreateInvoiceDialog({
             <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
               Unit <span className="text-destructive">*</span>
             </label>
-            <Select value={unitId} onValueChange={setUnitId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a unit" />
-              </SelectTrigger>
-              <SelectContent>
-                {units.map((u) => (
-                  <SelectItem key={u.id} value={u.id}>
-                    {u.unit_number}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <UnitPicker
+              communityId={community.id}
+              value={unitId}
+              onValueChange={setUnitId}
+              placeholder="Select a unit..."
+            />
           </div>
 
           {/* Title */}

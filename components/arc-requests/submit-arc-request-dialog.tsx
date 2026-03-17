@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import {
@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/shared/ui/select';
+import { UnitPicker } from '@/components/shared/unit-picker';
 import { toast } from 'sonner';
 import { logAuditEvent } from '@/lib/audit';
 import type { ArcProjectType } from '@/lib/types/database';
@@ -44,25 +45,9 @@ export function SubmitArcRequestDialog({
   const [estimatedCost, setEstimatedCost] = useState('');
   const [saving, setSaving] = useState(false);
   const [selectedUnitId, setSelectedUnitId] = useState('');
-  const [units, setUnits] = useState<Array<{ id: string; unit_number: string }>>([]);
 
   // Show unit picker for board in admin view, or any board member without a unit
   const needsUnitPicker = isBoard || (actualIsBoard && !unit);
-
-  // Fetch units when dialog opens and unit picker is needed
-  useEffect(() => {
-    if (open && needsUnitPicker) {
-      const supabase = createClient();
-      supabase
-        .from('units')
-        .select('id, unit_number')
-        .eq('community_id', community.id)
-        .order('unit_number')
-        .then(({ data }) => {
-          setUnits(data ?? []);
-        });
-    }
-  }, [open, needsUnitPicker, community.id]);
 
   const effectiveUnitId = needsUnitPicker ? selectedUnitId : unit?.id ?? '';
 
@@ -148,18 +133,12 @@ export function SubmitArcRequestDialog({
               <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
                 Unit *
               </Label>
-              <Select value={selectedUnitId} onValueChange={setSelectedUnitId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select unit" />
-                </SelectTrigger>
-                <SelectContent>
-                  {units.map((u) => (
-                    <SelectItem key={u.id} value={u.id}>
-                      Unit {u.unit_number}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <UnitPicker
+                communityId={community.id}
+                value={selectedUnitId}
+                onValueChange={setSelectedUnitId}
+                placeholder="Select unit..."
+              />
             </div>
           ) : unit ? (
             <div className="space-y-1.5">

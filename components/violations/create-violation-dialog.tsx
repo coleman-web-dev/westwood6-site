@@ -29,7 +29,8 @@ import {
   sendViolationNoticeEmail,
   notifyHouseholdOfViolation,
 } from '@/lib/actions/violation-actions';
-import type { Unit, ViolationCategory, ViolationSeverity, ViolationTemplate } from '@/lib/types/database';
+import { UnitPicker } from '@/components/shared/unit-picker';
+import type { ViolationCategory, ViolationSeverity, ViolationTemplate } from '@/lib/types/database';
 
 const MAX_FILES = 5;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -38,7 +39,7 @@ const ACCEPTED_TYPES = '.jpg,.jpeg,.png,.webp,.heic';
 interface CreateViolationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  units: Unit[];
+  units?: unknown[];
   templates?: ViolationTemplate[];
   communityId: string;
   communitySlug: string;
@@ -48,7 +49,6 @@ interface CreateViolationDialogProps {
 export function CreateViolationDialog({
   open,
   onOpenChange,
-  units,
   templates = [],
   communityId,
   communitySlug,
@@ -264,18 +264,12 @@ export function CreateViolationDialog({
               <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
                 Unit *
               </Label>
-              <Select value={unitId} onValueChange={setUnitId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select unit" />
-                </SelectTrigger>
-                <SelectContent>
-                  {units.map((u) => (
-                    <SelectItem key={u.id} value={u.id}>
-                      Unit {u.unit_number}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <UnitPicker
+                communityId={communityId}
+                value={unitId}
+                onValueChange={setUnitId}
+                placeholder="Select unit..."
+              />
             </div>
           )}
 

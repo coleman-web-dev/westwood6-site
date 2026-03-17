@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/shared/ui/select';
+import { UnitPicker } from '@/components/shared/unit-picker';
 import { toast } from 'sonner';
 import { CreditCard, Download } from 'lucide-react';
 import { Checkbox } from '@/components/shared/ui/checkbox';
@@ -332,27 +333,18 @@ export function InvoiceList({
           {/* Advanced filters row */}
           <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-end gap-3">
             {/* Unit filter */}
-            {units && units.length > 0 && (
-              <div className="space-y-1 min-w-[160px]">
-                <label className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                  Unit
-                </label>
-                <Select value={unitFilter} onValueChange={setUnitFilter}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Units</SelectItem>
-                    {units.map((u) => (
-                      <SelectItem key={u.id} value={u.id}>
-                        Unit {u.unit_number}
-                        {unitOwnerMap?.[u.id] ? ` - ${unitOwnerMap[u.id]}` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            <div className="space-y-1 min-w-[200px]">
+              <label className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                Unit
+              </label>
+              <UnitPicker
+                communityId={community.id}
+                value={unitFilter === 'all' ? '' : unitFilter}
+                onValueChange={(v) => setUnitFilter(v || 'all')}
+                placeholder="All Units"
+                optional
+              />
+            </div>
 
             {/* Date range */}
             <div className="space-y-1">

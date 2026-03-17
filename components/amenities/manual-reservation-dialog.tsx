@@ -23,25 +23,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/shared/ui/select';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/shared/ui/popover';
-import {
-  Command,
-  CommandInput,
-  CommandList,
-  CommandEmpty,
-  CommandGroup,
-  CommandItem,
-} from '@/components/shared/ui/command';
-import { Check, ChevronsUpDown, Upload } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Upload } from 'lucide-react';
+import { UnitPicker } from '@/components/shared/unit-picker';
 import { toast } from 'sonner';
 import { useDialogUnsavedChanges } from '@/lib/hooks/use-dialog-unsaved-changes';
 import { DialogUnsavedChangesAlert } from '@/components/shared/dialog-unsaved-changes-alert';
-import type { Amenity, Unit } from '@/lib/types/database';
+import type { Amenity } from '@/lib/types/database';
 
 interface ManualReservationDialogProps {
   amenity: Amenity;
@@ -164,10 +151,7 @@ export function ManualReservationDialog({
   const [adminNotes, setAdminNotes] = useState('');
 
   // Unit assignment (optional)
-  const [allUnits, setAllUnits] = useState<Unit[]>([]);
-  const [unitOwnerMap, setUnitOwnerMap] = useState<Record<string, string>>({});
   const [selectedUnitId, setSelectedUnitId] = useState('');
-  const [unitSearchOpen, setUnitSearchOpen] = useState(false);
 
   // Payment
   const [paymentMethod, setPaymentMethod] = useState('check');
@@ -208,37 +192,6 @@ export function ManualReservationDialog({
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   }, [open]);
-
-  // Load units for optional household assignment
-  useEffect(() => {
-    if (!open) return;
-    const supabase = createClient();
-    async function loadUnits() {
-      const { data: unitData } = await supabase
-        .from('units')
-        .select('*')
-        .eq('community_id', community.id)
-        .eq('status', 'active')
-        .order('unit_number', { ascending: true });
-
-      const units = (unitData as Unit[]) ?? [];
-      setAllUnits(units);
-
-      const { data: owners } = await supabase
-        .from('members')
-        .select('unit_id, first_name, last_name')
-        .eq('community_id', community.id)
-        .eq('member_role', 'owner')
-        .is('parent_member_id', null);
-
-      const ownerMap: Record<string, string> = {};
-      for (const o of (owners ?? []) as { unit_id: string | null; first_name: string; last_name: string }[]) {
-        if (o.unit_id) ownerMap[o.unit_id] = `${o.first_name} ${o.last_name}`;
-      }
-      setUnitOwnerMap(ownerMap);
-    }
-    loadUnits();
-  }, [open, community.id]);
 
   const isFullDay = bookingMode ? bookingMode === 'full_day' : amenity.booking_type === 'full_day';
   const fee = amenity.fee / 100;
@@ -444,62 +397,13 @@ export function ManualReservationDialog({
               <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
                 Assign to Household (optional)
               </label>
-              <Popover open={unitSearchOpen} onOpenChange={setUnitSearchOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={unitSearchOpen}
-                    className="w-full justify-between font-normal"
-                  >
-                    {selectedUnitId
-                      ? (() => {
-                          const u = allUnits.find((u) => u.id === selectedUnitId);
-                          return u
-                            ? `Unit ${u.unit_number}${unitOwnerMap[u.id] ? ` - ${unitOwnerMap[u.id]}` : ''}`
-                            : 'None';
-                        })()
-                      : 'None (external)'}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder="Search units..." />
-                    <CommandList>
-                      <CommandEmpty>No unit found.</CommandEmpty>
-                      <CommandGroup>
-                        <CommandItem
-                          value="none-external"
-                          onSelect={() => {
-                            setSelectedUnitId('');
-                            setUnitSearchOpen(false);
-                          }}
-                        >
-                          <Check className={cn('mr-2 h-4 w-4', !selectedUnitId ? 'opacity-100' : 'opacity-0')} />
-                          None (external)
-                        </CommandItem>
-                        {allUnits.map((u) => (
-                          <CommandItem
-                            key={u.id}
-                            value={`Unit ${u.unit_number} ${unitOwnerMap[u.id] ?? ''}`}
-                            onSelect={() => {
-                              setSelectedUnitId(u.id);
-                              setUnitSearchOpen(false);
-                            }}
-                          >
-                            <Check
-                              className={cn('mr-2 h-4 w-4', selectedUnitId === u.id ? 'opacity-100' : 'opacity-0')}
-                            />
-                            Unit {u.unit_number}
-                            {unitOwnerMap[u.id] ? ` - ${unitOwnerMap[u.id]}` : ''}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+              <UnitPicker
+                communityId={community.id}
+                value={selectedUnitId}
+                onValueChange={setSelectedUnitId}
+                placeholder="None (external)"
+                optional
+              />
             </div>
 
             {/* Admin notes */}

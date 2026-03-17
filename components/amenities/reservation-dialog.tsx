@@ -24,23 +24,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/shared/ui/select';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/shared/ui/popover';
-import {
-  Command,
-  CommandInput,
-  CommandList,
-  CommandEmpty,
-  CommandGroup,
-  CommandItem,
-} from '@/components/shared/ui/command';
 import { useDialogUnsavedChanges } from '@/lib/hooks/use-dialog-unsaved-changes';
 import { DialogUnsavedChangesAlert } from '@/components/shared/dialog-unsaved-changes-alert';
-import { Check, ChevronsUpDown, ChevronLeft, FileSignature } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { ChevronLeft, FileSignature } from 'lucide-react';
+import { UnitPicker } from '@/components/shared/unit-picker';
+// cn import removed - was only used by old unit combobox
 import { toast } from 'sonner';
 import {
   buildSystemContext,
@@ -208,8 +196,6 @@ export function ReservationDialog({
   const [unitMembers, setUnitMembers] = useState<Member[]>([]);
   const [selectedUnitId, setSelectedUnitId] = useState('');
   const [selectedMemberId, setSelectedMemberId] = useState('');
-  const [unitSearchOpen, setUnitSearchOpen] = useState(false);
-  const [unitOwnerMap, setUnitOwnerMap] = useState<Record<string, string>>({});
 
   // Agreement flow
   const hasAgreement = amenity.agreement_enabled && !!amenity.agreement_template;
@@ -253,21 +239,7 @@ export function ReservationDialog({
         .eq('status', 'active')
         .order('unit_number', { ascending: true });
 
-      const units = (unitData as Unit[]) ?? [];
-      setAllUnits(units);
-
-      const { data: owners } = await supabase
-        .from('members')
-        .select('unit_id, first_name, last_name')
-        .eq('community_id', community.id)
-        .eq('member_role', 'owner')
-        .is('parent_member_id', null);
-
-      const ownerMap: Record<string, string> = {};
-      for (const o of (owners ?? []) as { unit_id: string | null; first_name: string; last_name: string }[]) {
-        if (o.unit_id) ownerMap[o.unit_id] = `${o.first_name} ${o.last_name}`;
-      }
-      setUnitOwnerMap(ownerMap);
+      setAllUnits((unitData as Unit[]) ?? []);
 
       // Default to own unit if available
       if (unit) {
@@ -578,61 +550,18 @@ export function ReservationDialog({
             </div>
 
             {/* Board: Reserve on behalf */}
-            {isBoard && allUnits.length > 0 && (
+            {isBoard && (
               <>
                 <div className="space-y-1.5">
                   <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
                     Unit
                   </label>
-                  <Popover open={unitSearchOpen} onOpenChange={setUnitSearchOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={unitSearchOpen}
-                        className="w-full justify-between font-normal"
-                      >
-                        {selectedUnitId
-                          ? (() => {
-                              const u = allUnits.find((u) => u.id === selectedUnitId);
-                              return u
-                                ? `Unit ${u.unit_number}${unitOwnerMap[u.id] ? ` - ${unitOwnerMap[u.id]}` : ''}`
-                                : 'Select a unit';
-                            })()
-                          : 'Select a unit'}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Search units..." />
-                        <CommandList>
-                          <CommandEmpty>No unit found.</CommandEmpty>
-                          <CommandGroup>
-                            {allUnits.map((u) => (
-                              <CommandItem
-                                key={u.id}
-                                value={`Unit ${u.unit_number} ${unitOwnerMap[u.id] ?? ''}`}
-                                onSelect={() => {
-                                  setSelectedUnitId(u.id);
-                                  setUnitSearchOpen(false);
-                                }}
-                              >
-                                <Check
-                                  className={cn(
-                                    'mr-2 h-4 w-4',
-                                    selectedUnitId === u.id ? 'opacity-100' : 'opacity-0',
-                                  )}
-                                />
-                                Unit {u.unit_number}
-                                {unitOwnerMap[u.id] ? ` - ${unitOwnerMap[u.id]}` : ''}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                  <UnitPicker
+                    communityId={community.id}
+                    value={selectedUnitId}
+                    onValueChange={setSelectedUnitId}
+                    placeholder="Select a unit..."
+                  />
                 </div>
 
                 {unitMembers.length > 0 && (
