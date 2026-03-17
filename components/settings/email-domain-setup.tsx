@@ -38,64 +38,67 @@ interface DomainOptionInfo {
   cons: string[];
 }
 
-const OPTION_INFO: Record<SendingMode, DomainOptionInfo> = {
-  custom_domain: {
-    title: 'Your Own Domain',
-    description:
-      'Emails come from your community\'s own website address, like treasurer@westwood6.com. Board members can use this email right inside Gmail, Outlook, or Apple Mail on their phone or computer, just like any other email address.',
-    emailClients:
-      'Yes. Board members can add this to Gmail, Outlook, Apple Mail, or any other email app on their phone or computer.',
-    pros: [
-      'Looks the most professional to residents',
-      'Board members can read and send emails from their phone or computer using Gmail, Outlook, or Apple Mail',
-      'Create separate addresses for each role (treasurer@, president@, board@)',
-      'When someone leaves the board, one click hands the email over to the new person and cuts off the old person\'s access',
-      'Also works from the DuesIQ dashboard',
-    ],
-    cons: [
-      'Someone with access to your website domain settings needs to add a few records (we walk you through it)',
-      'Takes a few minutes to set up',
-      'After setup, it can take up to 3 days for everything to go live',
-    ],
-  },
-  subdomain: {
-    title: 'Community Address',
-    description:
-      'Your community gets its own email address like westwood6@duesiq.com. Board members can read and send emails, but only from the DuesIQ website. It will not show up in Gmail or other email apps.',
-    emailClients:
-      'No. This only works on the DuesIQ website. You cannot add it to Gmail, Outlook, or other email apps.',
-    pros: [
-      'Ready to go instantly, no setup needed',
-      'All board members share the same inbox on the DuesIQ website',
-      'Great if your board mostly works from the dashboard',
-    ],
-    cons: [
-      'Does not work in Gmail, Outlook, or Apple Mail',
-      'Less professional looking than using your own domain',
-      'Says "duesiq.com" instead of your community\'s name',
-    ],
-  },
-  default: {
-    title: 'Default',
-    description:
-      'Emails go out from a generic DuesIQ address (notifications@duesiq.com). This is one-way only. Residents receive emails from you, but there is no inbox for reading replies.',
-    emailClients:
-      'No. There is no inbox with this option, so there is nothing to add to Gmail or other apps.',
-    pros: [
-      'Nothing to set up, it just works',
-      'Fine if you only need to send announcements and payment reminders',
-    ],
-    cons: [
-      'No way to receive or read replies from residents',
-      'Does not work in Gmail, Outlook, or Apple Mail',
-      'Emails come from a generic address, not your community\'s name',
-      'Residents cannot email the board back directly',
-    ],
-  },
-};
+function getOptionInfo(slug: string): Record<SendingMode, DomainOptionInfo> {
+  const domain = `${slug}.com`;
+  return {
+    custom_domain: {
+      title: 'Your Own Domain',
+      description:
+        `Emails come from your community's own website address, like treasurer@${domain}. Board members can use this email right inside Gmail, Outlook, or Apple Mail on their phone or computer, just like any other email address.`,
+      emailClients:
+        'Yes. Board members can add this to Gmail, Outlook, Apple Mail, or any other email app on their phone or computer.',
+      pros: [
+        'Looks the most professional to residents',
+        'Board members can read and send emails from their phone or computer using Gmail, Outlook, or Apple Mail',
+        `Create separate addresses for each role (treasurer@${domain}, president@${domain}, board@${domain})`,
+        'When someone leaves the board, one click hands the email over to the new person and cuts off the old person\'s access',
+        'Also works from the DuesIQ dashboard',
+      ],
+      cons: [
+        'Someone with access to your website domain settings needs to add a few records (we walk you through it)',
+        'Takes a few minutes to set up',
+        'After setup, it can take up to 3 days for everything to go live',
+      ],
+    },
+    subdomain: {
+      title: 'Community Address',
+      description:
+        `Your community gets its own email address (${slug}@duesiq.com). Board members can read and send emails, but only from the DuesIQ website. It will not show up in Gmail or other email apps.`,
+      emailClients:
+        'No. This only works on the DuesIQ website. You cannot add it to Gmail, Outlook, or other email apps.',
+      pros: [
+        'Ready to go instantly, no setup needed',
+        'All board members share the same inbox on the DuesIQ website',
+        'Great if your board mostly works from the dashboard',
+      ],
+      cons: [
+        'Does not work in Gmail, Outlook, or Apple Mail',
+        'Less professional looking than using your own domain',
+        'Says "duesiq.com" instead of your community\'s name',
+      ],
+    },
+    default: {
+      title: 'Default',
+      description:
+        'Emails go out from a generic DuesIQ address (notifications@duesiq.com). This is one-way only. Residents receive emails from you, but there is no inbox for reading replies.',
+      emailClients:
+        'No. There is no inbox with this option, so there is nothing to add to Gmail or other apps.',
+      pros: [
+        'Nothing to set up, it just works',
+        'Fine if you only need to send announcements and payment reminders',
+      ],
+      cons: [
+        'No way to receive or read replies from residents',
+        'Does not work in Gmail, Outlook, or Apple Mail',
+        'Emails come from a generic address, not your community\'s name',
+        'Residents cannot email the board back directly',
+      ],
+    },
+  };
+}
 
-function OptionInfoCard({ mode }: { mode: SendingMode }) {
-  const info = OPTION_INFO[mode];
+function OptionInfoCard({ mode, slug }: { mode: SendingMode; slug: string }) {
+  const info = getOptionInfo(slug)[mode];
   return (
     <HoverCard openDelay={200} closeDelay={100}>
       <HoverCardTrigger asChild>
@@ -375,7 +378,7 @@ export function EmailDomainSetup() {
             <span className="text-body font-medium text-text-primary-light dark:text-text-primary-dark flex-1">
               Your Own Domain
             </span>
-            <OptionInfoCard mode="custom_domain" />
+            <OptionInfoCard mode="custom_domain" slug={community?.slug || 'yourcommunity'} />
           </div>
           <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
             Use your own domain like board@yourdomain.com. Works in Gmail, Outlook, and Apple Mail.
@@ -399,7 +402,7 @@ export function EmailDomainSetup() {
             <span className="text-body font-medium text-text-primary-light dark:text-text-primary-dark flex-1">
               Community Address
             </span>
-            <OptionInfoCard mode="subdomain" />
+            <OptionInfoCard mode="subdomain" slug={community?.slug || 'yourcommunity'} />
           </div>
           <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
             Send and receive as {community?.slug}@duesiq.com. Dashboard only.
@@ -423,7 +426,7 @@ export function EmailDomainSetup() {
             <span className="text-body font-medium text-text-primary-light dark:text-text-primary-dark flex-1">
               Default
             </span>
-            <OptionInfoCard mode="default" />
+            <OptionInfoCard mode="default" slug={community?.slug || 'yourcommunity'} />
           </div>
           <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
             Send notifications from notifications@duesiq.com. No inbox.
