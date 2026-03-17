@@ -49,7 +49,7 @@ CREATE INDEX idx_estoppel_requests_stripe_session ON estoppel_requests(stripe_se
 CREATE TRIGGER set_estoppel_requests_updated_at
   BEFORE UPDATE ON estoppel_requests
   FOR EACH ROW
-  EXECUTE FUNCTION set_updated_at();
+  EXECUTE FUNCTION update_updated_at();
 
 -- RLS
 ALTER TABLE estoppel_requests ENABLE ROW LEVEL SECURITY;
