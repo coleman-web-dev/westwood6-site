@@ -133,8 +133,10 @@ export function EstoppelRequestForm({
   }
 
   const standardFee = estoppelSettings.standard_fee;
+  const expeditedEnabled = estoppelSettings.expedited_fee_enabled !== false;
   const expeditedFee = estoppelSettings.expedited_fee;
-  const selectedFee = requestType === 'expedited' ? expeditedFee : standardFee;
+  const delinquentEnabled = estoppelSettings.delinquent_surcharge_enabled !== false;
+  const selectedFee = (requestType === 'expedited' && expeditedEnabled) ? expeditedFee : standardFee;
   const formatFee = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
   async function handleSubmit() {
@@ -223,27 +225,29 @@ export function EstoppelRequestForm({
             </p>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setRequestType('expedited')}
-            className={`p-4 rounded-inner-card border text-left transition-colors ${
-              requestType === 'expedited'
-                ? 'border-secondary-400 bg-secondary-400/5'
-                : 'border-stroke-light dark:border-stroke-dark hover:border-secondary-400/50'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-label font-semibold text-text-primary-light dark:text-text-primary-dark">
-                Expedited
-              </span>
-              <Badge variant="secondary" className="text-[10px]">
-                {formatFee(expeditedFee)}
-              </Badge>
-            </div>
-            <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-              Processed within 3 business days per Florida Statute 720.30851
-            </p>
-          </button>
+          {expeditedEnabled && (
+            <button
+              type="button"
+              onClick={() => setRequestType('expedited')}
+              className={`p-4 rounded-inner-card border text-left transition-colors ${
+                requestType === 'expedited'
+                  ? 'border-secondary-400 bg-secondary-400/5'
+                  : 'border-stroke-light dark:border-stroke-dark hover:border-secondary-400/50'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-label font-semibold text-text-primary-light dark:text-text-primary-dark">
+                  Expedited
+                </span>
+                <Badge variant="secondary" className="text-[10px]">
+                  {formatFee(expeditedFee)}
+                </Badge>
+              </div>
+              <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                Processed within 3 business days per Florida Statute 720.30851
+              </p>
+            </button>
+          )}
         </div>
       </div>
 
@@ -258,7 +262,7 @@ export function EstoppelRequestForm({
               {formatFee(selectedFee)}
             </span>
           </div>
-          {estoppelSettings.delinquent_surcharge > 0 && (
+          {delinquentEnabled && estoppelSettings.delinquent_surcharge > 0 && (
             <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
               An additional {formatFee(estoppelSettings.delinquent_surcharge)} surcharge may apply
               if there is an outstanding balance on the account per Florida Statute 720.30851.

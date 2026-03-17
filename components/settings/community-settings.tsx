@@ -66,7 +66,9 @@ export function CommunitySettings() {
   const [escalationNoticeType, setEscalationNoticeType] = useState<NoticeType>('final_notice');
   const [estoppelEnabled, setEstoppelEnabled] = useState(false);
   const [estoppelStandardFee, setEstoppelStandardFee] = useState(25000); // cents ($250)
-  const [estoppelExpeditedFee, setEstoppelExpeditedFee] = useState(50000); // cents ($500)
+  const [estoppelExpeditedFeeEnabled, setEstoppelExpeditedFeeEnabled] = useState(true);
+  const [estoppelExpeditedFee, setEstoppelExpeditedFee] = useState(10000); // cents ($100)
+  const [estoppelDelinquentSurchargeEnabled, setEstoppelDelinquentSurchargeEnabled] = useState(true);
   const [estoppelDelinquentSurcharge, setEstoppelDelinquentSurcharge] = useState(10000); // cents ($100)
   const [estoppelShowOnLanding, setEstoppelShowOnLanding] = useState(false);
   const [estoppelGlAccount, setEstoppelGlAccount] = useState('4600');
@@ -116,7 +118,9 @@ export function CommunitySettings() {
       const es = community.theme?.estoppel_settings as EstoppelSettings | undefined;
       setEstoppelEnabled(es?.enabled ?? false);
       setEstoppelStandardFee(es?.standard_fee ?? 25000);
-      setEstoppelExpeditedFee(es?.expedited_fee ?? 50000);
+      setEstoppelExpeditedFeeEnabled(es?.expedited_fee_enabled ?? true);
+      setEstoppelExpeditedFee(es?.expedited_fee ?? 10000);
+      setEstoppelDelinquentSurchargeEnabled(es?.delinquent_surcharge_enabled ?? true);
       setEstoppelDelinquentSurcharge(es?.delinquent_surcharge ?? 10000);
       setEstoppelShowOnLanding(es?.show_on_landing_page ?? false);
       setEstoppelGlAccount(es?.gl_revenue_account_code ?? '4600');
@@ -174,7 +178,9 @@ export function CommunitySettings() {
       escalationNoticeType !== (community.tenant_permissions?.violation_settings?.escalation_notice_type ?? 'final_notice') ||
       estoppelEnabled !== ((community.theme?.estoppel_settings as EstoppelSettings | undefined)?.enabled ?? false) ||
       estoppelStandardFee !== ((community.theme?.estoppel_settings as EstoppelSettings | undefined)?.standard_fee ?? 25000) ||
-      estoppelExpeditedFee !== ((community.theme?.estoppel_settings as EstoppelSettings | undefined)?.expedited_fee ?? 50000) ||
+      estoppelExpeditedFeeEnabled !== ((community.theme?.estoppel_settings as EstoppelSettings | undefined)?.expedited_fee_enabled ?? true) ||
+      estoppelExpeditedFee !== ((community.theme?.estoppel_settings as EstoppelSettings | undefined)?.expedited_fee ?? 10000) ||
+      estoppelDelinquentSurchargeEnabled !== ((community.theme?.estoppel_settings as EstoppelSettings | undefined)?.delinquent_surcharge_enabled ?? true) ||
       estoppelDelinquentSurcharge !== ((community.theme?.estoppel_settings as EstoppelSettings | undefined)?.delinquent_surcharge ?? 10000) ||
       estoppelShowOnLanding !== ((community.theme?.estoppel_settings as EstoppelSettings | undefined)?.show_on_landing_page ?? false) ||
       estoppelGlAccount !== ((community.theme?.estoppel_settings as EstoppelSettings | undefined)?.gl_revenue_account_code ?? '4600')
@@ -189,7 +195,7 @@ export function CommunitySettings() {
     autoGenerateInvoices, autoMarkOverdue, autoNotifyNewInvoices,
     reminderDaysBefore, reminderDaysAfter, arcEnabled, votingConfig,
     autoEscalationEnabled, defaultDeadlineDays, escalationNoticeType,
-    estoppelEnabled, estoppelStandardFee, estoppelExpeditedFee, estoppelDelinquentSurcharge, estoppelShowOnLanding, estoppelGlAccount,
+    estoppelEnabled, estoppelStandardFee, estoppelExpeditedFeeEnabled, estoppelExpeditedFee, estoppelDelinquentSurchargeEnabled, estoppelDelinquentSurcharge, estoppelShowOnLanding, estoppelGlAccount,
     community,
   ]);
 
@@ -259,7 +265,9 @@ export function CommunitySettings() {
             ...(community.theme?.estoppel_settings as EstoppelSettings | undefined),
             enabled: estoppelEnabled,
             standard_fee: estoppelStandardFee,
+            expedited_fee_enabled: estoppelExpeditedFeeEnabled,
             expedited_fee: estoppelExpeditedFee,
+            delinquent_surcharge_enabled: estoppelDelinquentSurchargeEnabled,
             delinquent_surcharge: estoppelDelinquentSurcharge,
             show_on_landing_page: estoppelShowOnLanding,
             gl_revenue_account_code: estoppelGlAccount,
@@ -1177,47 +1185,115 @@ export function CommunitySettings() {
                 <div className="border-t border-stroke-light dark:border-stroke-dark" />
 
                 {/* Fees */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-                      Standard fee ($)
-                    </Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      step={0.01}
-                      value={(estoppelStandardFee / 100).toFixed(2)}
-                      onChange={(e) => setEstoppelStandardFee(Math.round(Number(e.target.value) * 100))}
-                    />
+                <div className="space-y-1.5">
+                  <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                    Standard fee ($)
+                  </Label>
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="250.00"
+                    className="max-w-[200px]"
+                    defaultValue={(estoppelStandardFee / 100).toFixed(2)}
+                    key={`estoppel-std-${estoppelEnabled}`}
+                    onBlur={(e) => {
+                      const val = Number(e.target.value);
+                      if (!isNaN(val) && val >= 0) {
+                        const cents = Math.round(val * 100);
+                        setEstoppelStandardFee(cents);
+                        e.target.value = (cents / 100).toFixed(2);
+                      }
+                    }}
+                  />
+                </div>
+
+                <div className="border-t border-stroke-light dark:border-stroke-dark" />
+
+                {/* Expedited fee toggle + input */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-body text-text-primary-light dark:text-text-primary-dark">
+                      Expedited processing
+                    </p>
+                    <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                      Offer a faster turnaround option at a higher fee
+                    </p>
                   </div>
-                  <div className="space-y-1.5">
+                  <Switch
+                    checked={estoppelExpeditedFeeEnabled}
+                    onCheckedChange={setEstoppelExpeditedFeeEnabled}
+                  />
+                </div>
+                {estoppelExpeditedFeeEnabled && (
+                  <div className="space-y-1.5 pl-1">
                     <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
                       Expedited fee ($)
                     </Label>
                     <Input
-                      type="number"
-                      min={0}
-                      step={0.01}
-                      value={(estoppelExpeditedFee / 100).toFixed(2)}
-                      onChange={(e) => setEstoppelExpeditedFee(Math.round(Number(e.target.value) * 100))}
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="100.00"
+                      className="max-w-[200px]"
+                      defaultValue={(estoppelExpeditedFee / 100).toFixed(2)}
+                      key={`estoppel-exp-${estoppelExpeditedFeeEnabled}`}
+                      onBlur={(e) => {
+                        const val = Number(e.target.value);
+                        if (!isNaN(val) && val >= 0) {
+                          const cents = Math.round(val * 100);
+                          setEstoppelExpeditedFee(cents);
+                          e.target.value = (cents / 100).toFixed(2);
+                        }
+                      }}
                     />
+                    <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                      This is the total fee for expedited requests, not an additional charge on top of the standard fee.
+                    </p>
                   </div>
-                  <div className="space-y-1.5">
+                )}
+
+                <div className="border-t border-stroke-light dark:border-stroke-dark" />
+
+                {/* Delinquent surcharge toggle + input */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-body text-text-primary-light dark:text-text-primary-dark">
+                      Delinquent surcharge
+                    </p>
+                    <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                      Additional fee added when the property has overdue invoices
+                    </p>
+                  </div>
+                  <Switch
+                    checked={estoppelDelinquentSurchargeEnabled}
+                    onCheckedChange={setEstoppelDelinquentSurchargeEnabled}
+                  />
+                </div>
+                {estoppelDelinquentSurchargeEnabled && (
+                  <div className="space-y-1.5 pl-1">
                     <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-                      Delinquent surcharge ($)
+                      Surcharge amount ($)
                     </Label>
                     <Input
-                      type="number"
-                      min={0}
-                      step={0.01}
-                      value={(estoppelDelinquentSurcharge / 100).toFixed(2)}
-                      onChange={(e) => setEstoppelDelinquentSurcharge(Math.round(Number(e.target.value) * 100))}
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="100.00"
+                      className="max-w-[200px]"
+                      defaultValue={(estoppelDelinquentSurcharge / 100).toFixed(2)}
+                      key={`estoppel-del-${estoppelDelinquentSurchargeEnabled}`}
+                      onBlur={(e) => {
+                        const val = Number(e.target.value);
+                        if (!isNaN(val) && val >= 0) {
+                          const cents = Math.round(val * 100);
+                          setEstoppelDelinquentSurcharge(cents);
+                          e.target.value = (cents / 100).toFixed(2);
+                        }
+                      }}
                     />
+                    <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                      Added on top of the standard or expedited fee. Per Florida Statute 720.30851.
+                    </p>
                   </div>
-                </div>
-                <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                  Per Florida Statute 720.30851. Delinquent surcharge is added automatically when the property has overdue invoices.
-                </p>
+                )}
 
                 {revenueAccounts.length > 0 && (
                   <div className="space-y-1">
@@ -1286,7 +1362,9 @@ export function CommunitySettings() {
                   ...(community.theme?.estoppel_settings as EstoppelSettings | undefined),
                   enabled: estoppelEnabled,
                   standard_fee: estoppelStandardFee,
+                  expedited_fee_enabled: estoppelExpeditedFeeEnabled,
                   expedited_fee: estoppelExpeditedFee,
+                  delinquent_surcharge_enabled: estoppelDelinquentSurchargeEnabled,
                   delinquent_surcharge: estoppelDelinquentSurcharge,
                   show_on_landing_page: estoppelShowOnLanding,
                   gl_revenue_account_code: estoppelGlAccount,

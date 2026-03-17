@@ -67,16 +67,18 @@ export async function POST(req: NextRequest) {
     }
 
     // Calculate fee
-    let feeAmount = requestType === 'expedited'
+    const expeditedEnabled = estoppelSettings.expedited_fee_enabled !== false;
+    let feeAmount = (requestType === 'expedited' && expeditedEnabled)
       ? estoppelSettings.expedited_fee
       : estoppelSettings.standard_fee;
 
     // Check for delinquency surcharge by looking up unit from lot_number
+    const delinquentEnabled = estoppelSettings.delinquent_surcharge_enabled !== false;
     const lotNumber = requesterFields.lot_number?.trim();
     let unitId: string | null = null;
     let isDelinquent = false;
 
-    if (lotNumber) {
+    if (lotNumber && delinquentEnabled) {
       const { data: unit } = await supabase
         .from('units')
         .select('id, status')
@@ -91,6 +93,15 @@ export async function POST(req: NextRequest) {
           feeAmount += estoppelSettings.delinquent_surcharge || 0;
         }
       }
+    } else if (lotNumber) {
+      // Still look up the unit for reference, just don't apply surcharge
+      const { data: unit } = await supabase
+        .from('units')
+        .select('id')
+        .eq('community_id', communityId)
+        .eq('unit_number', lotNumber)
+        .single();
+      if (unit) unitId = unit.id;
     }
 
     if (feeAmount <= 0) {

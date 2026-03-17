@@ -378,7 +378,9 @@ export interface EstoppelSettings {
   enabled: boolean;
   standard_fee: number;
   expedited_fee: number;
+  expedited_fee_enabled?: boolean; // whether expedited option is offered (default: true for backward compat)
   delinquent_surcharge: number;
+  delinquent_surcharge_enabled?: boolean; // whether delinquent surcharge is applied (default: true for backward compat)
   show_on_landing_page: boolean;
   template: string | null;
   fields: EstoppelField[];
