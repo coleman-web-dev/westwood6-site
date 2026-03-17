@@ -24,8 +24,10 @@ import { VendorsManager } from '@/components/settings/vendors-manager';
 
 import { StripeMigrationSection } from '@/components/settings/stripe-migration-section';
 import { InsuranceReminderSettings } from '@/components/settings/insurance-reminder-settings';
-import type { PaymentFrequency, BulletinSettings, LateFeeSettings, ConvenienceFeeSettings, VotingConfig, NoticeType } from '@/lib/types/database';
+import type { PaymentFrequency, BulletinSettings, LateFeeSettings, ConvenienceFeeSettings, EstoppelSettings, EstoppelField, VotingConfig, NoticeType } from '@/lib/types/database';
 import { VOTING_CONFIG_DEFAULTS } from '@/lib/types/database';
+import { EstoppelWizardDialog } from '@/components/estoppel/estoppel-wizard-dialog';
+import { EstoppelManagement } from '@/components/estoppel/estoppel-management';
 
 export function CommunitySettings() {
   const { community, member } = useCommunity();
@@ -61,6 +63,12 @@ export function CommunitySettings() {
   const [autoEscalationEnabled, setAutoEscalationEnabled] = useState(false);
   const [defaultDeadlineDays, setDefaultDeadlineDays] = useState(14);
   const [escalationNoticeType, setEscalationNoticeType] = useState<NoticeType>('final_notice');
+  const [estoppelEnabled, setEstoppelEnabled] = useState(false);
+  const [estoppelStandardFee, setEstoppelStandardFee] = useState(25000); // cents ($250)
+  const [estoppelExpeditedFee, setEstoppelExpeditedFee] = useState(50000); // cents ($500)
+  const [estoppelDelinquentSurcharge, setEstoppelDelinquentSurcharge] = useState(10000); // cents ($100)
+  const [estoppelShowOnLanding, setEstoppelShowOnLanding] = useState(false);
+  const [estoppelWizardOpen, setEstoppelWizardOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // Load current values from community context
@@ -101,6 +109,12 @@ export function CommunitySettings() {
       setAutoEscalationEnabled(vs?.auto_escalation_enabled ?? false);
       setDefaultDeadlineDays(vs?.default_deadline_days ?? 14);
       setEscalationNoticeType(vs?.escalation_notice_type ?? 'final_notice');
+      const es = community.theme?.estoppel_settings as EstoppelSettings | undefined;
+      setEstoppelEnabled(es?.enabled ?? false);
+      setEstoppelStandardFee(es?.standard_fee ?? 25000);
+      setEstoppelExpeditedFee(es?.expedited_fee ?? 50000);
+      setEstoppelDelinquentSurcharge(es?.delinquent_surcharge ?? 10000);
+      setEstoppelShowOnLanding(es?.show_on_landing_page ?? false);
     }
   }, [community]);
 
@@ -137,7 +151,12 @@ export function CommunitySettings() {
       JSON.stringify(votingConfig) !== JSON.stringify({ ...VOTING_CONFIG_DEFAULTS, ...(community.theme?.voting_config as VotingConfig | undefined) }) ||
       autoEscalationEnabled !== (community.tenant_permissions?.violation_settings?.auto_escalation_enabled ?? false) ||
       defaultDeadlineDays !== (community.tenant_permissions?.violation_settings?.default_deadline_days ?? 14) ||
-      escalationNoticeType !== (community.tenant_permissions?.violation_settings?.escalation_notice_type ?? 'final_notice')
+      escalationNoticeType !== (community.tenant_permissions?.violation_settings?.escalation_notice_type ?? 'final_notice') ||
+      estoppelEnabled !== ((community.theme?.estoppel_settings as EstoppelSettings | undefined)?.enabled ?? false) ||
+      estoppelStandardFee !== ((community.theme?.estoppel_settings as EstoppelSettings | undefined)?.standard_fee ?? 25000) ||
+      estoppelExpeditedFee !== ((community.theme?.estoppel_settings as EstoppelSettings | undefined)?.expedited_fee ?? 50000) ||
+      estoppelDelinquentSurcharge !== ((community.theme?.estoppel_settings as EstoppelSettings | undefined)?.delinquent_surcharge ?? 10000) ||
+      estoppelShowOnLanding !== ((community.theme?.estoppel_settings as EstoppelSettings | undefined)?.show_on_landing_page ?? false)
     );
   }, [
     name, address, phone, email,
@@ -149,6 +168,7 @@ export function CommunitySettings() {
     autoGenerateInvoices, autoMarkOverdue, autoNotifyNewInvoices,
     reminderDaysBefore, reminderDaysAfter, arcEnabled, votingConfig,
     autoEscalationEnabled, defaultDeadlineDays, escalationNoticeType,
+    estoppelEnabled, estoppelStandardFee, estoppelExpeditedFee, estoppelDelinquentSurcharge, estoppelShowOnLanding,
     community,
   ]);
 
@@ -213,6 +233,14 @@ export function CommunitySettings() {
           },
           arc_enabled: arcEnabled,
           voting_config: votingConfig,
+          estoppel_settings: {
+            ...(community.theme?.estoppel_settings as EstoppelSettings | undefined),
+            enabled: estoppelEnabled,
+            standard_fee: estoppelStandardFee,
+            expedited_fee: estoppelExpeditedFee,
+            delinquent_surcharge: estoppelDelinquentSurcharge,
+            show_on_landing_page: estoppelShowOnLanding,
+          },
         },
       })
       .eq('id', community.id);
@@ -1036,6 +1064,160 @@ export function CommunitySettings() {
           </div>
         </div>
       </div>
+
+      {/* Estoppel Certificates */}
+      <div className="bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark rounded-panel p-card-padding">
+        <h2 className="text-card-title text-text-primary-light dark:text-text-primary-dark mb-1">
+          Estoppel Certificates
+        </h2>
+        <p className="text-meta text-text-muted-light dark:text-text-muted-dark mb-4">
+          Allow title companies and attorneys to request estoppel certificates online with payment.
+        </p>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-body text-text-primary-light dark:text-text-primary-dark">
+                Enable estoppel requests
+              </p>
+              <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                External parties can submit and pay for estoppel certificates
+              </p>
+            </div>
+            <Switch
+              checked={estoppelEnabled}
+              onCheckedChange={setEstoppelEnabled}
+            />
+          </div>
+
+          <Collapsible open={estoppelEnabled}>
+            <CollapsibleContent className="overflow-hidden transition-all data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+              <div className="border-t border-stroke-light dark:border-stroke-dark mt-4" />
+              <div className="space-y-4 pt-4">
+                {/* Template setup */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-body text-text-primary-light dark:text-text-primary-dark">
+                      Certificate template
+                    </p>
+                    <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                      {(community?.theme?.estoppel_settings as EstoppelSettings | undefined)?.template
+                        ? 'Template configured'
+                        : 'No template configured yet'}
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEstoppelWizardOpen(true)}
+                  >
+                    {(community?.theme?.estoppel_settings as EstoppelSettings | undefined)?.template
+                      ? 'Edit Template'
+                      : 'Set Up Template'}
+                  </Button>
+                </div>
+
+                <div className="border-t border-stroke-light dark:border-stroke-dark" />
+
+                {/* Fees */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                      Standard fee ($)
+                    </Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      value={(estoppelStandardFee / 100).toFixed(2)}
+                      onChange={(e) => setEstoppelStandardFee(Math.round(Number(e.target.value) * 100))}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                      Expedited fee ($)
+                    </Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      value={(estoppelExpeditedFee / 100).toFixed(2)}
+                      onChange={(e) => setEstoppelExpeditedFee(Math.round(Number(e.target.value) * 100))}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                      Delinquent surcharge ($)
+                    </Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      value={(estoppelDelinquentSurcharge / 100).toFixed(2)}
+                      onChange={(e) => setEstoppelDelinquentSurcharge(Math.round(Number(e.target.value) * 100))}
+                    />
+                  </div>
+                </div>
+                <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                  Per Florida Statute 720.30851. Delinquent surcharge is added automatically when the property has overdue invoices.
+                </p>
+
+                <div className="border-t border-stroke-light dark:border-stroke-dark" />
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-body text-text-primary-light dark:text-text-primary-dark">
+                      Show on landing page
+                    </p>
+                    <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                      Display an estoppel request link on the public community page
+                    </p>
+                  </div>
+                  <Switch
+                    checked={estoppelShowOnLanding}
+                    onCheckedChange={setEstoppelShowOnLanding}
+                  />
+                </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
+      </div>
+
+      {/* Estoppel Management (below settings when enabled) */}
+      {estoppelEnabled && (
+        <EstoppelManagement communityId={community.id} />
+      )}
+
+      {/* Estoppel Wizard Dialog */}
+      <EstoppelWizardDialog
+        open={estoppelWizardOpen}
+        onOpenChange={setEstoppelWizardOpen}
+        existingTemplate={(community?.theme?.estoppel_settings as EstoppelSettings | undefined)?.template}
+        existingFields={(community?.theme?.estoppel_settings as EstoppelSettings | undefined)?.fields}
+        onSave={async (template, fields) => {
+          const supabase = createClient();
+          await supabase
+            .from('communities')
+            .update({
+              theme: {
+                ...community.theme,
+                estoppel_settings: {
+                  ...(community.theme?.estoppel_settings as EstoppelSettings | undefined),
+                  enabled: estoppelEnabled,
+                  standard_fee: estoppelStandardFee,
+                  expedited_fee: estoppelExpeditedFee,
+                  delinquent_surcharge: estoppelDelinquentSurcharge,
+                  show_on_landing_page: estoppelShowOnLanding,
+                  template,
+                  fields,
+                },
+              },
+            })
+            .eq('id', community.id);
+          toast.success('Estoppel template saved.');
+        }}
+      />
 
       {/* ARC Requests */}
       <div className="bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark rounded-panel p-card-padding">

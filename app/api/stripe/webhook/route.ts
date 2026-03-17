@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { queuePaymentConfirmation } from '@/lib/email/queue';
 import { postPaymentReceived, postOverpaymentWalletCredit } from '@/lib/utils/accounting-entries';
 import { logAuditEvent } from '@/lib/audit';
+import { buildEstoppelSystemContext } from '@/lib/utils/estoppel-template';
 import type Stripe from 'stripe';
 
 export const runtime = 'nodejs';
@@ -136,6 +137,176 @@ export async function POST(req: NextRequest) {
           } else {
             console.log('RSVP already confirmed or not found, skipping:', rsvpId);
           }
+          break;
+        }
+
+        // --- Estoppel payment branch ---
+        if (metadataType === 'estoppel' && communityId) {
+          // Idempotency: check if already created
+          const { data: existingEstoppel } = await supabase
+            .from('estoppel_requests')
+            .select('id')
+            .eq('stripe_session_id', session.id)
+            .limit(1)
+            .maybeSingle();
+
+          if (existingEstoppel) {
+            console.log('Estoppel request already created, skipping:', session.id);
+            break;
+          }
+
+          // Reconstruct requester_fields from metadata
+          let requesterFields: Record<string, string> = {};
+          const chunksCount = session.metadata?.requester_fields_chunks;
+          if (chunksCount) {
+            let json = '';
+            for (let i = 0; i < parseInt(chunksCount); i++) {
+              json += session.metadata?.[`requester_fields_${i}`] || '';
+            }
+            try { requesterFields = JSON.parse(json); } catch { /* empty */ }
+          } else if (session.metadata?.requester_fields) {
+            try { requesterFields = JSON.parse(session.metadata.requester_fields); } catch { /* empty */ }
+          }
+
+          const requestType = session.metadata?.request_type || 'standard';
+          const deliveryEmail = session.metadata?.delivery_email || '';
+          const unitId = session.metadata?.unit_id || null;
+
+          // Auto-fill system fields from database
+          let systemFields: Record<string, string> = {};
+
+          const { data: community } = await supabase
+            .from('communities')
+            .select('name, address')
+            .eq('id', communityId)
+            .single();
+
+          if (unitId) {
+            // Look up unit financial data
+            const { data: unit } = await supabase
+              .from('units')
+              .select('id, payment_frequency')
+              .eq('id', unitId)
+              .single();
+
+            // Get active assessment
+            const { data: assessment } = await supabase
+              .from('assessments')
+              .select('annual_amount, default_frequency')
+              .eq('community_id', communityId)
+              .eq('is_active', true)
+              .limit(1)
+              .single();
+
+            // Get invoices for balance calculation
+            const { data: invoices } = await supabase
+              .from('invoices')
+              .select('amount, amount_paid, status, due_date, title')
+              .eq('unit_id', unitId)
+              .in('status', ['pending', 'overdue', 'partial']);
+
+            const currentBalance = (invoices || []).reduce(
+              (sum, inv) => sum + (inv.amount - (inv.amount_paid || 0)),
+              0,
+            );
+
+            // Find the last paid invoice to determine paid_through_date
+            const { data: lastPaidInvoice } = await supabase
+              .from('invoices')
+              .select('due_date')
+              .eq('unit_id', unitId)
+              .eq('status', 'paid')
+              .order('due_date', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            // Get violations
+            const { data: violations } = await supabase
+              .from('violations')
+              .select('title, status, description')
+              .eq('unit_id', unitId)
+              .neq('status', 'resolved');
+
+            const freq = unit?.payment_frequency || assessment?.default_frequency || 'monthly';
+            const annualAmount = assessment?.annual_amount || 0;
+            let assessmentAmount: number | null = null;
+            if (annualAmount) {
+              switch (freq) {
+                case 'monthly': assessmentAmount = Math.round(annualAmount / 12); break;
+                case 'quarterly': assessmentAmount = Math.round(annualAmount / 4); break;
+                case 'semi_annual': assessmentAmount = Math.round(annualAmount / 2); break;
+                case 'annual': assessmentAmount = annualAmount; break;
+              }
+            }
+
+            systemFields = buildEstoppelSystemContext({
+              communityName: community?.name || '',
+              communityAddress: community?.address || '',
+              assessmentAmount,
+              assessmentFrequency: freq,
+              paidThroughDate: lastPaidInvoice?.due_date
+                ? new Date(lastPaidInvoice.due_date).toLocaleDateString('en-US')
+                : null,
+              currentBalance,
+              lateFees: 0,
+              specialAssessments: [],
+              violations: (violations || []).map((v) => ({
+                title: v.title,
+                status: v.status,
+                description: v.description || undefined,
+              })),
+              completionDate: new Date().toLocaleDateString('en-US'),
+            });
+          } else if (community) {
+            // No unit found, minimal system fields
+            systemFields = buildEstoppelSystemContext({
+              communityName: community.name,
+              communityAddress: community.address || '',
+              assessmentAmount: null,
+              assessmentFrequency: null,
+              paidThroughDate: null,
+              currentBalance: 0,
+              lateFees: 0,
+              specialAssessments: [],
+              violations: [],
+              completionDate: new Date().toLocaleDateString('en-US'),
+            });
+          }
+
+          // Insert estoppel request
+          await supabase.from('estoppel_requests').insert({
+            community_id: communityId,
+            requester_fields: requesterFields,
+            system_fields: systemFields,
+            board_fields: {},
+            unit_id: unitId || null,
+            request_type: requestType,
+            fee_amount: session.amount_total || 0,
+            stripe_session_id: session.id,
+            stripe_payment_intent: (session.payment_intent as string) || null,
+            paid_at: new Date().toISOString(),
+            status: 'pending',
+            delivery_email: deliveryEmail,
+          });
+
+          // Notify board
+          void supabase.rpc('create_board_notifications', {
+            p_community_id: communityId,
+            p_type: 'general',
+            p_title: `New estoppel request (${requestType})`,
+            p_body: `Estoppel certificate requested for ${requesterFields.property_address || 'a property'}. Payment received.`,
+            p_reference_id: null,
+            p_reference_type: 'estoppel_request',
+          });
+
+          await logAuditEvent({
+            communityId,
+            action: 'estoppel_request_created',
+            targetType: 'estoppel_request',
+            metadata: { request_type: requestType, delivery_email: deliveryEmail },
+          });
+
+          console.log('Estoppel request created from checkout:', session.id);
           break;
         }
 

@@ -34,6 +34,12 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse;
   }
 
+  // Public community sub-pages (estoppel request form)
+  if (segments.length === 2 && segments[1] === 'estoppel') {
+    const { supabaseResponse } = await updateSession(request);
+    return supabaseResponse;
+  }
+
   // Dev bypass: skip auth in development when cookie is set
   // Double-check VERCEL_ENV to prevent accidental activation in production
   if (

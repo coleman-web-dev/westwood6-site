@@ -18,11 +18,13 @@ export async function sendEmailDirect({
   subject,
   html,
   from,
+  attachments,
 }: {
   to: string;
   subject: string;
   html: string;
   from?: string;
+  attachments?: Array<{ filename: string; content: Buffer }>;
 }) {
   const resend = getResendClient();
   const fromAddress = from || process.env.EMAIL_FROM_ADDRESS || 'DuesIQ <notifications@duesiq.com>';
@@ -32,6 +34,7 @@ export async function sendEmailDirect({
     to,
     subject,
     html,
+    ...(attachments?.length ? { attachments } : {}),
   });
 
   if (error) {

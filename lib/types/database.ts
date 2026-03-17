@@ -134,6 +134,7 @@ export interface CommunityTheme {
   vendor_settings?: VendorSettings;
   check_settings?: import('./check').CheckSettings;
   role_templates?: import('./permissions').RoleTemplate[];
+  estoppel_settings?: EstoppelSettings;
   [key: string]: unknown;
 }
 
@@ -357,6 +358,55 @@ export interface Payment {
 
 export type AgreementFieldType = 'text' | 'number' | 'yes_no' | 'select' | 'date';
 export type AgreementFieldPhase = 'reservation' | 'post_event';
+export type EstoppelFieldPhase = 'requester' | 'system' | 'board';
+export type EstoppelRequestStatus = 'pending' | 'in_review' | 'completed' | 'cancelled';
+export type EstoppelRequestType = 'standard' | 'expedited';
+
+export interface EstoppelField {
+  id: string;
+  key: string;
+  label: string;
+  type: AgreementFieldType;
+  required: boolean;
+  options?: string[];
+  placeholder?: string;
+  fill_phase: EstoppelFieldPhase;
+}
+
+export interface EstoppelSettings {
+  enabled: boolean;
+  standard_fee: number;
+  expedited_fee: number;
+  delinquent_surcharge: number;
+  show_on_landing_page: boolean;
+  template: string | null;
+  fields: EstoppelField[];
+}
+
+export interface EstoppelRequest {
+  id: string;
+  community_id: string;
+  requester_fields: Record<string, string>;
+  system_fields: Record<string, string>;
+  board_fields: Record<string, string>;
+  unit_id: string | null;
+  request_type: EstoppelRequestType;
+  fee_amount: number;
+  stripe_session_id: string | null;
+  stripe_payment_intent: string | null;
+  paid_at: string | null;
+  status: EstoppelRequestStatus;
+  completed_by: string | null;
+  completed_by_name: string | null;
+  completed_by_title: string | null;
+  completed_at: string | null;
+  signature_name: string | null;
+  delivery_email: string;
+  pdf_path: string | null;
+  delivered_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface AgreementField {
   id: string;
