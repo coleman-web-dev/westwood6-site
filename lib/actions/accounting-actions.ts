@@ -233,6 +233,7 @@ export async function seedChartOfAccountsAction(communityId: string) {
       { code: '4400', name: 'Other Income', account_type: 'revenue', fund: 'operating', is_system: false, normal_balance: 'credit', display_order: 450 },
       { code: '4500', name: 'Reserve Contribution Revenue', account_type: 'revenue', fund: 'reserve', is_system: false, normal_balance: 'credit', display_order: 460 },
       { code: '4600', name: 'Estoppel Fee Revenue', account_type: 'revenue', fund: 'operating', is_system: false, normal_balance: 'credit', display_order: 470 },
+      { code: '4700', name: 'Processing Fee Revenue', account_type: 'revenue', fund: 'operating', is_system: false, normal_balance: 'credit', display_order: 480 },
 
       // EXPENSES (5000s)
       { code: '5000', name: 'Maintenance & Repairs', account_type: 'expense', fund: 'operating', is_system: false, normal_balance: 'debit', display_order: 500 },

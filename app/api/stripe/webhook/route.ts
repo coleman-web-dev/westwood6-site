@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getStripeClient } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { queuePaymentConfirmation } from '@/lib/email/queue';
-import { postPaymentReceived, postOverpaymentWalletCredit, postEstoppelFeeReceived, postAmenityDepositReceived, postEventRsvpFeeReceived } from '@/lib/utils/accounting-entries';
+import { postPaymentReceived, postOverpaymentWalletCredit, postEstoppelFeeReceived, postAmenityDepositReceived, postEventRsvpFeeReceived, postProcessingFeeReceived } from '@/lib/utils/accounting-entries';
 import { logAuditEvent } from '@/lib/audit';
 import type Stripe from 'stripe';
 
@@ -277,9 +277,14 @@ export async function POST(req: NextRequest) {
           break;
         }
 
-        // Amount paid via Stripe (in cents)
-        const stripePaidAmount = session.amount_total || 0;
-        const totalPaid = (invoice.amount_paid || 0) + stripePaidAmount;
+        // Amount paid via Stripe (in cents) -- includes processing fee if any
+        const stripeTotalAmount = session.amount_total || 0;
+        // Determine how much of the Stripe total is the processing fee vs invoice payment
+        // The invoice charge is the remaining balance; everything above that is the fee
+        const invoiceRemaining = invoice.amount - (invoice.amount_paid || 0);
+        const processingFeeAmount = Math.max(0, stripeTotalAmount - invoiceRemaining);
+        const invoicePayment = stripeTotalAmount - processingFeeAmount;
+        const totalPaid = (invoice.amount_paid || 0) + invoicePayment;
 
         // Update invoice
         const { error: updateError } = await supabase
@@ -297,18 +302,23 @@ export async function POST(req: NextRequest) {
           break;
         }
 
-        // Create a payment record
+        // Create a payment record (invoice amount only, not the processing fee)
         await supabase.from('payments').insert({
           invoice_id: invoiceId,
           unit_id: invoice.unit_id,
-          amount: stripePaidAmount,
+          amount: invoicePayment,
           stripe_session_id: session.id,
           stripe_payment_intent: (session.payment_intent as string) || null,
           paid_by: invoice.paid_by || 'stripe',
         });
 
         // Post accounting journal entries (silently skips if not set up)
-        await postPaymentReceived(communityId, invoiceId, invoice.unit_id, Math.min(stripePaidAmount, invoice.amount), invoice.title);
+        await postPaymentReceived(communityId, invoiceId, invoice.unit_id, Math.min(invoicePayment, invoice.amount), invoice.title);
+
+        // Post processing fee GL entry if a fee was charged
+        if (processingFeeAmount > 0) {
+          postProcessingFeeReceived(communityId, invoiceId, invoice.unit_id, processingFeeAmount, invoice.title).catch(() => {});
+        }
 
         // Check for overpayment: credit excess to unit wallet
         if (totalPaid > invoice.amount) {
@@ -364,7 +374,7 @@ export async function POST(req: NextRequest) {
             community.slug,
             invoice.unit_id,
             invoice.title,
-            stripePaidAmount,
+            stripeTotalAmount,
             new Date().toISOString()
           );
         }
@@ -374,7 +384,7 @@ export async function POST(req: NextRequest) {
           action: 'payment_received',
           targetType: 'invoice',
           targetId: invoiceId,
-          metadata: { amount: stripePaidAmount, method: 'stripe_checkout', title: invoice.title },
+          metadata: { amount: stripeTotalAmount, method: 'stripe_checkout', title: invoice.title, processing_fee: processingFeeAmount },
         });
 
         console.log('Checkout session completed for invoice:', invoiceId);

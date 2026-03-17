@@ -355,6 +355,28 @@ export async function postEstoppelFeeReceived(
   });
 }
 
+/** Processing fee received: DR Operating Cash, CR Processing Fee Revenue */
+export async function postProcessingFeeReceived(
+  communityId: string,
+  invoiceId: string,
+  unitId: string,
+  feeAmount: number,
+  invoiceTitle: string,
+) {
+  return createJournalEntry({
+    communityId,
+    description: `Processing fee: ${invoiceTitle}`,
+    source: 'payment_received',
+    referenceType: 'invoice',
+    referenceId: invoiceId,
+    unitId,
+    lines: [
+      { accountCode: '1000', debit: feeAmount, credit: 0, description: 'Operating Cash' },
+      { accountCode: '4700', debit: 0, credit: feeAmount, description: 'Processing Fee Revenue' },
+    ],
+  });
+}
+
 /** Amenity deposit received: DR Operating Cash, CR Amenity Deposits Payable (liability) */
 export async function postAmenityDepositReceived(
   communityId: string,

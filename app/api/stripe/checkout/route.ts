@@ -12,7 +12,7 @@ import type { ConvenienceFeeSettings } from '@/lib/types/database';
  */
 export async function POST(req: NextRequest) {
   try {
-    const { invoiceId, communityId, successUrl, cancelUrl } = await req.json();
+    const { invoiceId, communityId, successUrl, cancelUrl, paymentMethod } = await req.json();
 
     if (!invoiceId || !communityId || !successUrl || !cancelUrl) {
       return NextResponse.json(
@@ -135,8 +135,15 @@ export async function POST(req: NextRequest) {
     }
 
     // Calculate convenience fee (covers Stripe processing fee + DuesIQ margin)
+    // Fee only applies if enabled and the selected payment method matches applies_to
+    const appliesTo = convenienceFee?.applies_to ?? 'all';
+    const feeApplies = convenienceFee?.enabled && (
+      appliesTo === 'all' ||
+      (appliesTo === 'card' && paymentMethod === 'card') ||
+      (appliesTo === 'ach' && paymentMethod === 'ach')
+    );
     let convenienceFeeAmount = 0;
-    if (convenienceFee?.enabled) {
+    if (feeApplies) {
       const percentFee = Math.round(chargeAmount * (convenienceFee.fee_percent / 100));
       const fixedFee = convenienceFee.fee_fixed || 0;
       convenienceFeeAmount = percentFee + fixedFee;
@@ -183,9 +190,15 @@ export async function POST(req: NextRequest) {
     // Direct mode: payment goes directly to community's Stripe account
     const isConnect = stripeAccount.mode === 'connect' && stripeAccount.stripe_account_id;
 
+    // Restrict payment methods if a specific method was chosen (for split fee flows)
+    const paymentMethodTypes: ('card' | 'us_bank_account')[] =
+      paymentMethod === 'card' ? ['card'] :
+      paymentMethod === 'ach' ? ['us_bank_account'] :
+      ['card', 'us_bank_account'];
+
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
-      payment_method_types: ['card', 'us_bank_account'],
+      payment_method_types: paymentMethodTypes,
       line_items: lineItems,
       success_url: successUrl,
       cancel_url: cancelUrl,

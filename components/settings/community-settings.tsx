@@ -53,6 +53,7 @@ export function CommunitySettings() {
   const [convenienceFeeEnabled, setConvenienceFeeEnabled] = useState(false);
   const [convenienceFeePercent, setConvenienceFeePercent] = useState(3.5);
   const [convenienceFeeFixed, setConvenienceFeeFixed] = useState(30); // cents
+  const [convenienceFeeAppliesTo, setConvenienceFeeAppliesTo] = useState<'card' | 'ach' | 'all'>('all');
   const [autoGenerateInvoices, setAutoGenerateInvoices] = useState(false);
   const [autoMarkOverdue, setAutoMarkOverdue] = useState(false);
   const [autoNotifyNewInvoices, setAutoNotifyNewInvoices] = useState(false);
@@ -99,6 +100,7 @@ export function CommunitySettings() {
       setConvenienceFeeEnabled(cfs?.enabled ?? false);
       setConvenienceFeePercent(cfs?.fee_percent ?? 3.5);
       setConvenienceFeeFixed(cfs?.fee_fixed ?? 30);
+      setConvenienceFeeAppliesTo(cfs?.applies_to ?? 'all');
       setAutoGenerateInvoices(!!community.theme?.payment_settings?.auto_generate_invoices);
       setAutoMarkOverdue(!!community.theme?.payment_settings?.auto_mark_overdue);
       setAutoNotifyNewInvoices(!!community.theme?.payment_settings?.auto_notify_new_invoices);
@@ -159,6 +161,7 @@ export function CommunitySettings() {
       convenienceFeeEnabled !== ((community.theme?.payment_settings?.convenience_fee_settings as ConvenienceFeeSettings | undefined)?.enabled ?? false) ||
       convenienceFeePercent !== ((community.theme?.payment_settings?.convenience_fee_settings as ConvenienceFeeSettings | undefined)?.fee_percent ?? 3.5) ||
       convenienceFeeFixed !== ((community.theme?.payment_settings?.convenience_fee_settings as ConvenienceFeeSettings | undefined)?.fee_fixed ?? 30) ||
+      convenienceFeeAppliesTo !== ((community.theme?.payment_settings?.convenience_fee_settings as ConvenienceFeeSettings | undefined)?.applies_to ?? 'all') ||
       autoGenerateInvoices !== (!!community.theme?.payment_settings?.auto_generate_invoices) ||
       autoMarkOverdue !== (!!community.theme?.payment_settings?.auto_mark_overdue) ||
       autoNotifyNewInvoices !== (!!community.theme?.payment_settings?.auto_notify_new_invoices) ||
@@ -182,7 +185,7 @@ export function CommunitySettings() {
     allowFlexibleFrequency, defaultFrequency,
     bulletinPosting, bulletinCommenting,
     lateFeesEnabled, gracePeriodDays, feeType, feeAmount, maxFee,
-    convenienceFeeEnabled, convenienceFeePercent, convenienceFeeFixed,
+    convenienceFeeEnabled, convenienceFeePercent, convenienceFeeFixed, convenienceFeeAppliesTo,
     autoGenerateInvoices, autoMarkOverdue, autoNotifyNewInvoices,
     reminderDaysBefore, reminderDaysAfter, arcEnabled, votingConfig,
     autoEscalationEnabled, defaultDeadlineDays, escalationNoticeType,
@@ -238,6 +241,7 @@ export function CommunitySettings() {
               enabled: convenienceFeeEnabled,
               fee_percent: convenienceFeePercent,
               fee_fixed: convenienceFeeFixed,
+              applies_to: convenienceFeeAppliesTo,
             },
             auto_generate_invoices: autoGenerateInvoices,
             auto_mark_overdue: autoMarkOverdue,
@@ -914,6 +918,26 @@ export function CommunitySettings() {
                       onChange={(e) => setConvenienceFeeFixed(Math.round(Number(e.target.value) * 100))}
                     />
                   </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                    Applies to
+                  </Label>
+                  <Select value={convenienceFeeAppliesTo} onValueChange={(v) => setConvenienceFeeAppliesTo(v as 'card' | 'ach' | 'all')}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="card">Credit/debit card only</SelectItem>
+                      <SelectItem value="ach">ACH bank transfer only</SelectItem>
+                      <SelectItem value="all">All payment methods</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                    {convenienceFeeAppliesTo === 'card' && 'Homeowners paying by ACH will not be charged a processing fee.'}
+                    {convenienceFeeAppliesTo === 'ach' && 'Homeowners paying by card will not be charged a processing fee.'}
+                    {convenienceFeeAppliesTo === 'all' && 'All homeowners will be charged a processing fee regardless of payment method.'}
+                  </p>
                 </div>
                 <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
                   Example: on a $250 invoice, the fee would be ${((250 * convenienceFeePercent / 100) + convenienceFeeFixed / 100).toFixed(2)}

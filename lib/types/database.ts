@@ -57,6 +57,7 @@ export interface ConvenienceFeeSettings {
   enabled: boolean;
   fee_percent: number; // e.g. 3.5 for 3.5%
   fee_fixed: number; // in cents, e.g. 30 for $0.30
+  applies_to?: 'card' | 'ach' | 'all'; // which payment methods the fee applies to (default: 'all')
 }
 
 export interface PaymentSettings {
