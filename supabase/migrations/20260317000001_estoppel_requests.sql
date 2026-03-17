@@ -41,11 +41,12 @@ CREATE TABLE IF NOT EXISTS estoppel_requests (
 );
 
 -- Indexes
-CREATE INDEX idx_estoppel_requests_community ON estoppel_requests(community_id);
-CREATE INDEX idx_estoppel_requests_status ON estoppel_requests(community_id, status);
-CREATE INDEX idx_estoppel_requests_stripe_session ON estoppel_requests(stripe_session_id) WHERE stripe_session_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_estoppel_requests_community ON estoppel_requests(community_id);
+CREATE INDEX IF NOT EXISTS idx_estoppel_requests_status ON estoppel_requests(community_id, status);
+CREATE INDEX IF NOT EXISTS idx_estoppel_requests_stripe_session ON estoppel_requests(stripe_session_id) WHERE stripe_session_id IS NOT NULL;
 
 -- Updated_at trigger (reuse existing function from initial schema)
+DROP TRIGGER IF EXISTS set_estoppel_requests_updated_at ON estoppel_requests;
 CREATE TRIGGER set_estoppel_requests_updated_at
   BEFORE UPDATE ON estoppel_requests
   FOR EACH ROW
@@ -55,11 +56,13 @@ CREATE TRIGGER set_estoppel_requests_updated_at
 ALTER TABLE estoppel_requests ENABLE ROW LEVEL SECURITY;
 
 -- Board members can view estoppel requests for their community
+DROP POLICY IF EXISTS "Board members can view estoppel requests" ON estoppel_requests;
 CREATE POLICY "Board members can view estoppel requests"
   ON estoppel_requests FOR SELECT
   USING (community_id = get_my_community_id() AND is_board_member());
 
 -- Board members can update estoppel requests for their community
+DROP POLICY IF EXISTS "Board members can update estoppel requests" ON estoppel_requests;
 CREATE POLICY "Board members can update estoppel requests"
   ON estoppel_requests FOR UPDATE
   USING (community_id = get_my_community_id() AND is_board_member());

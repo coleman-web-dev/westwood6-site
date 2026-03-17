@@ -27,6 +27,7 @@ CREATE INDEX IF NOT EXISTS idx_violation_templates_community
   ON violation_templates(community_id);
 
 -- Reuse existing updated_at trigger function
+DROP TRIGGER IF EXISTS violation_templates_updated_at ON violation_templates;
 CREATE TRIGGER violation_templates_updated_at
   BEFORE UPDATE ON violation_templates
   FOR EACH ROW EXECUTE FUNCTION update_violations_updated_at();
@@ -34,9 +35,11 @@ CREATE TRIGGER violation_templates_updated_at
 -- RLS
 ALTER TABLE violation_templates ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS violation_templates_board_all ON violation_templates;
 CREATE POLICY violation_templates_board_all ON violation_templates
   FOR ALL USING (community_id = get_my_community_id() AND is_board_member());
 
+DROP POLICY IF EXISTS violation_templates_resident_select ON violation_templates;
 CREATE POLICY violation_templates_resident_select ON violation_templates
   FOR SELECT USING (community_id = get_my_community_id() AND is_active = true);
 

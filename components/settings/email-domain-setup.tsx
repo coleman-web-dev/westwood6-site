@@ -15,12 +15,145 @@ import {
   Trash2,
   Loader2,
   Clock,
+  Info,
+  Check,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import {
+  HoverCard,
+  HoverCardTrigger,
+  HoverCardContent,
+} from '@/components/shared/ui/hover-card';
 import type { EmailSettings, CommunityEmailDomain, EmailAddress, DnsRecord } from '@/lib/types/database';
 
 type SendingMode = 'default' | 'subdomain' | 'custom_domain';
+
+interface DomainOptionInfo {
+  title: string;
+  description: string;
+  emailClients: string;
+  pros: string[];
+  cons: string[];
+}
+
+const OPTION_INFO: Record<SendingMode, DomainOptionInfo> = {
+  custom_domain: {
+    title: 'Your Own Domain',
+    description:
+      'Emails come from your community\'s own website address, like treasurer@westwood6.com. Board members can use this email right inside Gmail, Outlook, or Apple Mail on their phone or computer, just like any other email address.',
+    emailClients:
+      'Yes. Board members can add this to Gmail, Outlook, Apple Mail, or any other email app on their phone or computer.',
+    pros: [
+      'Looks the most professional to residents',
+      'Board members can read and send emails from their phone or computer using Gmail, Outlook, or Apple Mail',
+      'Create separate addresses for each role (treasurer@, president@, board@)',
+      'When someone leaves the board, one click hands the email over to the new person and cuts off the old person\'s access',
+      'Also works from the DuesIQ dashboard',
+    ],
+    cons: [
+      'Someone with access to your website domain settings needs to add a few records (we walk you through it)',
+      'Takes a few minutes to set up',
+      'After setup, it can take up to 3 days for everything to go live',
+    ],
+  },
+  subdomain: {
+    title: 'Community Address',
+    description:
+      'Your community gets its own email address like westwood6@duesiq.com. Board members can read and send emails, but only from the DuesIQ website. It will not show up in Gmail or other email apps.',
+    emailClients:
+      'No. This only works on the DuesIQ website. You cannot add it to Gmail, Outlook, or other email apps.',
+    pros: [
+      'Ready to go instantly, no setup needed',
+      'All board members share the same inbox on the DuesIQ website',
+      'Great if your board mostly works from the dashboard',
+    ],
+    cons: [
+      'Does not work in Gmail, Outlook, or Apple Mail',
+      'Less professional looking than using your own domain',
+      'Says "duesiq.com" instead of your community\'s name',
+    ],
+  },
+  default: {
+    title: 'Default',
+    description:
+      'Emails go out from a generic DuesIQ address (notifications@duesiq.com). This is one-way only. Residents receive emails from you, but there is no inbox for reading replies.',
+    emailClients:
+      'No. There is no inbox with this option, so there is nothing to add to Gmail or other apps.',
+    pros: [
+      'Nothing to set up, it just works',
+      'Fine if you only need to send announcements and payment reminders',
+    ],
+    cons: [
+      'No way to receive or read replies from residents',
+      'Does not work in Gmail, Outlook, or Apple Mail',
+      'Emails come from a generic address, not your community\'s name',
+      'Residents cannot email the board back directly',
+    ],
+  },
+};
+
+function OptionInfoCard({ mode }: { mode: SendingMode }) {
+  const info = OPTION_INFO[mode];
+  return (
+    <HoverCard openDelay={200} closeDelay={100}>
+      <HoverCardTrigger asChild>
+        <button
+          type="button"
+          className="p-0.5 rounded hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Info className="h-3.5 w-3.5 text-text-muted-light dark:text-text-muted-dark" />
+        </button>
+      </HoverCardTrigger>
+      <HoverCardContent
+        side="bottom"
+        align="start"
+        className="w-80 bg-surface-light dark:bg-surface-dark border-stroke-light dark:border-stroke-dark p-4"
+      >
+        <div className="space-y-3">
+          <p className="text-body text-text-secondary-light dark:text-text-secondary-dark">
+            {info.description}
+          </p>
+
+          <div>
+            <p className="text-meta font-semibold text-text-primary-light dark:text-text-primary-dark mb-1">
+              Can I use this in Gmail or Outlook?
+            </p>
+            <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+              {info.emailClients}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-meta font-semibold text-green-600 dark:text-green-400 mb-1">Pros</p>
+            <ul className="space-y-1">
+              {info.pros.map((pro) => (
+                <li key={pro} className="flex items-start gap-1.5 text-meta text-text-secondary-light dark:text-text-secondary-dark">
+                  <Check className="h-3 w-3 text-green-500 shrink-0 mt-0.5" />
+                  <span>{pro}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div>
+            <p className="text-meta font-semibold text-red-500 dark:text-red-400 mb-1">Cons</p>
+            <ul className="space-y-1">
+              {info.cons.map((con) => (
+                <li key={con} className="flex items-start gap-1.5 text-meta text-text-secondary-light dark:text-text-secondary-dark">
+                  <X className="h-3 w-3 text-red-400 shrink-0 mt-0.5" />
+                  <span>{con}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </HoverCardContent>
+    </HoverCard>
+  );
+}
 
 export function EmailDomainSetup() {
   const { community } = useCommunity();
@@ -216,34 +349,36 @@ export function EmailDomainSetup() {
   return (
     <div className="space-y-4">
       <h3 className="text-label text-text-primary-light dark:text-text-primary-dark">
-        Sending Address
+        Email Domain
       </h3>
       <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-        Choose how your community&apos;s outbound emails are addressed.
+        Choose the email address your community uses to send and receive emails.
+        This applies to notifications, announcements, and the community inbox.
       </p>
 
       {/* Mode cards */}
       <div className="grid gap-3 sm:grid-cols-3">
-        {/* Default */}
+        {/* Custom domain (first - most professional) */}
         <button
-          onClick={() => !hasDomain && setActiveMode('default')}
-          disabled={hasDomain}
+          onClick={() => !isSubdomain && setActiveMode('custom_domain')}
+          disabled={isSubdomain}
           className={cn(
             'text-left rounded-inner-card border p-3 transition-colors',
-            activeMode === 'default' && !hasDomain
+            (activeMode === 'custom_domain' || isCustom)
               ? 'border-secondary-400 bg-secondary-50/50 dark:bg-secondary-950/20'
               : 'border-stroke-light dark:border-stroke-dark hover:bg-surface-light-2 dark:hover:bg-surface-dark-2',
-            hasDomain && 'opacity-50 cursor-not-allowed',
+            isSubdomain && 'opacity-50 cursor-not-allowed',
           )}
         >
           <div className="flex items-center gap-2 mb-1">
-            <Mail className="h-4 w-4 text-text-muted-light dark:text-text-muted-dark" />
-            <span className="text-body font-medium text-text-primary-light dark:text-text-primary-dark">
-              Default
+            <Globe className="h-4 w-4 text-primary-600 dark:text-primary-400" />
+            <span className="text-body font-medium text-text-primary-light dark:text-text-primary-dark flex-1">
+              Your Own Domain
             </span>
+            <OptionInfoCard mode="custom_domain" />
           </div>
           <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-            notifications@duesiq.com
+            Use your own domain like board@yourdomain.com. Works in Gmail, Outlook, and Apple Mail.
           </p>
         </button>
 
@@ -261,35 +396,37 @@ export function EmailDomainSetup() {
         >
           <div className="flex items-center gap-2 mb-1">
             <Sparkles className="h-4 w-4 text-secondary-500" />
-            <span className="text-body font-medium text-text-primary-light dark:text-text-primary-dark">
+            <span className="text-body font-medium text-text-primary-light dark:text-text-primary-dark flex-1">
               Community Address
             </span>
+            <OptionInfoCard mode="subdomain" />
           </div>
           <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-            {community?.slug}@duesiq.com
+            Send and receive as {community?.slug}@duesiq.com. Dashboard only.
           </p>
         </button>
 
-        {/* Custom domain */}
+        {/* Default */}
         <button
-          onClick={() => !isSubdomain && setActiveMode('custom_domain')}
-          disabled={isSubdomain}
+          onClick={() => !hasDomain && setActiveMode('default')}
+          disabled={hasDomain}
           className={cn(
             'text-left rounded-inner-card border p-3 transition-colors',
-            (activeMode === 'custom_domain' || isCustom)
+            activeMode === 'default' && !hasDomain
               ? 'border-secondary-400 bg-secondary-50/50 dark:bg-secondary-950/20'
               : 'border-stroke-light dark:border-stroke-dark hover:bg-surface-light-2 dark:hover:bg-surface-dark-2',
-            isSubdomain && 'opacity-50 cursor-not-allowed',
+            hasDomain && 'opacity-50 cursor-not-allowed',
           )}
         >
           <div className="flex items-center gap-2 mb-1">
-            <Globe className="h-4 w-4 text-primary-600 dark:text-primary-400" />
-            <span className="text-body font-medium text-text-primary-light dark:text-text-primary-dark">
-              Your Own Domain
+            <Mail className="h-4 w-4 text-text-muted-light dark:text-text-muted-dark" />
+            <span className="text-body font-medium text-text-primary-light dark:text-text-primary-dark flex-1">
+              Default
             </span>
+            <OptionInfoCard mode="default" />
           </div>
           <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-            board@yourdomain.com
+            Send notifications from notifications@duesiq.com. No inbox.
           </p>
         </button>
       </div>
