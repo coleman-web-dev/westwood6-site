@@ -141,7 +141,7 @@ export function PayInvoiceButton({ invoiceId, communityId, amount, disabled }: P
           onClick={() => setShowAch(true)}
           className="text-label text-text-muted-light dark:text-text-muted-dark hover:text-text-primary-light dark:hover:text-text-primary-dark transition-colors underline underline-offset-2"
         >
-          Pay via ACH bank transfer
+          Pay via ACH
         </button>
       </div>
     );
