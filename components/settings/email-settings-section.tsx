@@ -7,7 +7,8 @@ import { Button } from '@/components/shared/ui/button';
 import { Input } from '@/components/shared/ui/input';
 import { Label } from '@/components/shared/ui/label';
 import { toast } from 'sonner';
-import { Mail, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Mail, CheckCircle, XCircle, Clock, Inbox, Loader2, CheckCircle2 } from 'lucide-react';
+import { Switch } from '@/components/shared/ui/switch';
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes';
 import { UnsavedChangesDialog } from '@/components/settings/unsaved-changes-dialog';
 import { EmailDomainSetup } from '@/components/settings/email-domain-setup';
@@ -32,6 +33,11 @@ export function EmailSettingsSection() {
   const savedReplyTo = useRef('');
   const savedFromName = useRef('');
 
+  // Community inbox state
+  const [inboxEnabled, setInboxEnabled] = useState(false);
+  const [togglingInbox, setTogglingInbox] = useState(false);
+  const [boardMembersGranted, setBoardMembersGranted] = useState(0);
+
   useEffect(() => {
     if (!community) return;
 
@@ -42,6 +48,7 @@ export function EmailSettingsSection() {
     setFromName(f);
     savedReplyTo.current = r;
     savedFromName.current = f;
+    setInboxEnabled(!!settings?.inbox_enabled);
 
     // Fetch recent email logs
     async function fetchLogs() {
@@ -96,6 +103,55 @@ export function EmailSettingsSection() {
     savedFromName.current = fromName;
     toast.success('Email settings updated.');
   }, [community, replyTo, fromName]);
+
+  const handleToggleInbox = useCallback(async () => {
+    if (!community) return;
+
+    const enabling = !inboxEnabled;
+    setTogglingInbox(true);
+
+    try {
+      if (enabling) {
+        const res = await fetch('/api/email/inbox/enable', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ communityId: community.id }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          toast.error(data.error || 'Failed to enable inbox');
+          return;
+        }
+
+        setInboxEnabled(true);
+        setBoardMembersGranted(data.boardMembersGranted || 0);
+        toast.success(
+          `Community inbox enabled. ${data.boardMembersGranted} board member${data.boardMembersGranted === 1 ? '' : 's'} granted access.`
+        );
+      } else {
+        const res = await fetch('/api/email/inbox/enable', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ communityId: community.id }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json();
+          toast.error(data.error || 'Failed to disable inbox');
+          return;
+        }
+
+        setInboxEnabled(false);
+        setBoardMembersGranted(0);
+        toast.success('Community inbox disabled.');
+      }
+    } catch {
+      toast.error('Something went wrong. Please try again.');
+    } finally {
+      setTogglingInbox(false);
+    }
+  }, [community, inboxEnabled]);
 
   const unsaved = useUnsavedChanges({ isDirty, onSave: handleSave });
 
@@ -167,6 +223,49 @@ export function EmailSettingsSection() {
             {saving ? 'Saving...' : 'Save Email Settings'}
           </Button>
         </div>
+      </div>
+
+      {/* Community inbox toggle */}
+      <div className="mt-6 pt-6 border-t border-stroke-light dark:border-stroke-dark">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-inner-card bg-secondary-400/10 flex items-center justify-center shrink-0 mt-0.5">
+              <Inbox className="h-4.5 w-4.5 text-secondary-500" />
+            </div>
+            <div>
+              <h3 className="text-label text-text-primary-light dark:text-text-primary-dark mb-0.5">
+                Community Inbox
+              </h3>
+              <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                {inboxEnabled
+                  ? 'Board members can send and receive emails from the Email page. Manage access below under Email Addresses.'
+                  : 'Enable a shared inbox so board members can read and reply to community emails directly from the dashboard.'}
+              </p>
+            </div>
+          </div>
+          <div className="shrink-0 pt-0.5">
+            {togglingInbox ? (
+              <Loader2 className="h-5 w-5 animate-spin text-text-muted-light dark:text-text-muted-dark" />
+            ) : (
+              <Switch
+                checked={inboxEnabled}
+                onCheckedChange={handleToggleInbox}
+              />
+            )}
+          </div>
+        </div>
+
+        {inboxEnabled && (
+          <div className="mt-3 ml-12 flex items-center gap-2 text-meta">
+            <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+            <span className="text-green-600 dark:text-green-400">
+              Active
+            </span>
+            <span className="text-text-muted-light dark:text-text-muted-dark">
+              &middot; All board members have inbox access by default
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Sending address configuration */}

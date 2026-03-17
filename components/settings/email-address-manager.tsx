@@ -21,8 +21,9 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { Badge } from '@/components/shared/ui/badge';
-import { Plus, Star, Trash2, Loader2, User, Mail } from 'lucide-react';
+import { Plus, Star, Trash2, Loader2, User, Mail, Users } from 'lucide-react';
 import { toast } from 'sonner';
+import { InboxAccessManager } from '@/components/email/inbox-access-manager';
 import type { EmailAddress, Member } from '@/lib/types/database';
 
 export function EmailAddressManager() {
@@ -31,6 +32,7 @@ export function EmailAddressManager() {
   const [boardMembers, setBoardMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
+  const [accessManagerAddr, setAccessManagerAddr] = useState<EmailAddress | null>(null);
 
   // Form state
   const [newAddress, setNewAddress] = useState('');
@@ -201,6 +203,11 @@ export function EmailAddressManager() {
                       Default
                     </Badge>
                   )}
+                  {addr.mailbox_type === 'full_inbox' && (
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                      Inbox
+                    </Badge>
+                  )}
                   {addr.role_label && (
                     <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                       {addr.role_label}
@@ -222,6 +229,15 @@ export function EmailAddressManager() {
                 )}
               </div>
               <div className="flex items-center gap-1 shrink-0">
+                {addr.mailbox_type === 'full_inbox' && (
+                  <button
+                    onClick={() => setAccessManagerAddr(addr)}
+                    className="p-1 rounded hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors"
+                    title="Manage inbox access"
+                  >
+                    <Users className="h-3.5 w-3.5 text-text-muted-light dark:text-text-muted-dark" />
+                  </button>
+                )}
                 {!addr.is_default && (
                   <button
                     onClick={() => handleSetDefault(addr.id)}
@@ -245,6 +261,18 @@ export function EmailAddressManager() {
           );
         })}
       </div>
+
+      {/* Inbox access manager dialog */}
+      {accessManagerAddr && (
+        <InboxAccessManager
+          emailAddressId={accessManagerAddr.id}
+          emailAddress={accessManagerAddr.address}
+          open={!!accessManagerAddr}
+          onOpenChange={(open) => {
+            if (!open) setAccessManagerAddr(null);
+          }}
+        />
+      )}
 
       {/* Add address dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>

@@ -111,6 +111,7 @@ export interface EmailSettings {
   primary_color?: string;
   sending_mode?: EmailSendingMode;
   subdomain_address?: string;
+  inbox_enabled?: boolean;
 }
 
 export interface VendorSettings {
@@ -241,6 +242,8 @@ export interface DnsRecord {
   priority?: number;
 }
 
+export type MailboxType = 'sending_only' | 'full_inbox';
+
 export interface EmailAddress {
   id: string;
   community_id: string;
@@ -252,8 +255,124 @@ export interface EmailAddress {
   assigned_to: string | null;
   forward_to: string | null;
   is_default: boolean;
+  mailbox_type: MailboxType;
   created_at: string;
   updated_at: string;
+}
+
+// ─── Email Inbox Types ──────────────────────────────────
+
+export interface EmailThread {
+  id: string;
+  community_id: string;
+  email_address_id: string;
+  subject: string;
+  last_message_at: string;
+  message_count: number;
+  is_archived: boolean;
+  created_at: string;
+}
+
+export interface EmailThreadWithState extends EmailThread {
+  is_read: boolean;
+  is_starred: boolean;
+  is_assigned: boolean;
+  last_read_at: string | null;
+  // Joined from latest inbox message for list preview
+  latest_from_address?: string;
+  latest_from_name?: string | null;
+  latest_snippet?: string | null;
+  has_attachments?: boolean;
+}
+
+export interface EmailInboxMessage {
+  id: string;
+  community_id: string;
+  email_address_id: string;
+  from_address: string;
+  from_name: string | null;
+  to_addresses: string[];
+  cc_addresses: string[];
+  subject: string;
+  body_text: string | null;
+  body_html: string | null;
+  snippet: string | null;
+  thread_id: string | null;
+  in_reply_to: string | null;
+  message_id: string | null;
+  has_attachments: boolean;
+  resend_inbound_id: string | null;
+  received_at: string;
+  created_at: string;
+}
+
+export interface EmailThreadMember {
+  id: string;
+  thread_id: string;
+  member_id: string;
+  is_read: boolean;
+  is_starred: boolean;
+  is_assigned: boolean;
+  last_read_at: string | null;
+}
+
+export interface EmailAttachment {
+  id: string;
+  inbox_message_id: string | null;
+  sent_message_id: string | null;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  storage_path: string;
+  created_at: string;
+}
+
+export interface EmailInboxAccess {
+  id: string;
+  community_id: string;
+  email_address_id: string;
+  member_id: string;
+  can_read: boolean;
+  can_reply: boolean;
+  can_compose: boolean;
+  notify_forward: boolean;
+  created_at: string;
+}
+
+export interface EmailSentMessage {
+  id: string;
+  community_id: string;
+  email_address_id: string;
+  sender_member_id: string;
+  to_addresses: string[];
+  cc_addresses: string[];
+  bcc_addresses: string[];
+  subject: string;
+  body_html: string | null;
+  body_text: string | null;
+  thread_id: string | null;
+  in_reply_to: string | null;
+  message_id: string | null;
+  resend_message_id: string | null;
+  sent_at: string;
+  created_at: string;
+}
+
+// Union type for messages in a thread view (inbound + outbound interleaved)
+export interface EmailThreadMessage {
+  id: string;
+  direction: 'inbound' | 'outbound';
+  from_address: string;
+  from_name: string | null;
+  to_addresses: string[];
+  cc_addresses: string[];
+  subject: string;
+  body_html: string | null;
+  body_text: string | null;
+  has_attachments: boolean;
+  attachments?: EmailAttachment[];
+  timestamp: string; // received_at for inbound, sent_at for outbound
+  sender_member_id?: string | null; // only for outbound
 }
 
 export interface SignupRequest {
