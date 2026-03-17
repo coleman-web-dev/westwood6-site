@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { postWalletApplied } from '@/lib/utils/accounting-entries';
 
 export interface ApplyResult {
   applied: number; // cents applied from wallet
@@ -162,6 +163,9 @@ export async function applyWalletToInvoiceBatch(
         description: `Auto-applied to: ${inv.title}`,
         created_by: memberId,
       });
+
+      // Post GL journal entry for wallet application
+      postWalletApplied(communityId, inv.id, unitId, applyAmount).catch(() => {});
 
       balance -= applyAmount;
       unitApplied += applyAmount;

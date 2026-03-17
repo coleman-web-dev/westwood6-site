@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getStripeClient } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
+import { postAmenityDepositReturned, postAmenityDepositRetained } from '@/lib/utils/accounting-entries';
 
 /**
  * POST /api/amenities/deposit-refund
@@ -62,10 +63,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Fetch reservation
+    // Fetch reservation with amenity name
     const { data: reservation, error: resError } = await supabase
       .from('reservations')
-      .select('*')
+      .select('*, amenity:amenities!amenity_id(name)')
       .eq('id', reservationId)
       .eq('community_id', communityId)
       .single();
@@ -138,6 +139,22 @@ export async function POST(req: NextRequest) {
         { error: 'Refund was processed but failed to update record. Please contact support.' },
         { status: 500 }
       );
+    }
+
+    // Post GL journal entries for deposit refund
+    const amenityName = (reservation.amenity as { name: string } | null)?.name ?? 'Amenity';
+    const unitId = reservation.unit_id as string | null;
+
+    if (unitId) {
+      // Refunded portion
+      if (refundAmount > 0) {
+        postAmenityDepositReturned(communityId, reservationId, unitId, refundAmount, amenityName).catch(() => {});
+      }
+      // Retained portion (if partial refund)
+      const retainedAmount = reservation.deposit_amount - refundAmount;
+      if (retainedAmount > 0) {
+        postAmenityDepositRetained(communityId, reservationId, unitId, retainedAmount, amenityName).catch(() => {});
+      }
     }
 
     return NextResponse.json({ success: true });

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { postLateFeeApplied } from '@/lib/utils/accounting-entries';
 import type { LateFeeSettings } from '@/lib/types/database';
 
 /**
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
     // Find eligible invoices: overdue/partial, due before cutoff, no late fee yet
     const { data: invoices, error: invError } = await supabase
       .from('invoices')
-      .select('id, amount, late_fee_amount')
+      .select('id, amount, late_fee_amount, unit_id')
       .eq('community_id', community.id)
       .in('status', ['overdue', 'partial'])
       .lt('due_date', cutoffDate)
@@ -81,6 +82,8 @@ export async function POST(req: NextRequest) {
         skipped++;
       } else {
         applied++;
+        // Post GL journal entry for late fee
+        postLateFeeApplied(community.id, invoice.id, invoice.unit_id, fee).catch(() => {});
       }
     }
   }

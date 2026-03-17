@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getStripeClient } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
+import { postEventRsvpFeeRefunded } from '@/lib/utils/accounting-entries';
 import type Stripe from 'stripe';
 
 /**
@@ -411,6 +412,11 @@ export async function DELETE(
         ...(refunded ? { refunded_at: new Date().toISOString() } : {}),
       })
       .eq('id', rsvp.id);
+
+    // Post GL journal entry for refund
+    if (refunded) {
+      postEventRsvpFeeRefunded(communityId, rsvp.id, rsvp.total_fee, event.title).catch(() => {});
+    }
 
     return NextResponse.json({
       success: true,

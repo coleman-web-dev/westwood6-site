@@ -441,6 +441,26 @@ export async function postEventRsvpFeeReceived(
   });
 }
 
+/** Event RSVP fee refunded: DR Amenity Fee Revenue, CR Operating Cash */
+export async function postEventRsvpFeeRefunded(
+  communityId: string,
+  rsvpId: string,
+  amount: number,
+  eventTitle: string,
+) {
+  return createJournalEntry({
+    communityId,
+    description: `Event RSVP fee refunded: ${eventTitle}`,
+    source: 'refund',
+    referenceType: 'event_rsvp',
+    referenceId: rsvpId,
+    lines: [
+      { accountCode: '4200', debit: amount, credit: 0, description: 'Amenity Fee Revenue (reversal)' },
+      { accountCode: '1000', debit: 0, credit: amount, description: 'Operating Cash' },
+    ],
+  });
+}
+
 /** Bounced check: reverse original payment, void original invoice AR */
 export async function postBouncedCheckReversal(
   communityId: string,
