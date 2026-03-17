@@ -167,14 +167,14 @@ export function MemberRoleAssignment({ templates, onAssigned }: MemberRoleAssign
                     </div>
                   ) : (
                     <Select
-                      value={bm.role_template_id || ''}
-                      onValueChange={(v) => handleAssign(bm.id, v)}
+                      value={bm.role_template_id || '__none__'}
+                      onValueChange={(v) => handleAssign(bm.id, v === '__none__' ? '' : v)}
                     >
                       <SelectTrigger className="h-8 text-meta">
                         <SelectValue placeholder="No template (read-only)" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">No template (read-only)</SelectItem>
+                        <SelectItem value="__none__">No template (read-only)</SelectItem>
                         {templates.map((t) => (
                           <SelectItem key={t.id} value={t.id}>
                             {t.name}

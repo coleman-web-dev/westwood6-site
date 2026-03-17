@@ -44,7 +44,7 @@ export function RolePermissionsManager() {
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDescription, setNewDescription] = useState('');
-  const [cloneFrom, setCloneFrom] = useState<string>('');
+  const [cloneFrom, setCloneFrom] = useState<string>('__none__');
   const [memberCounts, setMemberCounts] = useState<Record<string, number>>({});
 
   const loadData = useCallback(async () => {
@@ -152,7 +152,7 @@ export function RolePermissionsManager() {
     const id = `custom_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     let basePermissions = allPermissions();
 
-    if (cloneFrom) {
+    if (cloneFrom && cloneFrom !== '__none__') {
       const source = templates.find((t) => t.id === cloneFrom);
       if (source) {
         basePermissions = { ...source.permissions };
@@ -177,13 +177,13 @@ export function RolePermissionsManager() {
         action: 'role_template_created',
         targetType: 'community',
         targetId: community.id,
-        metadata: { template_name: newName.trim(), cloned_from: cloneFrom || null },
+        metadata: { template_name: newName.trim(), cloned_from: cloneFrom === '__none__' ? null : cloneFrom },
       });
       setSelectedId(id);
       setShowCreate(false);
       setNewName('');
       setNewDescription('');
-      setCloneFrom('');
+      setCloneFrom('__none__');
     }
   }
 
@@ -390,7 +390,7 @@ export function RolePermissionsManager() {
                   <SelectValue placeholder="Start from scratch (all access)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Start from scratch (all access)</SelectItem>
+                  <SelectItem value="__none__">Start from scratch (all access)</SelectItem>
                   {templates.map((t) => (
                     <SelectItem key={t.id} value={t.id}>
                       <Copy className="h-3 w-3 inline mr-1" />
