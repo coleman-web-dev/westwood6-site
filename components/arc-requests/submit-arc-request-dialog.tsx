@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useCommunity } from '@/lib/providers/community-provider';
 import {
   Dialog,
   DialogContent,
@@ -28,29 +29,59 @@ import type { ArcProjectType } from '@/lib/types/database';
 interface SubmitArcRequestDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  communityId: string;
-  unitId: string;
-  memberId: string;
   onCreated: () => void;
 }
 
 export function SubmitArcRequestDialog({
   open,
   onOpenChange,
-  communityId,
-  unitId,
-  memberId,
   onCreated,
 }: SubmitArcRequestDialogProps) {
+  const { community, member, unit, isBoard, actualIsBoard } = useCommunity();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [projectType, setProjectType] = useState<ArcProjectType>('other');
   const [estimatedCost, setEstimatedCost] = useState('');
   const [saving, setSaving] = useState(false);
+  const [selectedUnitId, setSelectedUnitId] = useState('');
+  const [units, setUnits] = useState<Array<{ id: string; unit_number: string }>>([]);
+
+  // Show unit picker for board in admin view, or any board member without a unit
+  const needsUnitPicker = isBoard || (actualIsBoard && !unit);
+
+  // Fetch units when dialog opens and unit picker is needed
+  useEffect(() => {
+    if (open && needsUnitPicker) {
+      const supabase = createClient();
+      supabase
+        .from('units')
+        .select('id, unit_number')
+        .eq('community_id', community.id)
+        .order('unit_number')
+        .then(({ data }) => {
+          setUnits(data ?? []);
+        });
+    }
+  }, [open, needsUnitPicker, community.id]);
+
+  const effectiveUnitId = needsUnitPicker ? selectedUnitId : unit?.id ?? '';
+
+  function resetForm() {
+    setTitle('');
+    setDescription('');
+    setProjectType('other');
+    setEstimatedCost('');
+    setSelectedUnitId('');
+  }
 
   async function handleSubmit() {
     if (!title.trim()) {
       toast.error('Please enter a title.');
+      return;
+    }
+
+    if (!member || !effectiveUnitId) {
+      toast.error(needsUnitPicker ? 'Please select a unit.' : 'No unit assigned.');
       return;
     }
 
@@ -60,9 +91,9 @@ export function SubmitArcRequestDialog({
     const costCents = estimatedCost ? Math.round(Number(estimatedCost) * 100) : null;
 
     const { error } = await supabase.from('arc_requests').insert({
-      community_id: communityId,
-      unit_id: unitId,
-      submitted_by: memberId,
+      community_id: community.id,
+      unit_id: effectiveUnitId,
+      submitted_by: member.id,
       title: title.trim(),
       description: description.trim() || null,
       project_type: projectType,
@@ -79,17 +110,15 @@ export function SubmitArcRequestDialog({
 
     toast.success('ARC request submitted.');
     logAuditEvent({
-      communityId,
-      actorId: memberId,
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
       action: 'arc_request_submitted',
       targetType: 'arc_request',
-      targetId: unitId,
+      targetId: effectiveUnitId,
       metadata: { title: title.trim(), project_type: projectType },
     });
-    setTitle('');
-    setDescription('');
-    setProjectType('other');
-    setEstimatedCost('');
+    resetForm();
     onOpenChange(false);
     onCreated();
   }
@@ -102,6 +131,36 @@ export function SubmitArcRequestDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
+          {/* Unit selector: board picks, residents see their unit */}
+          {needsUnitPicker ? (
+            <div className="space-y-1.5">
+              <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                Unit *
+              </Label>
+              <Select value={selectedUnitId} onValueChange={setSelectedUnitId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  {units.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      Unit {u.unit_number}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : unit ? (
+            <div className="space-y-1.5">
+              <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                Unit
+              </Label>
+              <p className="text-body text-text-primary-light dark:text-text-primary-dark">
+                Unit {unit.unit_number}
+              </p>
+            </div>
+          ) : null}
+
           <div className="space-y-1.5">
             <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
               Title *
@@ -168,7 +227,10 @@ export function SubmitArcRequestDialog({
           <DialogClose asChild>
             <Button variant="outline">Cancel</Button>
           </DialogClose>
-          <Button onClick={handleSubmit} disabled={saving}>
+          <Button
+            onClick={handleSubmit}
+            disabled={saving || !title.trim() || !effectiveUnitId}
+          >
             {saving ? 'Submitting...' : 'Submit Request'}
           </Button>
         </DialogFooter>

@@ -8,7 +8,7 @@ import { Ruler } from 'lucide-react';
 import { ArcRequestList } from '@/components/arc-requests/arc-request-list';
 import { SubmitArcRequestDialog } from '@/components/arc-requests/submit-arc-request-dialog';
 import { ReviewArcRequestDialog } from '@/components/arc-requests/review-arc-request-dialog';
-import type { ArcRequest, ArcStatus } from '@/lib/types/database';
+import type { ArcRequest } from '@/lib/types/database';
 
 const STATUS_TABS: { value: string; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -74,11 +74,9 @@ export default function ArcRequestsPage() {
             ARC Requests
           </h1>
         </div>
-        {!isBoard && unit && member && (
-          <Button onClick={() => setSubmitOpen(true)}>
-            Submit Request
-          </Button>
-        )}
+        <Button onClick={() => setSubmitOpen(true)}>
+          Submit Request
+        </Button>
       </div>
 
       {/* Status filter tabs (board only) */}
@@ -107,16 +105,11 @@ export default function ArcRequestsPage() {
         onSelect={setSelectedRequest}
       />
 
-      {!isBoard && unit && member && (
-        <SubmitArcRequestDialog
-          open={submitOpen}
-          onOpenChange={setSubmitOpen}
-          communityId={community.id}
-          unitId={unit.id}
-          memberId={member.id}
-          onCreated={fetchRequests}
-        />
-      )}
+      <SubmitArcRequestDialog
+        open={submitOpen}
+        onOpenChange={setSubmitOpen}
+        onCreated={fetchRequests}
+      />
 
       <ReviewArcRequestDialog
         request={selectedRequest}
