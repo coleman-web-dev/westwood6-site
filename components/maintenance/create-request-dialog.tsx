@@ -84,14 +84,14 @@ export function CreateRequestDialog({
     setSubmitting(true);
     const supabase = createClient();
 
-    const { error } = await supabase.from('maintenance_requests').insert({
+    const { data, error } = await supabase.from('maintenance_requests').insert({
       community_id: community.id,
       unit_id: effectiveUnitId,
       submitted_by: member.id,
       title: title.trim(),
       description: description.trim(),
       status: 'open',
-    });
+    }).select('id').single();
 
     setSubmitting(false);
 
@@ -101,6 +101,17 @@ export function CreateRequestDialog({
     }
 
     toast.success('Maintenance request submitted.');
+
+    // Notify board members
+    void supabase.rpc('create_board_notifications', {
+      p_community_id: community.id,
+      p_type: 'maintenance_request_submitted',
+      p_title: `New maintenance request: ${title.trim()}`,
+      p_body: `${member.first_name} ${member.last_name} submitted a maintenance request.`,
+      p_reference_id: data.id,
+      p_reference_type: 'maintenance_request',
+    });
+
     logAuditEvent({
       communityId: community.id,
       actorId: member?.user_id,

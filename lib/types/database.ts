@@ -621,7 +621,9 @@ export type NotificationType =
   | 'ballot_results'
   | 'proxy_requested'
   | 'proxy_granted'
-  | 'violation_created';
+  | 'violation_created'
+  | 'arc_request_submitted'
+  | 'maintenance_request_submitted';
 
 export interface Notification {
   id: string;

@@ -90,7 +90,7 @@ export function SubmitArcRequestDialog({
 
     const costCents = estimatedCost ? Math.round(Number(estimatedCost) * 100) : null;
 
-    const { error } = await supabase.from('arc_requests').insert({
+    const { data, error } = await supabase.from('arc_requests').insert({
       community_id: community.id,
       unit_id: effectiveUnitId,
       submitted_by: member.id,
@@ -99,7 +99,7 @@ export function SubmitArcRequestDialog({
       project_type: projectType,
       estimated_cost: costCents,
       status: 'submitted',
-    });
+    }).select('id').single();
 
     setSaving(false);
 
@@ -109,6 +109,17 @@ export function SubmitArcRequestDialog({
     }
 
     toast.success('ARC request submitted.');
+
+    // Notify board members
+    void supabase.rpc('create_board_notifications', {
+      p_community_id: community.id,
+      p_type: 'arc_request_submitted',
+      p_title: `New ARC request: ${title.trim()}`,
+      p_body: `${member.first_name} ${member.last_name} submitted an ARC request.`,
+      p_reference_id: data.id,
+      p_reference_type: 'arc_request',
+    });
+
     logAuditEvent({
       communityId: community.id,
       actorId: member?.user_id,
