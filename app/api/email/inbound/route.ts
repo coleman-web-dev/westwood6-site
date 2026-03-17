@@ -281,49 +281,88 @@ export async function POST(req: NextRequest) {
       // Forward to members with notify_forward = true
       const forwardMembers = accessList.filter((a) => a.notify_forward);
 
-      if (forwardMembers.length) {
-        const memberIds = forwardMembers.map((a) => a.member_id);
-        const { data: members } = await supabase
-          .from('members')
-          .select('id, email, first_name')
-          .in('id', memberIds)
-          .not('email', 'is', null);
+      // Also check for forward_to on the email address itself (role address forwarding)
+      const { data: addrForward } = await supabase
+        .from('email_addresses')
+        .select('forward_to')
+        .eq('id', emailAddressId)
+        .single();
 
-        const { data: community } = await supabase
-          .from('communities')
-          .select('name, slug')
-          .eq('id', communityId)
-          .single();
+      const { data: community } = await supabase
+        .from('communities')
+        .select('name, slug')
+        .eq('id', communityId)
+        .single();
 
-        if (members?.length && community) {
-          const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://duesiq.com';
-          const emailUrl = `${appUrl}/${community.slug}/email`;
+      if (community) {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://duesiq.com';
+        const emailUrl = `${appUrl}/${community.slug}/email`;
 
-          for (const member of members) {
-            if (!member.email) continue;
+        // Collect all forward target emails (from access-based forwarding + address-level forward_to)
+        const forwardTargets = new Set<string>();
 
-            try {
-              const html = await render(
-                InboxForwardEmail({
-                  communityName: community.name,
-                  fromName: fromName || fromAddress,
-                  fromAddress,
-                  subject: emailData.subject || '(No subject)',
-                  snippet: snippet || '',
-                  emailUrl,
-                  recipientName: member.first_name || 'there',
-                })
-              );
+        if (forwardMembers.length) {
+          const memberIds = forwardMembers.map((a) => a.member_id);
+          const { data: members } = await supabase
+            .from('members')
+            .select('id, email, first_name')
+            .in('id', memberIds)
+            .not('email', 'is', null);
 
-              await sendEmailDirect({
-                to: member.email,
-                subject: `[${community.name}] ${emailData.subject || '(No subject)'}`,
-                html,
-                from: `${community.name} <notifications@duesiq.com>`,
-              });
-            } catch (err) {
-              console.error(`Failed to forward to ${member.email}:`, err);
+          if (members?.length) {
+            for (const member of members) {
+              if (!member.email) continue;
+              forwardTargets.add(member.email);
+
+              try {
+                const html = await render(
+                  InboxForwardEmail({
+                    communityName: community.name,
+                    fromName: fromName || fromAddress,
+                    fromAddress,
+                    subject: emailData.subject || '(No subject)',
+                    snippet: snippet || '',
+                    emailUrl,
+                    recipientName: member.first_name || 'there',
+                  })
+                );
+
+                await sendEmailDirect({
+                  to: member.email,
+                  subject: `[${community.name}] ${emailData.subject || '(No subject)'}`,
+                  html,
+                  from: `${community.name} <notifications@duesiq.com>`,
+                });
+              } catch (err) {
+                console.error(`Failed to forward to ${member.email}:`, err);
+              }
             }
+          }
+        }
+
+        // Forward to address-level forward_to if set and not already covered
+        if (addrForward?.forward_to && !forwardTargets.has(addrForward.forward_to)) {
+          try {
+            const html = await render(
+              InboxForwardEmail({
+                communityName: community.name,
+                fromName: fromName || fromAddress,
+                fromAddress,
+                subject: emailData.subject || '(No subject)',
+                snippet: snippet || '',
+                emailUrl,
+                recipientName: 'there',
+              })
+            );
+
+            await sendEmailDirect({
+              to: addrForward.forward_to,
+              subject: `[${community.name}] ${emailData.subject || '(No subject)'}`,
+              html,
+              from: `${community.name} <notifications@duesiq.com>`,
+            });
+          } catch (err) {
+            console.error(`Failed to forward to ${addrForward.forward_to}:`, err);
           }
         }
       }

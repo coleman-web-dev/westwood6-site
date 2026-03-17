@@ -256,6 +256,9 @@ export interface EmailAddress {
   forward_to: string | null;
   is_default: boolean;
   mailbox_type: MailboxType;
+  smtp_resend_key_id: string | null;
+  smtp_created_at: string | null;
+  smtp_created_for_member_id: string | null;
   created_at: string;
   updated_at: string;
 }
