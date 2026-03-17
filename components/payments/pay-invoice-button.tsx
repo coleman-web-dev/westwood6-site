@@ -3,11 +3,6 @@
 import { useState } from 'react';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Button } from '@/components/shared/ui/button';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shared/ui/tooltip';
 import { toast } from 'sonner';
 import { CreditCard, Landmark } from 'lucide-react';
 import type { ConvenienceFeeSettings, PaymentSettings } from '@/lib/types/database';
@@ -26,6 +21,25 @@ function calcFee(amount: number, settings?: ConvenienceFeeSettings): number {
   return percentFee + fixedFee;
 }
 
+function ReceiptBreakdown({ amount, fee, label }: { amount: number; fee: number; label: string }) {
+  return (
+    <div className="text-meta text-text-muted-light dark:text-text-muted-dark tabular-nums space-y-0.5 pl-0.5">
+      <div className="flex justify-between gap-6">
+        <span>Invoice</span>
+        <span>${(amount / 100).toFixed(2)}</span>
+      </div>
+      <div className="flex justify-between gap-6">
+        <span>{label}</span>
+        <span>${(fee / 100).toFixed(2)}</span>
+      </div>
+      <div className="flex justify-between gap-6 border-t border-stroke-light dark:border-stroke-dark pt-0.5 text-text-secondary-light dark:text-text-secondary-dark">
+        <span>Total</span>
+        <span>${((amount + fee) / 100).toFixed(2)}</span>
+      </div>
+    </div>
+  );
+}
+
 export function PayInvoiceButton({ invoiceId, communityId, amount, disabled }: PayInvoiceButtonProps) {
   const { community } = useCommunity();
   const [loading, setLoading] = useState<'card' | 'ach' | 'any' | null>(null);
@@ -37,12 +51,10 @@ export function PayInvoiceButton({ invoiceId, communityId, amount, disabled }: P
   const appliesTo = feeSettings?.applies_to ?? 'all';
   const fee = calcFee(amount, feeSettings);
 
-  // Determine if fee is method-specific
   const needsSplit = feeSettings?.enabled && fee > 0 && appliesTo !== 'all';
 
   async function startCheckout(paymentMethod?: 'card' | 'ach') {
-    const loadingKey = paymentMethod ?? 'any';
-    setLoading(loadingKey);
+    setLoading(paymentMethod ?? 'any');
 
     try {
       const response = await fetch('/api/stripe/checkout', {
@@ -70,7 +82,7 @@ export function PayInvoiceButton({ invoiceId, communityId, amount, disabled }: P
     }
   }
 
-  // Split flow: card button primary, ACH as a secondary text link that toggles an ACH view
+  // Split flow: card primary, ACH toggled via link
   if (needsSplit) {
     const cardFee = appliesTo === 'card' ? fee : 0;
     const achFee = appliesTo === 'ach' ? fee : 0;
@@ -83,37 +95,20 @@ export function PayInvoiceButton({ invoiceId, communityId, amount, disabled }: P
           <p className="text-body text-text-secondary-light dark:text-text-secondary-dark">
             ACH transfers take 3-5 business days to process.
           </p>
+          {achFee > 0 && (
+            <ReceiptBreakdown amount={amount} fee={achFee} label="Processing fee" />
+          )}
           <div className="flex items-center gap-3">
-            {achFee > 0 ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => startCheckout('ach')}
-                    disabled={!!loading || disabled}
-                    className="text-green-600 border-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-950"
-                  >
-                    <Landmark className="h-4 w-4 mr-1.5" />
-                    {loading === 'ach' ? 'Redirecting...' : `Pay $${(achTotal / 100).toFixed(2)} via ACH`}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>${(amount / 100).toFixed(2)} + ${(achFee / 100).toFixed(2)} processing fee</p>
-                </TooltipContent>
-              </Tooltip>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => startCheckout('ach')}
-                disabled={!!loading || disabled}
-                className="text-green-600 border-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-950"
-              >
-                <Landmark className="h-4 w-4 mr-1.5" />
-                {loading === 'ach' ? 'Redirecting...' : `Pay $${(achTotal / 100).toFixed(2)} via ACH`}
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => startCheckout('ach')}
+              disabled={!!loading || disabled}
+              className="text-green-600 border-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-950"
+            >
+              <Landmark className="h-4 w-4 mr-1.5" />
+              {loading === 'ach' ? 'Redirecting...' : `Pay $${(achTotal / 100).toFixed(2)} via ACH`}
+            </Button>
             <button
               type="button"
               onClick={() => setShowAch(false)}
@@ -128,35 +123,18 @@ export function PayInvoiceButton({ invoiceId, communityId, amount, disabled }: P
 
     return (
       <div className="flex flex-col items-start gap-1.5">
-        {cardFee > 0 ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => startCheckout('card')}
-                disabled={!!loading || disabled}
-                className="text-green-600 border-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-950"
-              >
-                <CreditCard className="h-4 w-4 mr-1.5" />
-                {loading === 'card' ? 'Redirecting...' : `Pay Instant $${(cardTotal / 100).toFixed(2)}`}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>${(amount / 100).toFixed(2)} + ${(cardFee / 100).toFixed(2)} processing fee</p>
-            </TooltipContent>
-          </Tooltip>
-        ) : (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => startCheckout('card')}
-            disabled={!!loading || disabled}
-            className="text-green-600 border-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-950"
-          >
-            <CreditCard className="h-4 w-4 mr-1.5" />
-            {loading === 'card' ? 'Redirecting...' : `Pay Instant $${(cardTotal / 100).toFixed(2)}`}
-          </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => startCheckout('card')}
+          disabled={!!loading || disabled}
+          className="text-green-600 border-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-950"
+        >
+          <CreditCard className="h-4 w-4 mr-1.5" />
+          {loading === 'card' ? 'Redirecting...' : `Pay Instant $${(cardTotal / 100).toFixed(2)}`}
+        </Button>
+        {cardFee > 0 && (
+          <ReceiptBreakdown amount={amount} fee={cardFee} label="Processing fee" />
         )}
         <button
           type="button"
@@ -171,29 +149,22 @@ export function PayInvoiceButton({ invoiceId, communityId, amount, disabled }: P
 
   // Single button: fee applies to all methods or no fee
   const total = amount + fee;
-  const button = (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={() => startCheckout()}
-      disabled={!!loading || disabled}
-      className="text-green-600 border-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-950"
-    >
-      <CreditCard className="h-4 w-4 mr-1.5" />
-      {loading ? 'Redirecting...' : `Pay $${(total / 100).toFixed(2)}`}
-    </Button>
+
+  return (
+    <div className="flex flex-col items-start gap-1.5">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => startCheckout()}
+        disabled={!!loading || disabled}
+        className="text-green-600 border-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-950"
+      >
+        <CreditCard className="h-4 w-4 mr-1.5" />
+        {loading ? 'Redirecting...' : `Pay $${(total / 100).toFixed(2)}`}
+      </Button>
+      {fee > 0 && (
+        <ReceiptBreakdown amount={amount} fee={fee} label="Processing fee" />
+      )}
+    </div>
   );
-
-  if (fee > 0) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>{button}</TooltipTrigger>
-        <TooltipContent>
-          <p>${(amount / 100).toFixed(2)} + ${(fee / 100).toFixed(2)} processing fee</p>
-        </TooltipContent>
-      </Tooltip>
-    );
-  }
-
-  return button;
 }
