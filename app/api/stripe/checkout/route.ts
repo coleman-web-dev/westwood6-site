@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getStripeClient } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
+import type { ConvenienceFeeSettings } from '@/lib/types/database';
 
 /**
  * POST /api/stripe/checkout
@@ -112,14 +113,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Look up the community name
+    // Look up the community name and payment settings
     const { data: community } = await supabase
       .from('communities')
-      .select('name')
+      .select('name, theme')
       .eq('id', communityId)
       .single();
 
     const communityName = community?.name || 'Community';
+    const theme = community?.theme as Record<string, unknown> | null;
+    const paymentSettings = theme?.payment_settings as Record<string, unknown> | undefined;
+    const convenienceFee = paymentSettings?.convenience_fee_settings as ConvenienceFeeSettings | undefined;
 
     // Calculate amount to charge (total minus any amount already paid via wallet)
     const chargeAmount = invoice.amount - (invoice.amount_paid || 0);
@@ -130,43 +134,81 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Calculate application fee
+    // Calculate convenience fee (covers Stripe processing fee + DuesIQ margin)
+    let convenienceFeeAmount = 0;
+    if (convenienceFee?.enabled) {
+      const percentFee = Math.round(chargeAmount * (convenienceFee.fee_percent / 100));
+      const fixedFee = convenienceFee.fee_fixed || 0;
+      convenienceFeeAmount = percentFee + fixedFee;
+    }
+
+    // Application fee goes to DuesIQ platform (separate from convenience fee)
     const applicationFeeAmount = Math.round(
       chargeAmount * (stripeAccount.application_fee_percent / 100)
     );
 
-    // Create Checkout Session
+    // Build line items
+    const lineItems: Array<{
+      price_data: { currency: string; product_data: { name: string; description?: string }; unit_amount: number };
+      quantity: number;
+    }> = [
+      {
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: invoice.title,
+            description: `${communityName} - ${invoice.title}`,
+          },
+          unit_amount: chargeAmount,
+        },
+        quantity: 1,
+      },
+    ];
+
+    if (convenienceFeeAmount > 0) {
+      lineItems.push({
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: 'Processing Fee',
+          },
+          unit_amount: convenienceFeeAmount,
+        },
+        quantity: 1,
+      });
+    }
+
+    // Build checkout session config
+    // Connect mode: split payment to connected account with application fee
+    // Direct mode: payment goes directly to community's Stripe account
+    const isConnect = stripeAccount.mode === 'connect' && stripeAccount.stripe_account_id;
+
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card', 'us_bank_account'],
-      line_items: [
-        {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: invoice.title,
-              description: `${communityName} - ${invoice.title}`,
-            },
-            unit_amount: chargeAmount,
-          },
-          quantity: 1,
-        },
-      ],
-      payment_intent_data: {
-        application_fee_amount: applicationFeeAmount,
-        transfer_data: {
-          destination: stripeAccount.stripe_account_id,
-        },
-      },
+      line_items: lineItems,
       success_url: successUrl,
       cancel_url: cancelUrl,
       metadata: {
         invoice_id: invoiceId,
         community_id: communityId,
       },
+      ...(isConnect
+        ? {
+            payment_intent_data: {
+              application_fee_amount: applicationFeeAmount,
+              transfer_data: {
+                destination: stripeAccount.stripe_account_id!,
+              },
+            },
+          }
+        : {}),
     });
 
-    return NextResponse.json({ url: session.url });
+    return NextResponse.json({
+      url: session.url,
+      convenienceFee: convenienceFeeAmount,
+    });
   } catch (err) {
     console.error('Stripe checkout error:', err);
     const message = err instanceof Error ? err.message : 'Internal server error';

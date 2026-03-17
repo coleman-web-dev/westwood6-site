@@ -145,6 +145,7 @@ export async function POST(req: NextRequest) {
         id,
         unit_number,
         stripe_subscription_id,
+        preferred_billing_day,
         members!inner (
           id,
           stripe_customer_id,
@@ -195,13 +196,44 @@ export async function POST(req: NextRequest) {
         }
 
         try {
-          // Anchor new subscriptions to the 1st of next month
+          // Determine billing day: use unit's preferred day, or look up from last Stripe charge
+          let billingDay = 1; // default to 1st of month
+          const unitRecord = unit as unknown as { preferred_billing_day?: number | null };
+
+          if (unitRecord.preferred_billing_day) {
+            billingDay = unitRecord.preferred_billing_day;
+          } else {
+            // Look up last charge to preserve existing autopay date
+            try {
+              const charges = await stripe.charges.list({
+                customer: owner.stripe_customer_id,
+                limit: 1,
+              });
+              if (charges.data.length > 0) {
+                const chargeDate = new Date(charges.data[0].created * 1000);
+                billingDay = chargeDate.getUTCDate();
+                if (billingDay > 28) billingDay = 28; // cap at 28 to avoid month-end issues
+              }
+            } catch {
+              // If charge lookup fails, fall back to 1st
+            }
+          }
+
+          // Compute next occurrence of billing day in a future month
           const now = new Date();
-          const anchorDate = new Date(Date.UTC(
-            now.getUTCFullYear(),
-            now.getUTCMonth() + 1,
-            1, 0, 0, 0
-          ));
+          let anchorDate: Date;
+          const currentDay = now.getUTCDate();
+          if (currentDay < billingDay) {
+            // Billing day hasn't passed this month yet, anchor to this month
+            anchorDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), billingDay, 0, 0, 0));
+          } else {
+            // Billing day already passed, anchor to next month
+            anchorDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, billingDay, 0, 0, 0));
+          }
+          // Ensure anchor is in the future
+          if (anchorDate.getTime() <= now.getTime()) {
+            anchorDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, billingDay, 0, 0, 0));
+          }
           const billingCycleAnchor = Math.floor(anchorDate.getTime() / 1000);
 
           const subscription = await stripe.subscriptions.create({
@@ -215,12 +247,13 @@ export async function POST(req: NextRequest) {
             },
           });
 
-          // Update unit with subscription info
+          // Update unit with subscription info and billing day
           const { error: updateError } = await supabase
             .from('units')
             .update({
               stripe_subscription_id: subscription.id,
               stripe_subscription_status: subscription.status,
+              preferred_billing_day: billingDay,
             })
             .eq('id', unit.id);
 

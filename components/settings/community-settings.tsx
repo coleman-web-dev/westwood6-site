@@ -24,7 +24,7 @@ import { VendorsManager } from '@/components/settings/vendors-manager';
 
 import { StripeMigrationSection } from '@/components/settings/stripe-migration-section';
 import { InsuranceReminderSettings } from '@/components/settings/insurance-reminder-settings';
-import type { PaymentFrequency, BulletinSettings, LateFeeSettings, VotingConfig, NoticeType } from '@/lib/types/database';
+import type { PaymentFrequency, BulletinSettings, LateFeeSettings, ConvenienceFeeSettings, VotingConfig, NoticeType } from '@/lib/types/database';
 import { VOTING_CONFIG_DEFAULTS } from '@/lib/types/database';
 
 export function CommunitySettings() {
@@ -48,6 +48,9 @@ export function CommunitySettings() {
   const [feeType, setFeeType] = useState<'flat' | 'percent'>('flat');
   const [feeAmount, setFeeAmount] = useState(2500); // cents
   const [maxFee, setMaxFee] = useState<number | undefined>(undefined);
+  const [convenienceFeeEnabled, setConvenienceFeeEnabled] = useState(false);
+  const [convenienceFeePercent, setConvenienceFeePercent] = useState(3.5);
+  const [convenienceFeeFixed, setConvenienceFeeFixed] = useState(30); // cents
   const [autoGenerateInvoices, setAutoGenerateInvoices] = useState(false);
   const [autoMarkOverdue, setAutoMarkOverdue] = useState(false);
   const [autoNotifyNewInvoices, setAutoNotifyNewInvoices] = useState(false);
@@ -82,6 +85,10 @@ export function CommunitySettings() {
       setFeeType(lfs?.fee_type ?? 'flat');
       setFeeAmount(lfs?.fee_amount ?? 2500);
       setMaxFee(lfs?.max_fee);
+      const cfs = community.theme?.payment_settings?.convenience_fee_settings as ConvenienceFeeSettings | undefined;
+      setConvenienceFeeEnabled(cfs?.enabled ?? false);
+      setConvenienceFeePercent(cfs?.fee_percent ?? 3.5);
+      setConvenienceFeeFixed(cfs?.fee_fixed ?? 30);
       setAutoGenerateInvoices(!!community.theme?.payment_settings?.auto_generate_invoices);
       setAutoMarkOverdue(!!community.theme?.payment_settings?.auto_mark_overdue);
       setAutoNotifyNewInvoices(!!community.theme?.payment_settings?.auto_notify_new_invoices);
@@ -118,6 +125,9 @@ export function CommunitySettings() {
       feeType !== ((community.theme?.payment_settings?.late_fee_settings as LateFeeSettings | undefined)?.fee_type ?? 'flat') ||
       feeAmount !== ((community.theme?.payment_settings?.late_fee_settings as LateFeeSettings | undefined)?.fee_amount ?? 2500) ||
       maxFee !== (community.theme?.payment_settings?.late_fee_settings as LateFeeSettings | undefined)?.max_fee ||
+      convenienceFeeEnabled !== ((community.theme?.payment_settings?.convenience_fee_settings as ConvenienceFeeSettings | undefined)?.enabled ?? false) ||
+      convenienceFeePercent !== ((community.theme?.payment_settings?.convenience_fee_settings as ConvenienceFeeSettings | undefined)?.fee_percent ?? 3.5) ||
+      convenienceFeeFixed !== ((community.theme?.payment_settings?.convenience_fee_settings as ConvenienceFeeSettings | undefined)?.fee_fixed ?? 30) ||
       autoGenerateInvoices !== (!!community.theme?.payment_settings?.auto_generate_invoices) ||
       autoMarkOverdue !== (!!community.theme?.payment_settings?.auto_mark_overdue) ||
       autoNotifyNewInvoices !== (!!community.theme?.payment_settings?.auto_notify_new_invoices) ||
@@ -135,6 +145,7 @@ export function CommunitySettings() {
     allowFlexibleFrequency, defaultFrequency,
     bulletinPosting, bulletinCommenting,
     lateFeesEnabled, gracePeriodDays, feeType, feeAmount, maxFee,
+    convenienceFeeEnabled, convenienceFeePercent, convenienceFeeFixed,
     autoGenerateInvoices, autoMarkOverdue, autoNotifyNewInvoices,
     reminderDaysBefore, reminderDaysAfter, arcEnabled, votingConfig,
     autoEscalationEnabled, defaultDeadlineDays, escalationNoticeType,
@@ -184,6 +195,11 @@ export function CommunitySettings() {
               fee_type: feeType,
               fee_amount: feeAmount,
               ...(maxFee ? { max_fee: maxFee } : {}),
+            },
+            convenience_fee_settings: {
+              enabled: convenienceFeeEnabled,
+              fee_percent: convenienceFeePercent,
+              fee_fixed: convenienceFeeFixed,
             },
             auto_generate_invoices: autoGenerateInvoices,
             auto_mark_overdue: autoMarkOverdue,
@@ -785,6 +801,62 @@ export function CommunitySettings() {
                     </div>
                   )}
                 </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
+          <div className="border-t border-stroke-light dark:border-stroke-dark" />
+
+          {/* Processing fee */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-body text-text-primary-light dark:text-text-primary-dark">
+                Processing fee
+              </p>
+              <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                Add a processing fee to cover credit card charges
+              </p>
+            </div>
+            <Switch
+              checked={convenienceFeeEnabled}
+              onCheckedChange={setConvenienceFeeEnabled}
+            />
+          </div>
+
+          <Collapsible open={convenienceFeeEnabled}>
+            <CollapsibleContent className="overflow-hidden transition-all data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+              <div className="border-t border-stroke-light dark:border-stroke-dark mt-4" />
+              <div className="space-y-4 pt-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                      Fee percentage (%)
+                    </Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={10}
+                      step={0.1}
+                      value={convenienceFeePercent}
+                      onChange={(e) => setConvenienceFeePercent(Number(e.target.value))}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                      Fixed fee ($)
+                    </Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      value={(convenienceFeeFixed / 100).toFixed(2)}
+                      onChange={(e) => setConvenienceFeeFixed(Math.round(Number(e.target.value) * 100))}
+                    />
+                  </div>
+                </div>
+                <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                  Example: on a $250 invoice, the fee would be ${((250 * convenienceFeePercent / 100) + convenienceFeeFixed / 100).toFixed(2)}
+                </p>
               </div>
             </CollapsibleContent>
           </Collapsible>

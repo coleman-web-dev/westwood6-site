@@ -53,10 +53,17 @@ export interface LateFeeSettings {
   max_fee?: number;
 }
 
+export interface ConvenienceFeeSettings {
+  enabled: boolean;
+  fee_percent: number; // e.g. 3.5 for 3.5%
+  fee_fixed: number; // in cents, e.g. 30 for $0.30
+}
+
 export interface PaymentSettings {
   allow_flexible_frequency: boolean;
   default_frequency: PaymentFrequency;
   late_fee_settings?: LateFeeSettings;
+  convenience_fee_settings?: ConvenienceFeeSettings;
   auto_generate_invoices?: boolean;
   auto_mark_overdue?: boolean;
   auto_notify_new_invoices?: boolean;
@@ -164,6 +171,7 @@ export interface Unit {
   address: string | null;
   status: UnitStatus;
   payment_frequency: PaymentFrequency | null;
+  preferred_billing_day: number | null;
   stripe_subscription_id?: string | null;
   stripe_subscription_status?: string | null;
   created_at: string;
