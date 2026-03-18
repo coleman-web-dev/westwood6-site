@@ -55,7 +55,7 @@ export function CreateViolationDialog({
   communitySlug,
   onCreated,
 }: CreateViolationDialogProps) {
-  const { member, unit, isBoard, actualIsBoard } = useCommunity();
+  const { member, unit, actualIsBoard } = useCommunity();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [unitId, setUnitId] = useState('');
   const [category, setCategory] = useState<ViolationCategory>('other');
@@ -140,9 +140,16 @@ export function CreateViolationDialog({
   }
 
   async function handleCreate() {
-    if (!title.trim() || !effectiveUnitId) {
-      toast.error('Please fill in all required fields.');
-      return;
+    if (isResidentReporting) {
+      if (!title.trim()) {
+        toast.error('Please describe what you observed.');
+        return;
+      }
+    } else {
+      if (!title.trim() || !effectiveUnitId) {
+        toast.error('Please fill in all required fields.');
+        return;
+      }
     }
 
     if (!member) {
@@ -156,16 +163,29 @@ export function CreateViolationDialog({
     // Upload photos first
     const photoUrls = await uploadPhotos(supabase);
 
+    // For resident reports: use the reported unit if specified, otherwise their own unit
+    // The board will review and reassign as needed
+    const targetUnitId = isResidentReporting
+      ? (reportedUnitId || unit?.id || '')
+      : effectiveUnitId;
+
+    if (!targetUnitId) {
+      toast.error('Unable to determine which unit to associate this report with.');
+      setSaving(false);
+      return;
+    }
+
     const { data: inserted, error } = await supabase
       .from('violations')
       .insert({
         community_id: communityId,
-        unit_id: effectiveUnitId,
+        unit_id: targetUnitId,
         reported_by: member.id,
         category,
         title: title.trim(),
         description: description.trim() || null,
-        severity,
+        severity: isResidentReporting ? 'warning' : severity,
+        status: isResidentReporting ? 'reported' : 'notice_sent',
         photo_urls: photoUrls,
         compliance_deadline: complianceDeadline || null,
         reported_unit_id: isResidentReporting ? (reportedUnitId || null) : null,
@@ -181,7 +201,7 @@ export function CreateViolationDialog({
       return;
     }
 
-    toast.success('Violation reported.');
+    toast.success(isResidentReporting ? 'Issue reported. The board will review your report.' : 'Violation reported.');
     logAuditEvent({
       communityId,
       actorId: member?.user_id,
@@ -192,28 +212,8 @@ export function CreateViolationDialog({
       metadata: { title: title.trim(), category, severity },
     });
 
-    // Fire-and-forget: notify household + queue email
-    notifyHouseholdOfViolation(
-      communityId,
-      effectiveUnitId,
-      inserted.id,
-      title.trim(),
-      category,
-    ).catch(() => {});
-
-    sendViolationNoticeEmail(
-      communityId,
-      communitySlug,
-      effectiveUnitId,
-      title.trim(),
-      category,
-      severity,
-      'courtesy',
-      description.trim() || undefined,
-    ).catch(() => {});
-
-    // Fire-and-forget: notify board members about resident reports
     if (isResidentReporting) {
+      // Resident report: only notify board members for review
       const reporterName =
         [member.first_name, member.last_name].filter(Boolean).join(' ') ||
         member.email || 'A resident';
@@ -224,11 +224,31 @@ export function CreateViolationDialog({
         inserted.id,
         title.trim(),
         category,
-        severity,
+        'warning',
         reporterName,
         description.trim() || undefined,
         reportedLocation.trim() || undefined,
         undefined, // TODO: resolve reported unit number if reportedUnitId is set
+      ).catch(() => {});
+    } else {
+      // Board-created violation: notify household + send email notice
+      notifyHouseholdOfViolation(
+        communityId,
+        effectiveUnitId,
+        inserted.id,
+        title.trim(),
+        category,
+      ).catch(() => {});
+
+      sendViolationNoticeEmail(
+        communityId,
+        communitySlug,
+        effectiveUnitId,
+        title.trim(),
+        category,
+        severity,
+        'courtesy',
+        description.trim() || undefined,
       ).catch(() => {});
     }
 
@@ -250,7 +270,14 @@ export function CreateViolationDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Report Violation</DialogTitle>
+          <DialogTitle>
+            {isResidentReporting ? 'Report an Issue' : 'Report Violation'}
+          </DialogTitle>
+          {isResidentReporting && (
+            <p className="text-body text-text-muted-light dark:text-text-muted-dark">
+              Let the board know about a potential violation. They will review your report and take action if needed.
+            </p>
+          )}
         </DialogHeader>
 
         <div className="space-y-4 py-2">
@@ -275,19 +302,8 @@ export function CreateViolationDialog({
             </div>
           )}
 
-          {/* Unit selector: board picks, residents see their unit */}
-          {isResidentReporting ? (
-            unit && (
-              <div className="space-y-1.5">
-                <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-                  Your Unit
-                </Label>
-                <p className="text-body text-text-primary-light dark:text-text-primary-dark">
-                  Unit {unit.unit_number}
-                </p>
-              </div>
-            )
-          ) : (
+          {/* Unit selector: board picks a unit to issue violation against */}
+          {!isResidentReporting && (
             <div className="space-y-1.5">
               <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
                 Unit *
@@ -305,11 +321,11 @@ export function CreateViolationDialog({
           {isResidentReporting && (
             <div className="space-y-3 rounded-inner-card border border-stroke-light dark:border-stroke-dark p-3">
               <p className="text-label font-semibold text-text-primary-light dark:text-text-primary-dark">
-                Where did this happen?
+                Where is this happening?
               </p>
               <div className="space-y-1.5">
                 <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-                  Which unit or lot? (optional)
+                  Unit or lot number (if known)
                 </Label>
                 <UnitPicker
                   communityId={communityId}
@@ -333,16 +349,16 @@ export function CreateViolationDialog({
 
           <div className="space-y-1.5">
             <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-              Title *
+              {isResidentReporting ? 'What did you observe? *' : 'Title *'}
             </Label>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Brief description of the violation"
+              placeholder={isResidentReporting ? 'e.g., Weeds growing in driveway at lot 42' : 'Brief description of the violation'}
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className={actualIsBoard ? 'grid grid-cols-2 gap-4' : ''}>
             <div className="space-y-1.5">
               <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
                 Category
@@ -363,33 +379,35 @@ export function CreateViolationDialog({
               </Select>
             </div>
 
-            <div className="space-y-1.5">
-              <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-                Severity
-              </Label>
-              <Select value={severity} onValueChange={(v) => setSeverity(v as ViolationSeverity)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="warning">Warning</SelectItem>
-                  <SelectItem value="minor">Minor</SelectItem>
-                  <SelectItem value="major">Major</SelectItem>
-                  <SelectItem value="critical">Critical</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {actualIsBoard && (
+              <div className="space-y-1.5">
+                <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                  Severity
+                </Label>
+                <Select value={severity} onValueChange={(v) => setSeverity(v as ViolationSeverity)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="warning">Warning</SelectItem>
+                    <SelectItem value="minor">Minor</SelectItem>
+                    <SelectItem value="major">Major</SelectItem>
+                    <SelectItem value="critical">Critical</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           <div className="space-y-1.5">
             <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-              Description
+              {isResidentReporting ? 'Additional Details' : 'Description'}
             </Label>
             <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Detailed description of the violation..."
-              rows={4}
+              placeholder={isResidentReporting ? 'Any additional context that would help the board investigate...' : 'Detailed description of the violation...'}
+              rows={isResidentReporting ? 3 : 4}
               className="resize-none"
             />
           </div>
@@ -415,7 +433,7 @@ export function CreateViolationDialog({
           {/* Photo upload */}
           <div className="space-y-1.5">
             <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-              Photos
+              {isResidentReporting ? 'Photos (optional)' : 'Photos'}
             </Label>
             <div className="flex flex-wrap gap-2">
               {files.map((file, i) => (
@@ -466,7 +484,11 @@ export function CreateViolationDialog({
             <Button variant="outline">Cancel</Button>
           </DialogClose>
           <Button onClick={handleCreate} disabled={saving}>
-            {saving ? 'Creating...' : 'Report Violation'}
+            {saving
+              ? 'Submitting...'
+              : isResidentReporting
+                ? 'Submit Report'
+                : 'Create Violation'}
           </Button>
         </DialogFooter>
       </DialogContent>
