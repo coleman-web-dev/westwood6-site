@@ -1038,6 +1038,18 @@ export interface ArcRequest {
   updated_at: string;
 }
 
+export interface ArcResponse {
+  id: string;
+  arc_request_id: string;
+  community_id: string;
+  posted_by: string;
+  body: string;
+  attachment_urls: string[];
+  created_at: string;
+  updated_at: string;
+  author?: Pick<Member, 'id' | 'first_name' | 'last_name' | 'member_role' | 'system_role'>;
+}
+
 // ─── Budgets ────────────────────────────────────────
 
 export interface Budget {

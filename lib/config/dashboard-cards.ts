@@ -132,4 +132,13 @@ export const CARD_REGISTRY: Record<DashboardCardId, DashboardCardConfig> = {
     defaultW: 6,
     defaultH: 4,
   },
+  'arc-requests': {
+    id: 'arc-requests',
+    title: 'ARC Requests',
+    icon: 'ClipboardEdit',
+    minW: 3,
+    minH: 4,
+    defaultW: 6,
+    defaultH: 6,
+  },
 };

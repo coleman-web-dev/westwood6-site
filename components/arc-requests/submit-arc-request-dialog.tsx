@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import {
@@ -23,9 +23,14 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { UnitPicker } from '@/components/shared/unit-picker';
+import { Paperclip, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { logAuditEvent } from '@/lib/audit';
 import type { ArcProjectType } from '@/lib/types/database';
+
+const MAX_FILES = 5;
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const ACCEPTED_TYPES = 'image/*,.pdf,.doc,.docx';
 
 interface SubmitArcRequestDialogProps {
   open: boolean;
@@ -45,6 +50,8 @@ export function SubmitArcRequestDialog({
   const [estimatedCost, setEstimatedCost] = useState('');
   const [saving, setSaving] = useState(false);
   const [selectedUnitId, setSelectedUnitId] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Show unit picker for board in admin view, or any board member without a unit
   const needsUnitPicker = isBoard || (actualIsBoard && !unit);
@@ -57,6 +64,64 @@ export function SubmitArcRequestDialog({
     setProjectType('other');
     setEstimatedCost('');
     setSelectedUnitId('');
+    setFiles([]);
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const selected = Array.from(e.target.files ?? []);
+    const validFiles = selected.filter((f) => {
+      if (f.size > MAX_FILE_SIZE) {
+        toast.error(`${f.name} exceeds 10MB limit.`);
+        return false;
+      }
+      return true;
+    });
+
+    setFiles((prev) => {
+      const combined = [...prev, ...validFiles].slice(0, MAX_FILES);
+      if (prev.length + validFiles.length > MAX_FILES) {
+        toast.error(`Maximum ${MAX_FILES} files allowed.`);
+      }
+      return combined;
+    });
+
+    // Reset input so the same file can be re-selected
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  function removeFile(index: number) {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function uploadFiles(requestId: string): Promise<string[]> {
+    if (files.length === 0) return [];
+    const supabase = createClient();
+    const urls: string[] = [];
+
+    for (const file of files) {
+      const timestamp = Date.now();
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const filePath = `${community.id}/arc-requests/${requestId}/${timestamp}_${safeName}`;
+
+      const { error } = await supabase.storage
+        .from('hoa-documents')
+        .upload(filePath, file);
+
+      if (error) {
+        toast.error(`Failed to upload ${file.name}.`);
+        continue;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('hoa-documents')
+        .getPublicUrl(filePath);
+
+      if (urlData?.publicUrl) {
+        urls.push(urlData.publicUrl);
+      }
+    }
+
+    return urls;
   }
 
   async function handleSubmit() {
@@ -86,13 +151,24 @@ export function SubmitArcRequestDialog({
       status: 'submitted',
     }).select('id').single();
 
-    setSaving(false);
-
     if (error) {
+      setSaving(false);
       toast.error('Failed to submit request. Please try again.');
       return;
     }
 
+    // Upload files and save URLs
+    if (files.length > 0) {
+      const photoUrls = await uploadFiles(data.id);
+      if (photoUrls.length > 0) {
+        await supabase
+          .from('arc_requests')
+          .update({ photo_urls: photoUrls })
+          .eq('id', data.id);
+      }
+    }
+
+    setSaving(false);
     toast.success('ARC request submitted.');
 
     // Notify board members
@@ -210,6 +286,62 @@ export function SubmitArcRequestDialog({
               rows={4}
               className="resize-none"
             />
+          </div>
+
+          {/* File attachments */}
+          <div className="space-y-1.5">
+            <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+              Photos / Documents
+            </Label>
+            <div className="space-y-2">
+              {files.length > 0 && (
+                <div className="space-y-1">
+                  {files.map((f, i) => (
+                    <div
+                      key={`${f.name}-${i}`}
+                      className="flex items-center gap-2 text-meta text-text-secondary-light dark:text-text-secondary-dark bg-surface-light-2 dark:bg-surface-dark-2 rounded-inner-card px-2 py-1"
+                    >
+                      <Paperclip className="h-3 w-3 shrink-0" />
+                      <span className="truncate flex-1">{f.name}</span>
+                      <span className="shrink-0 tabular-nums">
+                        {(f.size / 1024).toFixed(0)} KB
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeFile(i)}
+                        className="p-0.5 rounded hover:bg-surface-light dark:hover:bg-surface-dark transition-colors"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {files.length < MAX_FILES && (
+                <>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept={ACCEPTED_TYPES}
+                    multiple
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Paperclip className="h-3.5 w-3.5 mr-1.5" />
+                    Attach files
+                  </Button>
+                  <p className="text-[10px] text-text-muted-light dark:text-text-muted-dark">
+                    Up to {MAX_FILES} files, 10MB each. Images, PDFs, or Word documents.
+                  </p>
+                </>
+              )}
+            </div>
           </div>
         </div>
 

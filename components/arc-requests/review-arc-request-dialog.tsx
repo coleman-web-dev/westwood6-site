@@ -24,8 +24,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/shared/ui/select';
+import { FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { logAuditEvent } from '@/lib/audit';
+import { ArcResponseThread } from './arc-response-thread';
 import type { ArcRequest, ArcStatus } from '@/lib/types/database';
 
 const STATUS_LABELS: Record<ArcStatus, string> = {
@@ -138,7 +140,7 @@ export function ReviewArcRequestDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{request.title}</DialogTitle>
           <DialogDescription>
@@ -176,6 +178,62 @@ export function ReviewArcRequestDialog({
               year: 'numeric', month: 'long', day: 'numeric',
             })}
           </p>
+
+          {/* Attached photos/documents */}
+          {request.photo_urls && request.photo_urls.length > 0 && (
+            <div className="space-y-1.5">
+              <span className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                Attachments
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {request.photo_urls.map((url, i) => {
+                  const isImage = /\.(jpg|jpeg|png|webp|heic)/i.test(url);
+                  if (isImage) {
+                    return (
+                      <a
+                        key={i}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block rounded border border-stroke-light dark:border-stroke-dark overflow-hidden hover:opacity-80 transition-opacity"
+                      >
+                        <img src={url} alt="Attachment" className="h-24 w-24 object-cover" />
+                      </a>
+                    );
+                  }
+                  const name = (() => {
+                    try {
+                      const raw = url.split('/').pop() ?? 'file';
+                      const match = raw.match(/^\d+_(.+)$/);
+                      return decodeURIComponent(match ? match[1] : raw);
+                    } catch {
+                      return 'file';
+                    }
+                  })();
+                  return (
+                    <a
+                      key={i}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 px-2 py-1 rounded border border-stroke-light dark:border-stroke-dark text-meta text-secondary-500 hover:text-secondary-400 transition-colors"
+                    >
+                      <FileText className="h-3 w-3 shrink-0" />
+                      {name}
+                    </a>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Communication thread */}
+          <div className="border-t border-stroke-light dark:border-stroke-dark pt-4">
+            <ArcResponseThread
+              arcRequestId={request.id}
+              communityId={community.id}
+            />
+          </div>
 
           {/* Board review controls */}
           {isBoard && (

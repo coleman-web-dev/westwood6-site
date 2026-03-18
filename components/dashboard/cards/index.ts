@@ -12,6 +12,7 @@ import { BulletinBoardCard } from './bulletin-board-card';
 import { ViolationsCard } from './violations-card';
 import { VendorsCard } from './vendors-card';
 import { BoardTasksCard } from './board-tasks-card';
+import { ArcRequestsCard } from './arc-requests-card';
 import type { DashboardCardId } from '@/lib/types/dashboard';
 
 export const CARD_COMPONENTS: Record<DashboardCardId, React.ComponentType> = {
@@ -29,4 +30,5 @@ export const CARD_COMPONENTS: Record<DashboardCardId, React.ComponentType> = {
   violations: ViolationsCard,
   vendors: VendorsCard,
   'board-tasks': BoardTasksCard,
+  'arc-requests': ArcRequestsCard,
 };
