@@ -56,8 +56,31 @@ export default function BudgetPage() {
       .order('is_income', { ascending: false })
       .order('category');
 
-    setLineItems((data as BudgetLineItem[]) || []);
-  }, [selectedYear, budgets]);
+    const items = (data as BudgetLineItem[]) || [];
+
+    // Fetch GL-derived actuals from the budget-variance report
+    try {
+      const res = await fetch(
+        `/api/accounting/reports?report=budget-variance&community_id=${community.id}&year=${selectedYear}`,
+      );
+      if (res.ok) {
+        const { rows } = await res.json() as { rows: { id?: string; actual: number }[] };
+        if (rows && rows.length > 0) {
+          const actualById = new Map(rows.filter((r) => r.id).map((r) => [r.id!, r.actual]));
+          for (const item of items) {
+            const glActual = actualById.get(item.id);
+            if (glActual !== undefined) {
+              item.actual_amount = glActual;
+            }
+          }
+        }
+      }
+    } catch {
+      // GL actuals unavailable, fall back to stored actual_amount
+    }
+
+    setLineItems(items);
+  }, [selectedYear, budgets, community.id]);
 
   useEffect(() => { fetchBudgets(); }, [fetchBudgets]);
   useEffect(() => { fetchLineItems(); }, [fetchLineItems]);

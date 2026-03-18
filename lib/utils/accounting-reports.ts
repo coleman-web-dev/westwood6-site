@@ -215,6 +215,25 @@ export async function getFundSummary(communityId: string): Promise<FundSummary> 
   };
 }
 
+/**
+ * Map budget categories to GL account codes.
+ * Income and expense categories map to different account code ranges.
+ */
+const CATEGORY_TO_ACCOUNTS: Record<string, { income: string[]; expense: string[] }> = {
+  dues:        { income: ['4000'], expense: [] },
+  assessments: { income: ['4010'], expense: [] },
+  amenity_fees:{ income: ['4200'], expense: [] },
+  interest:    { income: ['4300'], expense: [] },
+  maintenance: { income: [], expense: ['5000'] },
+  landscaping: { income: [], expense: ['5100'] },
+  insurance:   { income: [], expense: ['5200'] },
+  utilities:   { income: [], expense: ['5300'] },
+  management:  { income: [], expense: ['5400'] },
+  legal:       { income: [], expense: ['5500'] },
+  reserves:    { income: ['4500'], expense: ['5900'] },
+  other:       { income: ['4400'], expense: ['5600'] },
+};
+
 /** Get budget variance for a fiscal year */
 export async function getBudgetVariance(
   communityId: string,
@@ -244,19 +263,58 @@ export async function getBudgetVariance(
   const endDate = `${fiscalYear}-12-31`;
   const incomeStatement = await getIncomeStatement(communityId, startDate, endDate);
 
-  const actualByName = new Map<string, number>();
+  // Build lookup: GL account code → balance
+  const balanceByCode = new Map<string, number>();
   for (const row of [...incomeStatement.revenue.accounts, ...incomeStatement.expenses.accounts]) {
-    actualByName.set(row.name.toLowerCase(), row.balance);
+    balanceByCode.set(row.code, row.balance);
+  }
+
+  // Aggregate GL actuals by (category, is_income) using account code mapping
+  const categoryActuals = new Map<string, number>();
+  for (const [category, mapping] of Object.entries(CATEGORY_TO_ACCOUNTS)) {
+    let incomeTotal = 0;
+    for (const code of mapping.income) {
+      incomeTotal += balanceByCode.get(code) || 0;
+    }
+    let expenseTotal = 0;
+    for (const code of mapping.expense) {
+      expenseTotal += balanceByCode.get(code) || 0;
+    }
+    categoryActuals.set(`${category}_income`, incomeTotal);
+    categoryActuals.set(`${category}_expense`, expenseTotal);
+  }
+
+  // Group budget items by (category, is_income) to distribute proportionally
+  const groups = new Map<string, typeof items>();
+  for (const item of items) {
+    const key = `${item.category}_${item.is_income ? 'income' : 'expense'}`;
+    const group = groups.get(key) || [];
+    group.push(item);
+    groups.set(key, group);
   }
 
   return items.map((item) => {
-    const actual = actualByName.get(item.name.toLowerCase()) || item.actual_amount || 0;
+    const key = `${item.category}_${item.is_income ? 'income' : 'expense'}`;
+    const glTotal = categoryActuals.get(key) || 0;
+    const group = groups.get(key) || [];
+    const groupBudgeted = group.reduce((s, i) => s + i.budgeted_amount, 0);
+
+    // Distribute GL actual proportionally among items sharing the same category
+    let actual: number;
+    if (group.length <= 1 || groupBudgeted === 0) {
+      // Only item in this category, or no budget to distribute by
+      actual = group.length <= 1 ? glTotal : Math.round(glTotal / group.length);
+    } else {
+      actual = Math.round((item.budgeted_amount / groupBudgeted) * glTotal);
+    }
+
     const variance = item.is_income ? actual - item.budgeted_amount : item.budgeted_amount - actual;
     const variance_pct = item.budgeted_amount > 0
       ? ((actual / item.budgeted_amount) * 100)
       : actual > 0 ? 999 : 0;
 
     return {
+      id: item.id,
       category: item.category,
       name: item.name,
       budgeted: item.budgeted_amount,

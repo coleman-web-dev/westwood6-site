@@ -215,6 +215,7 @@ export interface BudgetLineItem {
 }
 
 export interface BudgetVarianceRow {
+  id?: string;
   category: string;
   name: string;
   budgeted: number;
