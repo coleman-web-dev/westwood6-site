@@ -55,7 +55,7 @@ export function CreateViolationDialog({
   communitySlug,
   onCreated,
 }: CreateViolationDialogProps) {
-  const { member, unit, isBoard } = useCommunity();
+  const { member, unit, isBoard, actualIsBoard } = useCommunity();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [unitId, setUnitId] = useState('');
   const [category, setCategory] = useState<ViolationCategory>('other');
@@ -82,8 +82,9 @@ export function CreateViolationDialog({
     }
   }
 
-  // Residents auto-select their own unit; board picks from dropdown
-  const isResidentReporting = !isBoard;
+  // Residents auto-select their own unit; board picks from dropdown.
+  // Use actualIsBoard so board members in personal view still get the unit picker.
+  const isResidentReporting = !actualIsBoard;
   const effectiveUnitId = isResidentReporting ? unit?.id ?? '' : unitId;
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -254,7 +255,7 @@ export function CreateViolationDialog({
 
         <div className="space-y-4 py-2">
           {/* Template selector (board only) */}
-          {isBoard && templates.length > 0 && (
+          {actualIsBoard && templates.length > 0 && (
             <div className="space-y-1.5">
               <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
                 Use Template
@@ -394,7 +395,7 @@ export function CreateViolationDialog({
           </div>
 
           {/* Compliance deadline (board only) */}
-          {isBoard && (
+          {actualIsBoard && (
             <div className="space-y-1.5">
               <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
                 Compliance Deadline
