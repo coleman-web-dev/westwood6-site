@@ -44,7 +44,7 @@ export default function ViolationsPage() {
     const supabase = createClient();
     let query = supabase
       .from('violations')
-      .select('*, units(unit_number), reported_units:units!violations_reported_unit_id_fkey(unit_number)')
+      .select('*, units!violations_unit_id_fkey(unit_number), reported_units:units!violations_reported_unit_id_fkey(unit_number)')
       .eq('community_id', community.id)
       .order('created_at', { ascending: false });
 
