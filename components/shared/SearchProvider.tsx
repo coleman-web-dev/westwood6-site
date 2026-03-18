@@ -7,31 +7,18 @@ import { searchLinks } from '@/data/config/searchLinks';
 export const SearchProvider = ({ children }) => {
   const router = useRouter();
 
-  const makeRootPath = (path: string) => {
-    if (!path.startsWith('/')) {
-      return `/${path}`;
-    }
-
-    return path;
-  };
+  const defaultActions = searchLinks.map((link) => ({
+    id: link.id,
+    name: link.name,
+    keywords: link.keywords,
+    section: link.section,
+    perform: () => router.push(link.href),
+  }));
 
   return (
     <KBarSearchProvider
       kbarConfig={{
-        searchDocumentsPath: 'search.json',
-        onSearchDocumentsLoad(json) {
-          return [
-            ...searchLinks.map((link) => {
-              return {
-                id: link.id,
-                name: link.name,
-                keywords: link.keywords,
-                section: link.section,
-                perform: () => router.push(link.href),
-              };
-            }),
-          ];
-        },
+        defaultActions,
       }}
     >
       {children}
