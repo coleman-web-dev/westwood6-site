@@ -1,12 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/shared/ui/button';
 import { Input } from '@/components/shared/ui/input';
 import { Label } from '@/components/shared/ui/label';
 import { toast } from 'sonner';
+import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes';
+import { UnsavedChangesDialog } from '@/components/settings/unsaved-changes-dialog';
 import type { CommunityTheme } from '@/lib/types/database';
 
 const DEFAULT_DAYS = [60, 30, 7];
@@ -58,7 +60,18 @@ export function InsuranceReminderSettings({ communityId, communityTheme }: Props
     router.refresh();
   }
 
+  const isDirty = useMemo(
+    () =>
+      day1 !== (currentDays[0] ?? 60) ||
+      day2 !== (currentDays[1] ?? 30) ||
+      day3 !== (currentDays[2] ?? 7),
+    [day1, day2, day3, currentDays],
+  );
+
+  const unsaved = useUnsavedChanges({ isDirty, onSave: handleSave });
+
   return (
+    <>
     <div className="space-y-3">
       <div>
         <h3 className="text-section-title text-text-primary-light dark:text-text-primary-dark">
@@ -123,5 +136,7 @@ export function InsuranceReminderSettings({ communityId, communityTheme }: Props
         </Button>
       </div>
     </div>
+    <UnsavedChangesDialog {...unsaved} />
+    </>
   );
 }

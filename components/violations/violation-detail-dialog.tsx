@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import {
@@ -27,6 +27,16 @@ import { logAuditEvent } from '@/lib/audit';
 import { NoticeHistory } from '@/components/violations/notice-history';
 import { IssueFineDialog } from '@/components/violations/issue-fine-dialog';
 import { sendViolationNoticeEmail } from '@/lib/actions/violation-actions';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/shared/ui/alert-dialog';
 import { CalendarClock, DollarSign } from 'lucide-react';
 import { Input } from '@/components/shared/ui/input';
 import type { ViolationStatus, ViolationNotice, NoticeType, DeliveryMethod, Invoice } from '@/lib/types/database';
@@ -76,6 +86,24 @@ export function ViolationDetailDialog({
   const [complianceDeadline, setComplianceDeadline] = useState('');
   const [fines, setFines] = useState<Invoice[]>([]);
   const [fineDialogOpen, setFineDialogOpen] = useState(false);
+  const [showDiscardAlert, setShowDiscardAlert] = useState(false);
+
+  const isDirty = useMemo(() => {
+    if (!violation || !isBoard) return false;
+    return (
+      status !== violation.status ||
+      resolutionNotes !== (violation.resolution_notes ?? '') ||
+      complianceDeadline !== (violation.compliance_deadline ?? '')
+    );
+  }, [violation, isBoard, status, resolutionNotes, complianceDeadline]);
+
+  function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen && isDirty) {
+      setShowDiscardAlert(true);
+      return;
+    }
+    onOpenChange(nextOpen);
+  }
 
   useEffect(() => {
     if (violation) {
@@ -221,7 +249,7 @@ export function ViolationDetailDialog({
 
   return (
     <>
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{violation.title}</DialogTitle>
@@ -241,6 +269,23 @@ export function ViolationDetailDialog({
               {violation.severity.charAt(0).toUpperCase() + violation.severity.slice(1)}
             </Badge>
           </div>
+
+          {/* Reported location (from resident reports) */}
+          {(violation.reported_units?.unit_number || violation.reported_location) && (
+            <div className="px-3 py-2 rounded-inner-card bg-surface-light-2 dark:bg-surface-dark-2 space-y-1">
+              <span className="text-label font-semibold text-text-secondary-light dark:text-text-secondary-dark">
+                Reported Location
+              </span>
+              <div className="text-body text-text-primary-light dark:text-text-primary-dark">
+                {violation.reported_units?.unit_number && (
+                  <p>Unit {violation.reported_units.unit_number}</p>
+                )}
+                {violation.reported_location && (
+                  <p>{violation.reported_location}</p>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Compliance deadline */}
           {violation.compliance_deadline && (() => {
@@ -522,6 +567,28 @@ export function ViolationDetailDialog({
         onFineIssued={() => { fetchFines(); onUpdated(); }}
       />
     )}
+
+    <AlertDialog open={showDiscardAlert} onOpenChange={setShowDiscardAlert}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Unsaved changes</AlertDialogTitle>
+          <AlertDialogDescription>
+            You have unsaved changes. Are you sure you want to close without saving?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Keep editing</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => {
+              setShowDiscardAlert(false);
+              onOpenChange(false);
+            }}
+          >
+            Discard changes
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     </>
   );
 }

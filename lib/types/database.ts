@@ -161,6 +161,8 @@ export interface Community {
       auto_escalation_enabled: boolean;
       default_deadline_days: number;
       escalation_notice_type: NoticeType;
+      report_notification_mode?: 'all_board' | 'specific_members' | 'none';
+      report_notification_member_ids?: string[];
     };
   };
   created_at: string;
@@ -970,6 +972,8 @@ export interface Violation {
   resolved_at: string | null;
   compliance_deadline: string | null;
   auto_escalated_at: string | null;
+  reported_unit_id: string | null;
+  reported_location: string | null;
   created_at: string;
   updated_at: string;
 }

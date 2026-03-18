@@ -28,6 +28,7 @@ import { ImagePlus, X } from 'lucide-react';
 import {
   sendViolationNoticeEmail,
   notifyHouseholdOfViolation,
+  notifyBoardOfViolationReport,
 } from '@/lib/actions/violation-actions';
 import { UnitPicker } from '@/components/shared/unit-picker';
 import type { ViolationCategory, ViolationSeverity, ViolationTemplate } from '@/lib/types/database';
@@ -63,6 +64,8 @@ export function CreateViolationDialog({
   const [severity, setSeverity] = useState<ViolationSeverity>('warning');
   const [complianceDeadline, setComplianceDeadline] = useState('');
   const [files, setFiles] = useState<File[]>([]);
+  const [reportedUnitId, setReportedUnitId] = useState('');
+  const [reportedLocation, setReportedLocation] = useState('');
   const [saving, setSaving] = useState(false);
 
   function handleTemplateSelect(templateId: string) {
@@ -164,6 +167,8 @@ export function CreateViolationDialog({
         severity,
         photo_urls: photoUrls,
         compliance_deadline: complianceDeadline || null,
+        reported_unit_id: isResidentReporting ? (reportedUnitId || null) : null,
+        reported_location: isResidentReporting ? (reportedLocation.trim() || null) : null,
       })
       .select('id')
       .single();
@@ -206,6 +211,26 @@ export function CreateViolationDialog({
       description.trim() || undefined,
     ).catch(() => {});
 
+    // Fire-and-forget: notify board members about resident reports
+    if (isResidentReporting) {
+      const reporterName =
+        [member.first_name, member.last_name].filter(Boolean).join(' ') ||
+        member.email || 'A resident';
+
+      notifyBoardOfViolationReport(
+        communityId,
+        communitySlug,
+        inserted.id,
+        title.trim(),
+        category,
+        severity,
+        reporterName,
+        description.trim() || undefined,
+        reportedLocation.trim() || undefined,
+        undefined, // TODO: resolve reported unit number if reportedUnitId is set
+      ).catch(() => {});
+    }
+
     // Reset form
     setTitle('');
     setDescription('');
@@ -214,6 +239,8 @@ export function CreateViolationDialog({
     setSeverity('warning');
     setComplianceDeadline('');
     setFiles([]);
+    setReportedUnitId('');
+    setReportedLocation('');
     onOpenChange(false);
     onCreated();
   }
@@ -252,7 +279,7 @@ export function CreateViolationDialog({
             unit && (
               <div className="space-y-1.5">
                 <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-                  Unit
+                  Your Unit
                 </Label>
                 <p className="text-body text-text-primary-light dark:text-text-primary-dark">
                   Unit {unit.unit_number}
@@ -270,6 +297,36 @@ export function CreateViolationDialog({
                 onValueChange={setUnitId}
                 placeholder="Select unit..."
               />
+            </div>
+          )}
+
+          {/* Location identifier (resident reports only) */}
+          {isResidentReporting && (
+            <div className="space-y-3 rounded-inner-card border border-stroke-light dark:border-stroke-dark p-3">
+              <p className="text-label font-semibold text-text-primary-light dark:text-text-primary-dark">
+                Where did this happen?
+              </p>
+              <div className="space-y-1.5">
+                <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                  Which unit or lot? (optional)
+                </Label>
+                <UnitPicker
+                  communityId={communityId}
+                  value={reportedUnitId}
+                  onValueChange={setReportedUnitId}
+                  placeholder="Select unit or lot..."
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                  Or describe the location
+                </Label>
+                <Input
+                  value={reportedLocation}
+                  onChange={(e) => setReportedLocation(e.target.value)}
+                  placeholder="e.g., common area near pool, parking lot B"
+                />
+              </div>
             </div>
           )}
 

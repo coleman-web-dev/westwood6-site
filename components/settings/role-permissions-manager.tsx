@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Button } from '@/components/shared/ui/button';
@@ -26,6 +26,8 @@ import {
 import { toast } from 'sonner';
 import { logAuditEvent } from '@/lib/audit';
 import { Plus, Shield, Trash2, Copy, Loader2 } from 'lucide-react';
+import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes';
+import { UnsavedChangesDialog } from '@/components/settings/unsaved-changes-dialog';
 import type { RoleTemplate, PermissionKey } from '@/lib/types/permissions';
 import {
   PERMISSION_KEYS,
@@ -46,6 +48,7 @@ export function RolePermissionsManager() {
   const [newDescription, setNewDescription] = useState('');
   const [cloneFrom, setCloneFrom] = useState<string>('__none__');
   const [memberCounts, setMemberCounts] = useState<Record<string, number>>({});
+  const savedTemplatesRef = useRef<string>('');
 
   const loadData = useCallback(async () => {
     const supabase = createClient();
@@ -53,6 +56,7 @@ export function RolePermissionsManager() {
     // Load templates from community theme
     const stored = (community.theme?.role_templates ?? DEFAULT_ROLE_TEMPLATES) as RoleTemplate[];
     setTemplates(stored);
+    savedTemplatesRef.current = JSON.stringify(stored);
     if (!selectedId && stored.length > 0) {
       setSelectedId(stored[0].id);
     }
@@ -101,6 +105,7 @@ export function RolePermissionsManager() {
     }
 
     setTemplates(updated);
+    savedTemplatesRef.current = JSON.stringify(updated);
     toast.success('Role templates saved.');
     logAuditEvent({
       communityId: community.id,
@@ -142,6 +147,13 @@ export function RolePermissionsManager() {
   async function handleSave() {
     await saveTemplates(templates);
   }
+
+  const isDirty = useMemo(
+    () => JSON.stringify(templates) !== savedTemplatesRef.current,
+    [templates],
+  );
+
+  const unsaved = useUnsavedChanges({ isDirty, onSave: handleSave });
 
   async function handleCreateTemplate() {
     if (!newName.trim()) {
@@ -409,6 +421,7 @@ export function RolePermissionsManager() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <UnsavedChangesDialog {...unsaved} />
     </div>
   );
 }

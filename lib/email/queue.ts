@@ -623,6 +623,59 @@ export async function queueViolationNotice(
 }
 
 /**
+ * Queue a violation report notification email to a specific board member.
+ * Called when a resident reports a violation and the community has notification routing configured.
+ */
+export async function queueViolationReportNotification(
+  communityId: string,
+  communitySlug: string,
+  recipientMemberId: string,
+  recipientEmail: string,
+  recipientName: string,
+  reporterName: string,
+  violationTitle: string,
+  category: string,
+  severity: string,
+  description?: string,
+  reportedLocation?: string,
+  reportedUnitNumber?: string,
+) {
+  const supabase = createAdminClient();
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://duesiq.com';
+
+  const { data: community } = await supabase
+    .from('communities')
+    .select('name')
+    .eq('id', communityId)
+    .single();
+
+  const communityName = community?.name || 'Your Community';
+
+  return queueEmail({
+    communityId,
+    recipientMemberId,
+    recipientEmail,
+    recipientName,
+    category: 'violation_notice' as EmailCategory,
+    priority: 'normal' as EmailPriority,
+    subject: `Violation Report: ${violationTitle}`,
+    templateId: 'violation-report-notification',
+    templateData: {
+      communityName,
+      reporterName,
+      violationTitle,
+      category,
+      severity,
+      description,
+      reportedLocation,
+      reportedUnitNumber,
+      dashboardUrl: `${baseUrl}/${communitySlug}/violations`,
+      unsubscribeUrl: buildUnsubscribeUrl(recipientMemberId, 'violation_notice', communitySlug),
+    },
+  });
+}
+
+/**
  * Queue ballot notification emails for all community members.
  * Variants: 'opened' (voting started), 'closed' (voting ended), 'results_published'.
  */

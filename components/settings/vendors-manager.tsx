@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Trash2, Upload, X, Pencil, Eye, EyeOff, Globe } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -22,6 +22,8 @@ import {
   DialogFooter,
 } from '@/components/shared/ui/dialog';
 import { toast } from 'sonner';
+import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes';
+import { UnsavedChangesDialog } from '@/components/settings/unsaved-changes-dialog';
 import { DEFAULT_VENDORS_DISCLAIMER, DEFAULT_VENDORS_CONFIG } from '@/lib/types/landing';
 import type { CommunityVendor, CommunityVendorsConfig, VendorVisibility } from '@/lib/types/landing';
 import type { CommunityTheme } from '@/lib/types/database';
@@ -207,6 +209,15 @@ export function VendorsManager({ communityId, communityName, communityTheme }: P
       case 'hidden': return <EyeOff className="h-3.5 w-3.5 text-text-muted-light dark:text-text-muted-dark" />;
     }
   }
+
+  const isDirty = useMemo(
+    () =>
+      title !== (config.title ?? '') ||
+      disclaimer !== (config.disclaimer ?? ''),
+    [title, disclaimer, config.title, config.disclaimer],
+  );
+
+  const unsaved = useUnsavedChanges({ isDirty, onSave: handleSaveMeta });
 
   const dialogOpen = editingIndex !== null;
 
@@ -494,6 +505,7 @@ export function VendorsManager({ communityId, communityName, communityTheme }: P
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <UnsavedChangesDialog {...unsaved} />
     </div>
   );
 }

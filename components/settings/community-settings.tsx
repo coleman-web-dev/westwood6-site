@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Button } from '@/components/shared/ui/button';
@@ -15,6 +16,8 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { Collapsible, CollapsibleContent } from '@/components/shared/ui/collapsible';
+import { RadioGroup, RadioGroupItem } from '@/components/shared/ui/radio-group';
+import { Checkbox } from '@/components/shared/ui/checkbox';
 import { toast } from 'sonner';
 import { logAuditEvent } from '@/lib/audit';
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes';
@@ -31,6 +34,7 @@ import { EstoppelManagement } from '@/components/estoppel/estoppel-management';
 
 export function CommunitySettings() {
   const { community, member } = useCommunity();
+  const router = useRouter();
 
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
@@ -64,6 +68,9 @@ export function CommunitySettings() {
   const [autoEscalationEnabled, setAutoEscalationEnabled] = useState(false);
   const [defaultDeadlineDays, setDefaultDeadlineDays] = useState(14);
   const [escalationNoticeType, setEscalationNoticeType] = useState<NoticeType>('final_notice');
+  const [reportNotificationMode, setReportNotificationMode] = useState<'all_board' | 'specific_members' | 'none'>('all_board');
+  const [reportNotificationMemberIds, setReportNotificationMemberIds] = useState<string[]>([]);
+  const [boardMembers, setBoardMembers] = useState<Array<{ id: string; email: string; display_name: string | null }>>([]);
   const [estoppelEnabled, setEstoppelEnabled] = useState(false);
   const [estoppelStandardFee, setEstoppelStandardFee] = useState(25000); // cents ($250)
   const [estoppelExpeditedFeeEnabled, setEstoppelExpeditedFeeEnabled] = useState(true);
@@ -115,6 +122,8 @@ export function CommunitySettings() {
       setAutoEscalationEnabled(vs?.auto_escalation_enabled ?? false);
       setDefaultDeadlineDays(vs?.default_deadline_days ?? 14);
       setEscalationNoticeType(vs?.escalation_notice_type ?? 'final_notice');
+      setReportNotificationMode(vs?.report_notification_mode ?? 'all_board');
+      setReportNotificationMemberIds(vs?.report_notification_member_ids ?? []);
       const es = community.theme?.estoppel_settings as EstoppelSettings | undefined;
       setEstoppelEnabled(es?.enabled ?? false);
       setEstoppelStandardFee(es?.standard_fee ?? 25000);
@@ -137,6 +146,18 @@ export function CommunitySettings() {
           if (data && data.length > 0) {
             setRevenueAccounts(data);
           }
+        });
+
+      // Fetch board members for violation notification routing
+      supabase
+        .from('members')
+        .select('id, email, display_name')
+        .eq('community_id', community.id)
+        .in('system_role', ['board', 'manager', 'super_admin'])
+        .eq('is_approved', true)
+        .order('display_name')
+        .then(({ data }) => {
+          if (data) setBoardMembers(data);
         });
     }
   }, [community]);
@@ -176,6 +197,8 @@ export function CommunitySettings() {
       autoEscalationEnabled !== (community.tenant_permissions?.violation_settings?.auto_escalation_enabled ?? false) ||
       defaultDeadlineDays !== (community.tenant_permissions?.violation_settings?.default_deadline_days ?? 14) ||
       escalationNoticeType !== (community.tenant_permissions?.violation_settings?.escalation_notice_type ?? 'final_notice') ||
+      reportNotificationMode !== (community.tenant_permissions?.violation_settings?.report_notification_mode ?? 'all_board') ||
+      JSON.stringify(reportNotificationMemberIds) !== JSON.stringify(community.tenant_permissions?.violation_settings?.report_notification_member_ids ?? []) ||
       estoppelEnabled !== ((community.theme?.estoppel_settings as EstoppelSettings | undefined)?.enabled ?? false) ||
       estoppelStandardFee !== ((community.theme?.estoppel_settings as EstoppelSettings | undefined)?.standard_fee ?? 25000) ||
       estoppelExpeditedFeeEnabled !== ((community.theme?.estoppel_settings as EstoppelSettings | undefined)?.expedited_fee_enabled ?? true) ||
@@ -195,6 +218,7 @@ export function CommunitySettings() {
     autoGenerateInvoices, autoMarkOverdue, autoNotifyNewInvoices,
     reminderDaysBefore, reminderDaysAfter, arcEnabled, votingConfig,
     autoEscalationEnabled, defaultDeadlineDays, escalationNoticeType,
+    reportNotificationMode, reportNotificationMemberIds,
     estoppelEnabled, estoppelStandardFee, estoppelExpeditedFeeEnabled, estoppelExpeditedFee, estoppelDelinquentSurchargeEnabled, estoppelDelinquentSurcharge, estoppelShowOnLanding, estoppelGlAccount,
     community,
   ]);
@@ -229,6 +253,8 @@ export function CommunitySettings() {
             auto_escalation_enabled: autoEscalationEnabled,
             default_deadline_days: defaultDeadlineDays,
             escalation_notice_type: escalationNoticeType,
+            report_notification_mode: reportNotificationMode,
+            report_notification_member_ids: reportNotificationMode === 'specific_members' ? reportNotificationMemberIds : [],
           },
         },
         theme: {
@@ -293,6 +319,7 @@ export function CommunitySettings() {
       metadata: { name: name.trim() },
     });
     toast.success('Community settings updated.');
+    router.refresh();
   }
 
   const unsaved = useUnsavedChanges({ isDirty, onSave: handleSave });
@@ -531,6 +558,64 @@ export function CommunitySettings() {
               </div>
             </CollapsibleContent>
           </Collapsible>
+
+          {/* Violation report notification routing */}
+          <div className="border-t border-stroke-light dark:border-stroke-dark pt-4 space-y-3">
+            <div>
+              <p className="text-body font-medium text-text-primary-light dark:text-text-primary-dark">
+                Violation Report Notifications
+              </p>
+              <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                Who gets notified when a resident reports a violation?
+              </p>
+            </div>
+            <RadioGroup
+              value={reportNotificationMode}
+              onValueChange={(v) => setReportNotificationMode(v as 'all_board' | 'specific_members' | 'none')}
+              className="space-y-2"
+            >
+              <label className="flex items-center gap-2 cursor-pointer">
+                <RadioGroupItem value="all_board" />
+                <span className="text-body text-text-primary-light dark:text-text-primary-dark">
+                  All board members
+                </span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <RadioGroupItem value="specific_members" />
+                <span className="text-body text-text-primary-light dark:text-text-primary-dark">
+                  Specific members
+                </span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <RadioGroupItem value="none" />
+                <span className="text-body text-text-primary-light dark:text-text-primary-dark">
+                  Nobody
+                </span>
+              </label>
+            </RadioGroup>
+
+            {reportNotificationMode === 'specific_members' && boardMembers.length > 0 && (
+              <div className="ml-6 space-y-2 pt-1">
+                {boardMembers.map((bm) => (
+                  <label key={bm.id} className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={reportNotificationMemberIds.includes(bm.id)}
+                      onCheckedChange={(checked) => {
+                        setReportNotificationMemberIds((prev) =>
+                          checked
+                            ? [...prev, bm.id]
+                            : prev.filter((id) => id !== bm.id)
+                        );
+                      }}
+                    />
+                    <span className="text-body text-text-primary-light dark:text-text-primary-dark">
+                      {bm.display_name || bm.email}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

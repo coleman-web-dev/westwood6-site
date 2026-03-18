@@ -11,7 +11,10 @@ import { ViolationDetailDialog } from '@/components/violations/violation-detail-
 import { ViolationTemplatesManager } from '@/components/violations/violation-templates-manager';
 import type { Violation, ViolationStatus, Unit, ViolationTemplate } from '@/lib/types/database';
 
-export type ViolationWithUnit = Violation & { units?: { unit_number: string } | null };
+export type ViolationWithUnit = Violation & {
+  units?: { unit_number: string } | null;
+  reported_units?: { unit_number: string } | null;
+};
 
 const STATUS_TABS: { value: string; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -41,7 +44,7 @@ export default function ViolationsPage() {
     const supabase = createClient();
     let query = supabase
       .from('violations')
-      .select('*, units(unit_number)')
+      .select('*, units(unit_number), reported_units:units!violations_reported_unit_id_fkey(unit_number)')
       .eq('community_id', community.id)
       .order('created_at', { ascending: false });
 
