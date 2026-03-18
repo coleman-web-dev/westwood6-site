@@ -33,7 +33,13 @@ export function CreateBudgetDialog({
   onCreated,
 }: CreateBudgetDialogProps) {
   const currentYear = new Date().getFullYear();
-  const [fiscalYear, setFiscalYear] = useState(currentYear);
+  // Default to the next fiscal year that doesn't already have a budget
+  const defaultYear = (() => {
+    let year = currentYear;
+    while (existingYears.includes(year)) year++;
+    return year;
+  })();
+  const [fiscalYear, setFiscalYear] = useState(defaultYear);
   const [reserveContribution, setReserveContribution] = useState('');
   const [saving, setSaving] = useState(false);
 
