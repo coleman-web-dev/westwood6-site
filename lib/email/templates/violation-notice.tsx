@@ -51,9 +51,14 @@ export function ViolationNoticeEmail({
 
       <Section style={ctaStyle}>
         <Link href={dashboardUrl} style={buttonStyle}>
-          View Details
+          View & Respond
         </Link>
       </Section>
+
+      <Text style={disclaimerStyle}>
+        Please do not reply to this email. To respond to this violation or provide
+        documentation, use the link above to view the violation on your community portal.
+      </Text>
     </EmailLayout>
   );
 }
@@ -108,4 +113,13 @@ const buttonStyle: React.CSSProperties = {
   fontSize: '14px',
   fontWeight: '600',
   display: 'inline-block',
+};
+
+const disclaimerStyle: React.CSSProperties = {
+  fontSize: '12px',
+  color: '#8888a0',
+  lineHeight: '18px',
+  margin: '24px 0 0 0',
+  textAlign: 'center' as const,
+  fontStyle: 'italic',
 };
