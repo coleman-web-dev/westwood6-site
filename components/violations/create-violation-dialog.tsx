@@ -55,7 +55,7 @@ export function CreateViolationDialog({
   communitySlug,
   onCreated,
 }: CreateViolationDialogProps) {
-  const { member, unit, actualIsBoard } = useCommunity();
+  const { member, unit, isBoard, actualIsBoard } = useCommunity();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [unitId, setUnitId] = useState('');
   const [category, setCategory] = useState<ViolationCategory>('other');
@@ -83,8 +83,8 @@ export function CreateViolationDialog({
   }
 
   // Residents auto-select their own unit; board picks from dropdown.
-  // Use actualIsBoard so board members in personal view still get the unit picker.
-  const isResidentReporting = !actualIsBoard;
+  // Uses isBoard (respects view mode) so board members can preview the resident experience.
+  const isResidentReporting = !isBoard;
   const effectiveUnitId = isResidentReporting ? unit?.id ?? '' : unitId;
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -282,7 +282,7 @@ export function CreateViolationDialog({
 
         <div className="space-y-4 py-2">
           {/* Template selector (board only) */}
-          {actualIsBoard && templates.length > 0 && (
+          {isBoard && templates.length > 0 && (
             <div className="space-y-1.5">
               <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
                 Use Template
@@ -358,7 +358,7 @@ export function CreateViolationDialog({
             />
           </div>
 
-          <div className={actualIsBoard ? 'grid grid-cols-2 gap-4' : ''}>
+          <div className={isBoard ? 'grid grid-cols-2 gap-4' : ''}>
             <div className="space-y-1.5">
               <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
                 Category
@@ -379,7 +379,7 @@ export function CreateViolationDialog({
               </Select>
             </div>
 
-            {actualIsBoard && (
+            {isBoard && (
               <div className="space-y-1.5">
                 <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
                   Severity
@@ -413,7 +413,7 @@ export function CreateViolationDialog({
           </div>
 
           {/* Compliance deadline (board only) */}
-          {actualIsBoard && (
+          {isBoard && (
             <div className="space-y-1.5">
               <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
                 Compliance Deadline

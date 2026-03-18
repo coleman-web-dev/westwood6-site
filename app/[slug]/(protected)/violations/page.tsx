@@ -110,7 +110,7 @@ export default function ViolationsPage() {
           )}
           {showCreateButton && (
             <Button onClick={() => setCreateOpen(true)}>
-              Report Violation
+              {isBoard ? 'Report Violation' : 'Report an Issue'}
             </Button>
           )}
         </div>
