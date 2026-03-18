@@ -16,6 +16,8 @@ import {
 import type { CsvColumn } from '@/lib/utils/export-csv';
 import type { Member, DocumentFolder } from '@/lib/types/database';
 
+type NoteCountMap = Record<string, number>;
+
 type SortOption =
   | 'last_name_asc'
   | 'last_name_desc'
@@ -56,6 +58,7 @@ export default function DirectoryPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('last_name_asc');
+  const [noteCounts, setNoteCounts] = useState<NoteCountMap>({});
 
   const canView = isBoard || community.tenant_permissions?.can_view_directory;
 
@@ -82,6 +85,22 @@ export default function DirectoryPage() {
       const { data } = await query;
       setMembers((data as DirectoryMember[]) ?? []);
       setLoading(false);
+
+      // Fetch note counts for board members
+      if (isBoard) {
+        const { data: notesData } = await supabase
+          .from('member_notes')
+          .select('member_id')
+          .eq('community_id', community.id);
+
+        if (notesData) {
+          const counts: NoteCountMap = {};
+          for (const n of notesData as { member_id: string }[]) {
+            counts[n.member_id] = (counts[n.member_id] || 0) + 1;
+          }
+          setNoteCounts(counts);
+        }
+      }
     }
 
     fetchMembers();
@@ -137,6 +156,13 @@ export default function DirectoryPage() {
       }
     });
   }, [members, search, sortBy]);
+
+  const handleNoteCountChange = useCallback((memberId: string, delta: number) => {
+    setNoteCounts((prev) => ({
+      ...prev,
+      [memberId]: Math.max(0, (prev[memberId] || 0) + delta),
+    }));
+  }, []);
 
   if (!canView) {
     return (
@@ -227,6 +253,9 @@ export default function DirectoryPage() {
                   ? `/${community.slug}/household?unit=${m.unit_id}`
                   : undefined
               }
+              isBoard={isBoard}
+              noteCount={noteCounts[m.id] || 0}
+              onNoteCountChange={handleNoteCountChange}
             />
           ))}
         </div>
