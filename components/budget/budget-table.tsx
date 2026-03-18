@@ -60,81 +60,76 @@ export function BudgetTable({ budget, lineItems, onUpdated }: BudgetTableProps) 
     onUpdated();
   }
 
-  function renderSection(title: string, items: BudgetLineItem[]) {
+  function renderSectionRows(title: string, items: BudgetLineItem[]) {
     const totalBudgeted = items.reduce((s, i) => s + i.budgeted_amount, 0);
     const totalActual = items.reduce((s, i) => s + i.actual_amount, 0);
 
     return (
-      <div>
-        <h3 className="text-section-title text-text-primary-light dark:text-text-primary-dark mb-3">
-          {title}
-        </h3>
+      <>
+        {/* Section header */}
+        <tr>
+          <td colSpan={6} className="pt-6 pb-2">
+            <span className="text-section-title text-text-primary-light dark:text-text-primary-dark">
+              {title}
+            </span>
+          </td>
+        </tr>
         {items.length === 0 ? (
-          <p className="text-meta text-text-muted-light dark:text-text-muted-dark">No items.</p>
+          <tr>
+            <td colSpan={6} className="py-2 text-meta text-text-muted-light dark:text-text-muted-dark">
+              No items.
+            </td>
+          </tr>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-body">
-              <thead>
-                <tr className="text-left text-meta text-text-muted-light dark:text-text-muted-dark border-b border-stroke-light dark:border-stroke-dark">
-                  <th className="pb-2 pr-4">Category</th>
-                  <th className="pb-2 pr-4">Name</th>
-                  <th className="pb-2 pr-4 text-right">Budgeted</th>
-                  <th className="pb-2 pr-4 text-right">Actual</th>
-                  <th className="pb-2 pr-4 text-right">Variance</th>
-                  <th className="pb-2 w-10"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item) => {
-                  const variance = item.actual_amount - item.budgeted_amount;
-                  return (
-                    <tr key={item.id} className="border-b border-stroke-light/50 dark:border-stroke-dark/50">
-                      <td className="py-2 pr-4 text-text-secondary-light dark:text-text-secondary-dark">
-                        {CATEGORY_LABELS[item.category] || item.category}
-                      </td>
-                      <td className="py-2 pr-4 text-text-primary-light dark:text-text-primary-dark">
-                        {item.name}
-                      </td>
-                      <td className="py-2 pr-4 text-right tabular-nums">
-                        ${fmt(item.budgeted_amount)}
-                      </td>
-                      <td className="py-2 pr-4 text-right tabular-nums">
-                        ${fmt(item.actual_amount)}
-                      </td>
-                      <td className={`py-2 pr-4 text-right tabular-nums ${variance > 0 ? 'text-red-600 dark:text-red-400' : variance < 0 ? 'text-green-600 dark:text-green-400' : ''}`}>
-                        {variance === 0 ? '-' : `${variance > 0 ? '+' : ''}$${fmt(Math.abs(variance))}`}
-                      </td>
-                      <td className="py-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(item.id)}
-                          disabled={deletingId === item.id}
-                          className="h-7 w-7 p-0 text-text-muted-light dark:text-text-muted-dark hover:text-destructive"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })}
-                <tr className="font-semibold">
-                  <td className="py-2 pr-4" colSpan={2}>Total</td>
-                  <td className="py-2 pr-4 text-right tabular-nums">${fmt(totalBudgeted)}</td>
-                  <td className="py-2 pr-4 text-right tabular-nums">${fmt(totalActual)}</td>
-                  <td className="py-2 pr-4 text-right tabular-nums">
-                    {(() => {
-                      const v = totalActual - totalBudgeted;
-                      return v === 0 ? '-' : `${v > 0 ? '+' : ''}$${fmt(Math.abs(v))}`;
-                    })()}
+          <>
+            {items.map((item) => {
+              const variance = item.actual_amount - item.budgeted_amount;
+              return (
+                <tr key={item.id} className="border-b border-stroke-light/50 dark:border-stroke-dark/50">
+                  <td className="py-2 pr-4 text-text-secondary-light dark:text-text-secondary-dark">
+                    {CATEGORY_LABELS[item.category] || item.category}
                   </td>
-                  <td></td>
+                  <td className="py-2 pr-4 text-text-primary-light dark:text-text-primary-dark">
+                    {item.name}
+                  </td>
+                  <td className="py-2 pr-4 text-right tabular-nums">
+                    ${fmt(item.budgeted_amount)}
+                  </td>
+                  <td className="py-2 pr-4 text-right tabular-nums">
+                    ${fmt(item.actual_amount)}
+                  </td>
+                  <td className={`py-2 pr-4 text-right tabular-nums ${variance > 0 ? 'text-red-600 dark:text-red-400' : variance < 0 ? 'text-green-600 dark:text-green-400' : ''}`}>
+                    {variance === 0 ? '-' : `${variance > 0 ? '+' : ''}$${fmt(Math.abs(variance))}`}
+                  </td>
+                  <td className="py-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDelete(item.id)}
+                      disabled={deletingId === item.id}
+                      className="h-7 w-7 p-0 text-text-muted-light dark:text-text-muted-dark hover:text-destructive"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </td>
                 </tr>
-              </tbody>
-            </table>
-          </div>
+              );
+            })}
+            <tr className="font-semibold border-b border-stroke-light dark:border-stroke-dark">
+              <td className="py-2 pr-4" colSpan={2}>Total</td>
+              <td className="py-2 pr-4 text-right tabular-nums">${fmt(totalBudgeted)}</td>
+              <td className="py-2 pr-4 text-right tabular-nums">${fmt(totalActual)}</td>
+              <td className="py-2 pr-4 text-right tabular-nums">
+                {(() => {
+                  const v = totalActual - totalBudgeted;
+                  return v === 0 ? '-' : `${v > 0 ? '+' : ''}$${fmt(Math.abs(v))}`;
+                })()}
+              </td>
+              <td></td>
+            </tr>
+          </>
         )}
-      </div>
+      </>
     );
   }
 
@@ -156,8 +151,32 @@ export function BudgetTable({ budget, lineItems, onUpdated }: BudgetTableProps) 
         </div>
       </div>
 
-      {renderSection('Income', incomeItems)}
-      {renderSection('Expenses', expenseItems)}
+      <div className="overflow-x-auto">
+        <table className="w-full text-body" style={{ tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: '15%' }} />
+            <col />
+            <col style={{ width: '140px' }} />
+            <col style={{ width: '140px' }} />
+            <col style={{ width: '140px' }} />
+            <col style={{ width: '40px' }} />
+          </colgroup>
+          <thead>
+            <tr className="text-left text-meta text-text-muted-light dark:text-text-muted-dark border-b border-stroke-light dark:border-stroke-dark">
+              <th className="pb-2 pr-4">Category</th>
+              <th className="pb-2 pr-4">Name</th>
+              <th className="pb-2 pr-4 text-right">Budgeted</th>
+              <th className="pb-2 pr-4 text-right">Actual</th>
+              <th className="pb-2 pr-4 text-right">Variance</th>
+              <th className="pb-2"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {renderSectionRows('Income', incomeItems)}
+            {renderSectionRows('Expenses', expenseItems)}
+          </tbody>
+        </table>
+      </div>
 
       <AddLineItemDialog
         open={addOpen}
