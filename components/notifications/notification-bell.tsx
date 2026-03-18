@@ -12,7 +12,7 @@ import {
   PopoverTrigger,
 } from '@/components/shared/ui/popover';
 import { ScrollArea } from '@/components/shared/ui/scroll-area';
-import { BellIcon, FileSignature, CalendarCheck, CheckCheck, Vote, Users, ShieldAlert, ClipboardList, Wrench, CreditCard, Receipt, CircleCheck, CircleX, Wallet } from 'lucide-react';
+import { BellIcon, FileSignature, CalendarCheck, CheckCheck, Vote, Users, ShieldAlert, ClipboardList, Wrench, CreditCard, Receipt, CircleCheck, CircleX, Wallet, MessageSquare } from 'lucide-react';
 import { SignedAgreementViewer } from '@/components/amenities/signed-agreement-viewer';
 import type { Notification, NotificationType } from '@/lib/types/database';
 
@@ -29,6 +29,7 @@ const TYPE_ICON: Record<NotificationType, React.ReactNode> = {
   proxy_requested: <Users className="h-4 w-4 text-secondary-500" />,
   proxy_granted: <Users className="h-4 w-4 text-green-500" />,
   violation_created: <ShieldAlert className="h-4 w-4 text-red-500" />,
+  violation_response: <MessageSquare className="h-4 w-4 text-secondary-500" />,
   arc_request_submitted: <ClipboardList className="h-4 w-4 text-secondary-500" />,
   maintenance_request_submitted: <Wrench className="h-4 w-4 text-secondary-500" />,
   payment_failed: <CreditCard className="h-4 w-4 text-red-500" />,

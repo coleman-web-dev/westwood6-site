@@ -26,6 +26,8 @@ import { toast } from 'sonner';
 import { logAuditEvent } from '@/lib/audit';
 import { NoticeHistory } from '@/components/violations/notice-history';
 import { IssueFineDialog } from '@/components/violations/issue-fine-dialog';
+import { ViolationResponseThread } from '@/components/violations/violation-response-thread';
+import { PayInvoiceButton } from '@/components/payments/pay-invoice-button';
 import { sendViolationNoticeEmail } from '@/lib/actions/violation-actions';
 import {
   AlertDialog,
@@ -502,36 +504,49 @@ export function ViolationDetailDialog({
             </div>
           )}
 
-          {/* Fines display (resident read-only) */}
+          {/* Fines display (resident view with pay buttons) */}
           {!isBoard && fines.length > 0 && (
             <div className="border-t border-stroke-light dark:border-stroke-dark pt-4 space-y-3">
               <h4 className="text-card-title text-text-primary-light dark:text-text-primary-dark">
                 Fines
               </h4>
               <div className="space-y-2">
-                {fines.map((f) => (
-                  <div
-                    key={f.id}
-                    className="flex items-center justify-between px-3 py-2 rounded-inner-card bg-surface-light-2 dark:bg-surface-dark-2"
-                  >
-                    <div>
-                      <p className="text-label text-text-primary-light dark:text-text-primary-dark">
-                        {f.title}
-                      </p>
-                      <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                        Due {new Date(f.due_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </p>
+                {fines.map((f) => {
+                  const canPay = ['pending', 'overdue', 'partial'].includes(f.status);
+                  const remaining = f.amount - (f.amount_paid ?? 0);
+                  return (
+                    <div
+                      key={f.id}
+                      className="px-3 py-2 rounded-inner-card bg-surface-light-2 dark:bg-surface-dark-2 space-y-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-label text-text-primary-light dark:text-text-primary-dark">
+                            {f.title}
+                          </p>
+                          <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                            Due {new Date(f.due_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-label text-text-primary-light dark:text-text-primary-dark">
+                            ${(f.amount / 100).toFixed(2)}
+                          </p>
+                          <Badge variant={f.status === 'paid' ? 'secondary' : f.status === 'overdue' ? 'destructive' : 'default'} className="text-[10px]">
+                            {f.status}
+                          </Badge>
+                        </div>
+                      </div>
+                      {canPay && remaining > 0 && (
+                        <PayInvoiceButton
+                          invoiceId={f.id}
+                          communityId={community.id}
+                          amount={remaining}
+                        />
+                      )}
                     </div>
-                    <div className="text-right">
-                      <p className="text-label text-text-primary-light dark:text-text-primary-dark">
-                        ${(f.amount / 100).toFixed(2)}
-                      </p>
-                      <Badge variant={f.status === 'paid' ? 'secondary' : f.status === 'overdue' ? 'destructive' : 'default'} className="text-[10px]">
-                        {f.status}
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -540,6 +555,16 @@ export function ViolationDetailDialog({
           {notices.length > 0 && (
             <div className="border-t border-stroke-light dark:border-stroke-dark pt-4">
               <NoticeHistory notices={notices} />
+            </div>
+          )}
+
+          {/* Response thread */}
+          {violation && (
+            <div className="border-t border-stroke-light dark:border-stroke-dark pt-4">
+              <ViolationResponseThread
+                violationId={violation.id}
+                communityId={community.id}
+              />
             </div>
           )}
         </div>

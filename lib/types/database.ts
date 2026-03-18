@@ -749,6 +749,7 @@ export type NotificationType =
   | 'proxy_requested'
   | 'proxy_granted'
   | 'violation_created'
+  | 'violation_response'
   | 'arc_request_submitted'
   | 'maintenance_request_submitted'
   | 'payment_failed'
@@ -1002,6 +1003,18 @@ export interface ViolationNotice {
   delivery_method: DeliveryMethod;
   notes: string | null;
   created_at: string;
+}
+
+export interface ViolationResponse {
+  id: string;
+  violation_id: string;
+  community_id: string;
+  posted_by: string;
+  body: string;
+  attachment_urls: string[];
+  created_at: string;
+  updated_at: string;
+  author?: Pick<Member, 'id' | 'first_name' | 'last_name' | 'member_role' | 'system_role'>;
 }
 
 // ─── ARC Requests ───────────────────────────────────
