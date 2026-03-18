@@ -15,6 +15,7 @@ import {
   postManualWalletDebit,
   postAmenityDepositReturned,
   postAmenityDepositRetained,
+  postOverpaymentWalletCredit,
 } from '@/lib/utils/accounting-entries';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
@@ -344,6 +345,23 @@ export async function postPaymentReceivedAction(
     return { success: true };
   } catch (error) {
     console.error('Failed to post payment received journal entry:', error);
+    return { success: false };
+  }
+}
+
+// ─── Overpayment Wallet Credit ────────────────────────────────────
+
+export async function postOverpaymentWalletCreditAction(
+  communityId: string,
+  invoiceId: string,
+  unitId: string,
+  amount: number,
+) {
+  try {
+    await postOverpaymentWalletCredit(communityId, invoiceId, unitId, amount);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to post overpayment wallet credit journal entry:', error);
     return { success: false };
   }
 }

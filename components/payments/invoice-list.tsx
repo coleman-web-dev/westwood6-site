@@ -27,9 +27,10 @@ import {
   AlertDialogTitle,
 } from '@/components/shared/ui/alert-dialog';
 import { downloadCsv } from '@/lib/utils/export-csv';
-import { postInvoiceWaivedAction, postInvoiceVoidedAction, postPaymentReceivedAction } from '@/lib/actions/accounting-actions';
+import { postInvoiceWaivedAction, postInvoiceVoidedAction } from '@/lib/actions/accounting-actions';
 import { logAuditEvent } from '@/lib/audit';
 import { BounceInvoiceDialog } from '@/components/payments/bounce-invoice-dialog';
+import { RecordPaymentDialog } from '@/components/payments/record-payment-dialog';
 import { PayInvoiceButton } from '@/components/payments/pay-invoice-button';
 import type { Invoice, InvoiceStatus, Unit } from '@/lib/types/database';
 
@@ -81,6 +82,7 @@ export function InvoiceList({
   const [dateTo, setDateTo] = useState('');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [bouncingInvoice, setBouncingInvoice] = useState<Invoice | null>(null);
+  const [recordingPaymentInvoice, setRecordingPaymentInvoice] = useState<Invoice | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkAction, setBulkAction] = useState<string | null>(null);
   const [bulkProcessing, setBulkProcessing] = useState(false);
@@ -113,36 +115,6 @@ export function InvoiceList({
     if (dateTo && inv.due_date > dateTo) return false;
     return true;
   });
-
-  async function handleMarkPaid(invoice: Invoice) {
-    setUpdatingId(invoice.id);
-    const supabase = createClient();
-
-    const { error } = await supabase
-      .from('invoices')
-      .update({ status: 'paid', paid_at: new Date().toISOString(), amount_paid: invoice.amount })
-      .eq('id', invoice.id);
-
-    setUpdatingId(null);
-
-    if (error) {
-      toast.error('Failed to mark invoice as paid. Please try again.');
-      return;
-    }
-
-    toast.success('Invoice marked as paid.');
-    logAuditEvent({
-      communityId: community.id,
-      actorId: member?.user_id,
-      actorEmail: member?.email,
-      action: 'invoice_marked_paid',
-      targetType: 'invoice',
-      targetId: invoice.id,
-      metadata: { title: invoice.title, amount: invoice.amount },
-    });
-    await postPaymentReceivedAction(community.id, invoice.id, invoice.unit_id, invoice.amount, invoice.title);
-    onInvoiceUpdated();
-  }
 
   async function handleMarkWaived(invoice: Invoice) {
     setUpdatingId(invoice.id);
@@ -616,10 +588,10 @@ export function InvoiceList({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleMarkPaid(invoice)}
+                    onClick={() => setRecordingPaymentInvoice(invoice)}
                     disabled={isUpdating}
                   >
-                    {isUpdating ? 'Updating...' : 'Mark as Paid'}
+                    Record Payment
                   </Button>
                   <Button
                     variant="ghost"
@@ -658,6 +630,15 @@ export function InvoiceList({
           );
         })
       )}
+
+      {/* Record payment dialog */}
+      <RecordPaymentDialog
+        invoice={recordingPaymentInvoice}
+        open={recordingPaymentInvoice !== null}
+        onOpenChange={(open) => { if (!open) setRecordingPaymentInvoice(null); }}
+        onSuccess={onInvoiceUpdated}
+        unitOwnerName={recordingPaymentInvoice ? unitOwnerMap?.[recordingPaymentInvoice.unit_id] : undefined}
+      />
 
       {/* Bounce invoice dialog */}
       <BounceInvoiceDialog
