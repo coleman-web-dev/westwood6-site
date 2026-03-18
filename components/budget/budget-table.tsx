@@ -4,8 +4,9 @@ import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/shared/ui/button';
 import { toast } from 'sonner';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Upload } from 'lucide-react';
 import { AddLineItemDialog } from '@/components/budget/add-line-item-dialog';
+import { ImportBudgetDialog } from '@/components/budget/import-budget-dialog';
 import type { Budget, BudgetLineItem, BudgetCategory } from '@/lib/types/database';
 
 const CATEGORY_LABELS: Record<BudgetCategory, string> = {
@@ -31,6 +32,7 @@ interface BudgetTableProps {
 
 export function BudgetTable({ budget, lineItems, onUpdated }: BudgetTableProps) {
   const [addOpen, setAddOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const incomeItems = lineItems.filter((i) => i.is_income);
@@ -138,10 +140,16 @@ export function BudgetTable({ budget, lineItems, onUpdated }: BudgetTableProps) 
         <h2 className="text-card-title text-text-primary-light dark:text-text-primary-dark">
           Line Items
         </h2>
-        <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" />
-          Add Item
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+            <Upload className="h-4 w-4 mr-1" />
+            Import
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            Add Item
+          </Button>
+        </div>
       </div>
 
       {renderSection('Income', incomeItems)}
@@ -152,6 +160,13 @@ export function BudgetTable({ budget, lineItems, onUpdated }: BudgetTableProps) 
         onOpenChange={setAddOpen}
         budgetId={budget.id}
         onCreated={onUpdated}
+      />
+
+      <ImportBudgetDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        budgetId={budget.id}
+        onImported={onUpdated}
       />
     </div>
   );
