@@ -8,13 +8,33 @@ import { useCommunity } from '@/lib/providers/community-provider';
 import { searchLinks } from '@/data/config/searchLinks';
 import type { Announcement, Document as DocType } from '@/lib/types/database';
 
+interface MemberRow {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string | null;
+  phone: string | null;
+  member_role: string;
+  system_role: string;
+  units: { unit_number: string; address: string | null } | null;
+}
+
+interface UnitRow {
+  id: string;
+  unit_number: string;
+  address: string | null;
+  status: string;
+}
+
 export function SearchProviderWrapper({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { community, isBoard, member } = useCommunity();
+  const { community, isBoard } = useCommunity();
   const basePath = `/${community.slug}`;
 
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [documents, setDocuments] = useState<DocType[]>([]);
+  const [members, setMembers] = useState<MemberRow[]>([]);
+  const [units, setUnits] = useState<UnitRow[]>([]);
 
   // Fetch community data for dynamic actions
   useEffect(() => {
@@ -35,6 +55,23 @@ export function SearchProviderWrapper({ children }: { children: React.ReactNode 
       .order('created_at', { ascending: false })
       .limit(20)
       .then(({ data }) => setDocuments((data as DocType[]) || []));
+
+    // Fetch members with their unit info
+    supabase
+      .from('members')
+      .select('id, first_name, last_name, email, phone, member_role, system_role, units(unit_number, address)')
+      .eq('community_id', community.id)
+      .eq('is_approved', true)
+      .order('last_name', { ascending: true })
+      .then(({ data }) => setMembers((data as MemberRow[]) || []));
+
+    // Fetch units
+    supabase
+      .from('units')
+      .select('id, unit_number, address, status')
+      .eq('community_id', community.id)
+      .order('unit_number', { ascending: true })
+      .then(({ data }) => setUnits((data as UnitRow[]) || []));
   }, [community.id]);
 
   // Build actions
@@ -66,8 +103,65 @@ export function SearchProviderWrapper({ children }: { children: React.ReactNode 
       perform: () => router.push(`${basePath}/documents`),
     }));
 
-    return [...navActions, ...announcementActions, ...documentActions];
-  }, [basePath, router, announcements, documents]);
+    // Member actions - searchable by name, email, unit number, address
+    const memberActions = members.map((m) => {
+      const name = `${m.first_name} ${m.last_name}`;
+      const unitInfo = m.units ? `Lot ${m.units.unit_number}` : '';
+      const keywords = [
+        'member resident',
+        m.email ?? '',
+        m.phone ?? '',
+        m.units?.unit_number ?? '',
+        m.units?.address ?? '',
+        m.member_role,
+      ]
+        .filter(Boolean)
+        .join(' ');
+
+      return {
+        id: `member-${m.id}`,
+        name: unitInfo ? `${name} (${unitInfo})` : name,
+        keywords,
+        section: 'Members',
+        subtitle: m.email ?? undefined,
+        perform: () => router.push(`${basePath}/household`),
+      };
+    });
+
+    // Unit / lot actions - searchable by lot number and address
+    const unitActions = units.map((u) => {
+      const name = u.address
+        ? `Lot ${u.unit_number} - ${u.address}`
+        : `Lot ${u.unit_number}`;
+      const keywords = [
+        'lot unit address home',
+        u.unit_number,
+        u.address ?? '',
+        u.status,
+      ]
+        .filter(Boolean)
+        .join(' ');
+
+      return {
+        id: `unit-${u.id}`,
+        name,
+        keywords,
+        section: 'Lots',
+        perform: () =>
+          isBoard
+            ? router.push(`${basePath}/household?unit=${u.unit_number}`)
+            : router.push(`${basePath}/household`),
+      };
+    });
+
+    return [
+      ...navActions,
+      ...memberActions,
+      ...unitActions,
+      ...announcementActions,
+      ...documentActions,
+    ];
+  }, [basePath, router, announcements, documents, members, units, isBoard]);
 
   useRegisterActions(actions, [actions]);
 
