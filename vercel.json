@@ -43,6 +43,10 @@
     {
       "path": "/api/cron/violation-escalation",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/lease-notifications",
+      "schedule": "0 9 * * *"
     }
   ]
 }

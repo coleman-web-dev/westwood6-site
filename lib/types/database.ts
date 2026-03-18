@@ -165,6 +165,7 @@ export interface Community {
       report_notification_member_ids?: string[];
     };
   };
+  default_lease_notification_rules: LeaseNotificationRule[];
   created_at: string;
   archived_at: string | null;
 }
@@ -179,6 +180,27 @@ export interface Unit {
   preferred_billing_day: number | null;
   stripe_subscription_id?: string | null;
   stripe_subscription_status?: string | null;
+  is_leased: boolean;
+  lease_document_path: string | null;
+  lease_start_date: string | null;
+  lease_expiration_date: string | null;
+  lease_notification_rules: LeaseNotificationRule[];
+  created_at: string;
+}
+
+export interface LeaseNotificationRule {
+  days_before: number;
+}
+
+export interface HouseholdDocument {
+  id: string;
+  community_id: string;
+  unit_id: string;
+  title: string;
+  description: string | null;
+  file_path: string;
+  file_type: string | null;
+  uploaded_by: string;
   created_at: string;
 }
 

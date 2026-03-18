@@ -11,6 +11,8 @@ import { SignedAgreementsSection } from '@/components/household/signed-agreement
 import { HouseholdFinancialSummary } from '@/components/household/household-financial-summary';
 import { HouseholdVotingHistory } from '@/components/household/household-voting-history';
 import { HouseholdPaymentHistory } from '@/components/household/household-payment-history';
+import { HouseholdDocuments } from '@/components/household/household-documents';
+import { LeaseSection } from '@/components/household/lease-section';
 import { AddUnitDialog } from '@/components/household/add-unit-dialog';
 import { EditUnitDialog } from '@/components/household/edit-unit-dialog';
 import { Home, FileSignature, Check, ChevronsUpDown, ArrowLeft, Plus, Pencil } from 'lucide-react';
@@ -332,9 +334,24 @@ export default function HouseholdPage() {
         </div>
       )}
 
+      {/* Lease management (below unit info card) */}
+      {activeUnit && (
+        <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding">
+          <LeaseSection
+            unit={activeUnit}
+            onUnitUpdated={(updated) => {
+              if (isBoard) {
+                setAllUnits((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+              }
+              setSelectedUnit(updated);
+            }}
+          />
+        </div>
+      )}
+
       {/* Two-column layout */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Left column: Members + Agreements */}
+        {/* Left column: Members + Agreements + Documents */}
         <div className="space-y-6">
           <MemberList
             members={members}
@@ -354,6 +371,12 @@ export default function HouseholdPage() {
                 </h2>
               </div>
               <SignedAgreementsSection unitId={activeUnit.id} />
+            </div>
+          )}
+
+          {activeUnit && (
+            <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding">
+              <HouseholdDocuments unitId={activeUnit.id} />
             </div>
           )}
         </div>

@@ -18,6 +18,7 @@ export const SearchProvider = ({ children }) => {
   return (
     <KBarSearchProvider
       kbarConfig={{
+        searchDocumentsPath: '',
         defaultActions,
       }}
     >
