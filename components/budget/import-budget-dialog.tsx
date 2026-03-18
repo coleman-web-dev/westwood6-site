@@ -251,10 +251,10 @@ export function ImportBudgetDialog({
                 {items.length} items
               </span>
               <span className="text-green-600 dark:text-green-400">
-                Income: ${(incomeTotal / 100).toFixed(2)}
+                Income: ${(incomeTotal / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
               <span className="text-red-600 dark:text-red-400">
-                Expenses: ${(expenseTotal / 100).toFixed(2)}
+                Expenses: ${(expenseTotal / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
 

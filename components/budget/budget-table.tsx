@@ -9,6 +9,10 @@ import { AddLineItemDialog } from '@/components/budget/add-line-item-dialog';
 import { ImportBudgetDialog } from '@/components/budget/import-budget-dialog';
 import type { Budget, BudgetLineItem, BudgetCategory } from '@/lib/types/database';
 
+function fmt(cents: number): string {
+  return (cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 const CATEGORY_LABELS: Record<BudgetCategory, string> = {
   dues: 'Dues',
   assessments: 'Assessments',
@@ -92,13 +96,13 @@ export function BudgetTable({ budget, lineItems, onUpdated }: BudgetTableProps) 
                         {item.name}
                       </td>
                       <td className="py-2 pr-4 text-right tabular-nums">
-                        ${(item.budgeted_amount / 100).toFixed(2)}
+                        ${fmt(item.budgeted_amount)}
                       </td>
                       <td className="py-2 pr-4 text-right tabular-nums">
-                        ${(item.actual_amount / 100).toFixed(2)}
+                        ${fmt(item.actual_amount)}
                       </td>
                       <td className={`py-2 pr-4 text-right tabular-nums ${variance > 0 ? 'text-red-600 dark:text-red-400' : variance < 0 ? 'text-green-600 dark:text-green-400' : ''}`}>
-                        {variance === 0 ? '-' : `${variance > 0 ? '+' : ''}$${(variance / 100).toFixed(2)}`}
+                        {variance === 0 ? '-' : `${variance > 0 ? '+' : ''}$${fmt(Math.abs(variance))}`}
                       </td>
                       <td className="py-2">
                         <Button
@@ -116,12 +120,12 @@ export function BudgetTable({ budget, lineItems, onUpdated }: BudgetTableProps) 
                 })}
                 <tr className="font-semibold">
                   <td className="py-2 pr-4" colSpan={2}>Total</td>
-                  <td className="py-2 pr-4 text-right tabular-nums">${(totalBudgeted / 100).toFixed(2)}</td>
-                  <td className="py-2 pr-4 text-right tabular-nums">${(totalActual / 100).toFixed(2)}</td>
+                  <td className="py-2 pr-4 text-right tabular-nums">${fmt(totalBudgeted)}</td>
+                  <td className="py-2 pr-4 text-right tabular-nums">${fmt(totalActual)}</td>
                   <td className="py-2 pr-4 text-right tabular-nums">
                     {(() => {
                       const v = totalActual - totalBudgeted;
-                      return v === 0 ? '-' : `${v > 0 ? '+' : ''}$${(v / 100).toFixed(2)}`;
+                      return v === 0 ? '-' : `${v > 0 ? '+' : ''}$${fmt(Math.abs(v))}`;
                     })()}
                   </td>
                   <td></td>
