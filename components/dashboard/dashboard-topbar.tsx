@@ -32,10 +32,15 @@ export function DashboardTopbar({ onMenuClick }: DashboardTopbarProps) {
         <MenuIcon className="w-5 h-5" />
       </button>
 
-      {/* Title */}
-      <h1 className="text-[18px] sm:text-page-title text-text-primary-light dark:text-text-primary-dark">
-        Dashboard
-      </h1>
+      {/* Greeting */}
+      <div className="min-w-0">
+        <p className="text-meta text-text-muted-light dark:text-text-muted-dark leading-tight truncate hidden sm:block">
+          {community.name}
+        </p>
+        <h1 className="text-[18px] sm:text-page-title text-text-primary-light dark:text-text-primary-dark leading-tight truncate">
+          Hi, {member?.first_name || 'there'}!
+        </h1>
+      </div>
 
       {/* View mode toggle (board members only) */}
       {actualIsBoard && (
