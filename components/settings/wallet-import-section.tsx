@@ -47,6 +47,7 @@ interface AddressBalance {
   netCents: number;
   credits: number;
   charges: number;
+  invoicesCents: number; // amounts owed from invoice-type rows
   txCount: number;
   rows: ParsedWalletRow[];
 }
@@ -104,6 +105,19 @@ function parseWalletCSV(text: string): ParsedWalletRow[] {
   });
 }
 
+/**
+ * Detect if a row is an invoice (bill/amount owed) rather than a wallet transaction.
+ * Invoice rows have no household name and # prefixed transaction IDs.
+ * Their positive amounts represent money OWED, not credits.
+ */
+function isInvoiceRow(row: ParsedWalletRow): boolean {
+  // No household name + # prefixed ID = invoice created in Membershine
+  if (!row.household && row.txId.startsWith('#')) return true;
+  // "Past Due" in name with no household = definitely an invoice
+  if (!row.household && row.name.toLowerCase().includes('past due')) return true;
+  return false;
+}
+
 function computeBalances(rows: ParsedWalletRow[]): AddressBalance[] {
   const active = rows.filter((r) => !r.voided);
   const byAddress: Record<string, AddressBalance> = {};
@@ -118,6 +132,7 @@ function computeBalances(rows: ParsedWalletRow[]): AddressBalance[] {
         netCents: 0,
         credits: 0,
         charges: 0,
+        invoicesCents: 0,
         txCount: 0,
         rows: [],
       };
@@ -125,10 +140,20 @@ function computeBalances(rows: ParsedWalletRow[]): AddressBalance[] {
     if (!byAddress[addr].household && r.household) {
       byAddress[addr].household = r.household;
     }
+
     const cents = Math.round(r.amount * 100);
-    byAddress[addr].netCents += cents;
-    if (r.amount > 0) byAddress[addr].credits += cents;
-    else byAddress[addr].charges += cents;
+
+    if (isInvoiceRow(r)) {
+      // Invoice rows: positive amounts are debts, not credits.
+      // They don't affect wallet balance - they're outstanding invoices.
+      byAddress[addr].invoicesCents += cents;
+    } else {
+      // Wallet transactions: positive = credit, negative = charge
+      byAddress[addr].netCents += cents;
+      if (r.amount > 0) byAddress[addr].credits += cents;
+      else byAddress[addr].charges += cents;
+    }
+
     byAddress[addr].txCount++;
     byAddress[addr].rows.push(r);
   }
@@ -187,9 +212,11 @@ export function WalletImportSection() {
   const stats = useMemo(() => {
     const matched = matches.filter((m) => m.unitId && m.netCents > 0);
     const unmatched = matches.filter((m) => !m.unitId && m.netCents > 0);
-    const zero = matches.filter((m) => m.netCents <= 0);
+    const zero = matches.filter((m) => m.netCents <= 0 && m.invoicesCents === 0);
+    const pastDue = matches.filter((m) => m.invoicesCents > 0 && m.netCents <= 0);
     const totalCredits = matched.reduce((s, m) => s + m.netCents, 0);
-    return { matched, unmatched, zero, totalCredits };
+    const totalOwed = matches.reduce((s, m) => s + m.invoicesCents, 0);
+    return { matched, unmatched, zero, pastDue, totalCredits, totalOwed };
   }, [matches]);
 
   const handleFileUpload = useCallback(
@@ -343,9 +370,9 @@ export function WalletImportSection() {
       {step === 'review' && (
         <div className="space-y-4">
           {/* Summary cards */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 gap-3">
             <div className="rounded-inner-card bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/30 p-3">
-              <p className="text-meta text-emerald-600 dark:text-emerald-400">Matched</p>
+              <p className="text-meta text-emerald-600 dark:text-emerald-400">Matched Credits</p>
               <p className="text-metric-xl text-emerald-700 dark:text-emerald-300">
                 {stats.matched.length}
               </p>
@@ -362,9 +389,18 @@ export function WalletImportSection() {
                 Need manual match
               </p>
             </div>
+            <div className="rounded-inner-card bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/30 p-3">
+              <p className="text-meta text-red-600 dark:text-red-400">Past Due (Invoices)</p>
+              <p className="text-metric-xl text-red-700 dark:text-red-300">
+                {stats.pastDue.length}
+              </p>
+              <p className="text-meta text-red-600/70 dark:text-red-400/70">
+                ${(stats.totalOwed / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })} owed
+              </p>
+            </div>
             <div className="rounded-inner-card bg-gray-50 dark:bg-gray-950/20 border border-gray-200 dark:border-gray-800/30 p-3">
               <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                Zero / Negative
+                Zero Balance
               </p>
               <p className="text-metric-xl text-text-secondary-light dark:text-text-secondary-dark">
                 {stats.zero.length}
@@ -387,7 +423,10 @@ export function WalletImportSection() {
                       Household
                     </th>
                     <th className="text-right p-3 text-label text-text-secondary-light dark:text-text-secondary-dark">
-                      Balance
+                      Wallet Credit
+                    </th>
+                    <th className="text-right p-3 text-label text-text-secondary-light dark:text-text-secondary-dark">
+                      Invoices Owed
                     </th>
                     <th className="text-left p-3 text-label text-text-secondary-light dark:text-text-secondary-dark">
                       Matched Unit
@@ -399,7 +438,7 @@ export function WalletImportSection() {
                 </thead>
                 <tbody className="divide-y divide-stroke-light dark:divide-stroke-dark">
                   {matches
-                    .filter((m) => m.netCents > 0)
+                    .filter((m) => m.netCents > 0 || m.invoicesCents > 0)
                     .map((m) => {
                       const isExpanded = expandedRows.has(m.address);
                       const isEditing = editingUnit === m.address;
@@ -562,9 +601,24 @@ function MatchRow({
           {match.household || <span className="text-text-muted-light dark:text-text-muted-dark italic">none</span>}
         </td>
 
-        {/* Balance */}
-        <td className="p-3 text-right tabular-nums font-semibold text-emerald-600 dark:text-emerald-400">
-          ${dollars}
+        {/* Wallet Credit */}
+        <td className={`p-3 text-right tabular-nums font-semibold ${
+          match.netCents > 0
+            ? 'text-emerald-600 dark:text-emerald-400'
+            : 'text-text-muted-light dark:text-text-muted-dark'
+        }`}>
+          {match.netCents > 0 ? `$${dollars}` : '$0.00'}
+        </td>
+
+        {/* Invoices Owed */}
+        <td className={`p-3 text-right tabular-nums font-semibold ${
+          match.invoicesCents > 0
+            ? 'text-red-600 dark:text-red-400'
+            : 'text-text-muted-light dark:text-text-muted-dark'
+        }`}>
+          {match.invoicesCents > 0
+            ? `$${(match.invoicesCents / 100).toFixed(2)}`
+            : '-'}
         </td>
 
         {/* Matched Unit */}
@@ -616,7 +670,7 @@ function MatchRow({
       {/* Expanded transaction rows */}
       {isExpanded && (
         <tr>
-          <td colSpan={6} className="p-0">
+          <td colSpan={7} className="p-0">
             <div className="bg-surface-light-2/50 dark:bg-surface-dark-2/50 px-6 py-3 border-t border-stroke-light dark:border-stroke-dark">
               <p className="text-label text-text-muted-light dark:text-text-muted-dark mb-2">
                 {match.txCount} transactions
@@ -636,24 +690,36 @@ function MatchRow({
                       (a, b) =>
                         new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
                     )
-                    .map((r, i) => (
-                      <tr key={i} className="border-t border-stroke-light/50 dark:border-stroke-dark/50">
+                    .map((r, i) => {
+                      const invoice = isInvoiceRow(r);
+                      return (
+                      <tr key={i} className={`border-t border-stroke-light/50 dark:border-stroke-dark/50 ${invoice ? 'bg-red-50/50 dark:bg-red-950/10' : ''}`}>
                         <td className="py-1 pr-3 whitespace-nowrap">{r.timestamp}</td>
-                        <td className="py-1 pr-3">{r.name.substring(0, 50)}</td>
+                        <td className="py-1 pr-3">
+                          {r.name.substring(0, 50)}
+                          {invoice && (
+                            <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 font-medium">
+                              INVOICE
+                            </span>
+                          )}
+                        </td>
                         <td
                           className={`py-1 pr-3 text-right tabular-nums ${
-                            r.amount > 0
-                              ? 'text-emerald-600 dark:text-emerald-400'
-                              : 'text-red-500 dark:text-red-400'
+                            invoice
+                              ? 'text-red-600 dark:text-red-400'
+                              : r.amount > 0
+                                ? 'text-emerald-600 dark:text-emerald-400'
+                                : 'text-red-500 dark:text-red-400'
                           }`}
                         >
-                          {r.amount > 0 ? '+' : ''}${r.amount.toFixed(2)}
+                          {invoice ? `$${r.amount.toFixed(2)} owed` : `${r.amount > 0 ? '+' : ''}$${r.amount.toFixed(2)}`}
                         </td>
                         <td className="py-1 text-text-muted-light dark:text-text-muted-dark truncate max-w-[300px]">
                           {r.notes}
                         </td>
                       </tr>
-                    ))}
+                    );
+                    })}
                 </tbody>
               </table>
             </div>
