@@ -46,6 +46,7 @@ export default function AmenitiesPage() {
   const [manualDialogOpen, setManualDialogOpen] = useState(false);
   const [bookingMode, setBookingMode] = useState<'full_day' | 'time_slot'>('full_day');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   // Board: show choice menu for online vs manual reservation
   const [choiceMenuOpen, setChoiceMenuOpen] = useState(false);
 
@@ -117,6 +118,7 @@ export default function AmenitiesPage() {
 
   // Handle month navigation
   function handleMonthChange(month: Date) {
+    setCurrentMonth(month);
     if (selectedAmenity) {
       fetchBlockedDates(selectedAmenity.id, month);
     }
@@ -128,7 +130,7 @@ export default function AmenitiesPage() {
     setSelectedSlot(null);
     setRefreshKey((k) => k + 1);
     if (selectedAmenity) {
-      fetchBlockedDates(selectedAmenity.id, new Date());
+      fetchBlockedDates(selectedAmenity.id, currentMonth);
     }
   }
 
