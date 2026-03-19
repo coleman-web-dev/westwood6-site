@@ -7,6 +7,7 @@ export type JournalSource =
   | 'invoice_created'
   | 'payment_received'
   | 'late_fee_applied'
+  | 'late_fee_removed'
   | 'invoice_waived'
   | 'invoice_voided'
   | 'wallet_credit'

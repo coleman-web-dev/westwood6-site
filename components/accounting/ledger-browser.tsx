@@ -41,6 +41,7 @@ const SOURCE_LABELS: Record<JournalSource, string> = {
   invoice_created: 'Invoice',
   payment_received: 'Payment',
   late_fee_applied: 'Late Fee',
+  late_fee_removed: 'Late Fee Removed',
   invoice_waived: 'Waived',
   invoice_voided: 'Voided',
   wallet_credit: 'Wallet Credit',
