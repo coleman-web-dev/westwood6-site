@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { syncBankTransactions } from '@/lib/utils/plaid-sync';
 
+export const maxDuration = 300; // 5 minutes - sync + AI categorization can take a while
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
