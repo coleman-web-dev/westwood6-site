@@ -7,13 +7,16 @@ import { useCommunity } from '@/lib/providers/community-provider';
 import { DashboardCardShell } from './dashboard-card-shell';
 
 export function BalanceCard() {
-  const { community, unit } = useCommunity();
+  const { community, unit, isBoard, viewMode } = useCommunity();
   const [balance, setBalance] = useState<number | null>(null);
   const [walletCredit, setWalletCredit] = useState<number>(0);
+  const [overdueCount, setOverdueCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
+  const isAdminView = isBoard && viewMode === 'admin';
+
   useEffect(() => {
-    if (!unit) {
+    if (!isAdminView && !unit) {
       setLoading(false);
       return;
     }
@@ -21,31 +24,46 @@ export function BalanceCard() {
     const supabase = createClient();
 
     async function fetchBalance() {
-      const { data: invoices } = await supabase
-        .from('invoices')
-        .select('amount, status')
-        .eq('unit_id', unit!.id)
-        .in('status', ['pending', 'overdue', 'partial']);
+      if (isAdminView) {
+        // Community-wide outstanding
+        const { data: invoices } = await supabase
+          .from('invoices')
+          .select('amount, amount_paid, status')
+          .eq('community_id', community.id)
+          .in('status', ['pending', 'overdue', 'partial']);
 
-      const total = invoices?.reduce((sum: number, inv: { amount: number }) => sum + inv.amount, 0) ?? 0;
-      setBalance(total);
+        const total = invoices?.reduce((sum: number, inv: { amount: number; amount_paid: number | null }) =>
+          sum + (inv.amount - (inv.amount_paid ?? 0)), 0) ?? 0;
+        setBalance(total);
+        setOverdueCount(invoices?.filter((inv: { status: string }) => inv.status === 'overdue').length ?? 0);
+        setWalletCredit(0);
+      } else {
+        const { data: invoices } = await supabase
+          .from('invoices')
+          .select('amount, amount_paid, status')
+          .eq('unit_id', unit!.id)
+          .in('status', ['pending', 'overdue', 'partial']);
 
-      // Fetch wallet credit
-      const { data: walletData } = await supabase
-        .from('unit_wallets')
-        .select('balance')
-        .eq('unit_id', unit!.id)
-        .single();
+        const total = invoices?.reduce((sum: number, inv: { amount: number; amount_paid: number | null }) =>
+          sum + (inv.amount - (inv.amount_paid ?? 0)), 0) ?? 0;
+        setBalance(total);
 
-      setWalletCredit(walletData?.balance ?? 0);
+        const { data: walletData } = await supabase
+          .from('unit_wallets')
+          .select('balance')
+          .eq('unit_id', unit!.id)
+          .single();
+
+        setWalletCredit(walletData?.balance ?? 0);
+      }
       setLoading(false);
     }
 
     fetchBalance();
-  }, [unit]);
+  }, [unit, isAdminView, community.id]);
 
   return (
-    <DashboardCardShell title="Account Balance">
+    <DashboardCardShell title={isAdminView ? 'Community Outstanding' : 'Account Balance'}>
       {loading ? (
         <div className="animate-pulse h-8 w-24 rounded bg-muted" />
       ) : (
@@ -55,7 +73,9 @@ export function BalanceCard() {
               ${((balance ?? 0) / 100).toFixed(2)}
             </p>
             <p className="text-meta text-text-secondary-light dark:text-text-secondary-dark mt-1">
-              Outstanding balance
+              {isAdminView
+                ? `${overdueCount > 0 ? `${overdueCount} overdue` : 'No overdue invoices'}`
+                : 'Outstanding balance'}
             </p>
             {walletCredit > 0 && (
               <p className="text-meta text-primary-600 dark:text-primary-400 mt-1 tabular-nums">
@@ -63,7 +83,7 @@ export function BalanceCard() {
               </p>
             )}
           </div>
-          {(balance ?? 0) > 0 && (
+          {!isAdminView && (balance ?? 0) > 0 && (
             <Link
               href={`/${community.slug}/payments`}
               className="inline-block text-label text-secondary-500 dark:text-secondary-400 hover:text-secondary-600 dark:hover:text-secondary-300 transition-colors font-semibold"

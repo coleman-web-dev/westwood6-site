@@ -4,8 +4,10 @@ import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Badge } from '@/components/shared/ui/badge';
-import { CheckCircle2, AlertTriangle, Wallet, ExternalLink } from 'lucide-react';
+import { Button } from '@/components/shared/ui/button';
+import { CheckCircle2, AlertTriangle, Wallet, ExternalLink, Banknote } from 'lucide-react';
 import Link from 'next/link';
+import { RecordPaymentDialog } from '@/components/payments/record-payment-dialog';
 import type { Invoice, Payment, WalletTransaction, LedgerEntry } from '@/lib/types/database';
 
 interface HouseholdFinancialSummaryProps {
@@ -14,13 +16,19 @@ interface HouseholdFinancialSummaryProps {
 }
 
 export function HouseholdFinancialSummary({ unitId, communityId }: HouseholdFinancialSummaryProps) {
-  const { community } = useCommunity();
+  const { community, isBoard } = useCommunity();
   const [loading, setLoading] = useState(true);
   const [walletBalance, setWalletBalance] = useState(0);
+  const [outstandingInvoices, setOutstandingInvoices] = useState<Invoice[]>([]);
   const [outstandingCount, setOutstandingCount] = useState(0);
   const [outstandingAmount, setOutstandingAmount] = useState(0);
   const [hasOverdue, setHasOverdue] = useState(false);
   const [recentEntries, setRecentEntries] = useState<LedgerEntry[]>([]);
+  const [ownerName, setOwnerName] = useState('');
+
+  // Record Payment dialog state
+  const [payDialogOpen, setPayDialogOpen] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -30,7 +38,7 @@ export function HouseholdFinancialSummary({ unitId, communityId }: HouseholdFina
       supabase.from('unit_wallets').select('balance').eq('unit_id', unitId).single(),
       supabase
         .from('invoices')
-        .select('id, title, amount, amount_paid, status, due_date')
+        .select('*')
         .eq('unit_id', unitId)
         .in('status', ['pending', 'overdue', 'partial']),
       supabase
@@ -51,7 +59,8 @@ export function HouseholdFinancialSummary({ unitId, communityId }: HouseholdFina
     setWalletBalance(walletResult.data?.balance ?? 0);
 
     // Outstanding invoices
-    const invoices = (invoiceResult.data as Pick<Invoice, 'id' | 'title' | 'amount' | 'amount_paid' | 'status' | 'due_date'>[]) ?? [];
+    const invoices = (invoiceResult.data as Invoice[]) ?? [];
+    setOutstandingInvoices(invoices);
     setOutstandingCount(invoices.length);
     setOutstandingAmount(invoices.reduce((sum, inv) => sum + (inv.amount - (inv.amount_paid ?? 0)), 0));
     setHasOverdue(invoices.some((inv) => inv.status === 'overdue'));
@@ -82,6 +91,17 @@ export function HouseholdFinancialSummary({ unitId, communityId }: HouseholdFina
     }
     entries.sort((a, b) => b.entry_date.localeCompare(a.entry_date));
     setRecentEntries(entries.slice(0, 5));
+
+    // Fetch owner name for payment dialog
+    const { data: ownerData } = await supabase
+      .from('members')
+      .select('first_name, last_name')
+      .eq('unit_id', unitId)
+      .eq('member_role', 'owner')
+      .limit(1)
+      .single();
+    if (ownerData) setOwnerName(`${ownerData.first_name} ${ownerData.last_name}`);
+
     setLoading(false);
   }, [unitId]);
 
@@ -153,6 +173,51 @@ export function HouseholdFinancialSummary({ unitId, communityId }: HouseholdFina
         </div>
       </div>
 
+      {/* Outstanding invoices with Record Payment buttons */}
+      {isBoard && outstandingInvoices.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+            Outstanding Invoices
+          </h3>
+          {outstandingInvoices.map((inv) => {
+            const remaining = inv.amount - (inv.amount_paid ?? 0);
+            return (
+              <div
+                key={inv.id}
+                className="flex items-center justify-between gap-2 py-2 px-3 rounded-inner-card bg-surface-light-2 dark:bg-surface-dark-2"
+              >
+                <div className="min-w-0">
+                  <p className="text-body text-text-primary-light dark:text-text-primary-dark truncate">
+                    {inv.title}
+                  </p>
+                  <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                    Due {new Date(inv.due_date + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                    {inv.status === 'overdue' && <span className="text-red-600 dark:text-red-400 ml-1">Overdue</span>}
+                    {inv.status === 'partial' && <span className="text-amber-600 dark:text-amber-400 ml-1">Partial</span>}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="text-label tabular-nums font-semibold text-red-600 dark:text-red-400">
+                    ${(remaining / 100).toFixed(2)}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedInvoice(inv);
+                      setPayDialogOpen(true);
+                    }}
+                  >
+                    <Banknote className="h-4 w-4 mr-1" />
+                    Record Payment
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* Recent activity */}
       {recentEntries.length > 0 && (
         <div className="space-y-1.5">
@@ -193,6 +258,15 @@ export function HouseholdFinancialSummary({ unitId, communityId }: HouseholdFina
         View Full Ledger
         <ExternalLink className="h-3 w-3" />
       </Link>
+
+      {/* Record Payment Dialog */}
+      <RecordPaymentDialog
+        invoice={selectedInvoice}
+        open={payDialogOpen}
+        onOpenChange={setPayDialogOpen}
+        onSuccess={fetchData}
+        unitOwnerName={ownerName}
+      />
     </div>
   );
 }

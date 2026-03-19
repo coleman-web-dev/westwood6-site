@@ -9,29 +9,46 @@ import { CreditCard } from 'lucide-react';
 import type { Payment } from '@/lib/types/database';
 
 export function PaymentsCard() {
-  const { community, unit } = useCommunity();
+  const { community, unit, isBoard, viewMode } = useCommunity();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const isAdminView = isBoard && viewMode === 'admin';
+
   useEffect(() => {
-    if (!unit) { setLoading(false); return; }
+    if (!isAdminView && !unit) { setLoading(false); return; }
 
     const supabase = createClient();
 
-    async function fetch() {
-      const { data } = await supabase
+    async function fetchPayments() {
+      let query = supabase
         .from('payments')
         .select('*')
-        .eq('unit_id', unit!.id)
         .order('created_at', { ascending: false })
         .limit(5);
 
+      if (isAdminView) {
+        // Community-wide: join through invoices to get community_id
+        // payments don't have community_id, so filter by units in community
+        const { data: unitIds } = await supabase
+          .from('units')
+          .select('id')
+          .eq('community_id', community.id);
+        const ids = unitIds?.map((u: { id: string }) => u.id) ?? [];
+        if (ids.length > 0) {
+          query = query.in('unit_id', ids);
+        }
+      } else {
+        query = query.eq('unit_id', unit!.id);
+      }
+
+      const { data } = await query;
       setPayments((data as Payment[]) ?? []);
       setLoading(false);
     }
 
-    fetch();
-  }, [unit]);
+    fetchPayments();
+  }, [unit, isAdminView, community.id]);
 
   return (
     <DashboardCardShell title="Recent Payments">
