@@ -74,10 +74,11 @@ export const LEDGER_FIELDS: LedgerField[] = [
   },
 ];
 
-export type ChargeType = 'assessment' | 'security_deposit' | 'other';
+export type ChargeType = 'assessment' | 'assessment_late_fee' | 'security_deposit' | 'other';
 
 export const CHARGE_TYPE_OPTIONS: { value: ChargeType; label: string }[] = [
   { value: 'assessment', label: 'Assessment / Dues' },
+  { value: 'assessment_late_fee', label: 'Assessment + Late Fee' },
   { value: 'security_deposit', label: 'Security Deposit' },
   { value: 'other', label: 'Other Fee' },
 ];
@@ -586,13 +587,23 @@ export function resolveChargeType(
 /**
  * Get distinct charge amounts from matched rows (for the amount-grouping UI).
  * Includes auto-detection: the most common amount is assumed to be monthly dues,
- * and amounts that are clean multiples are flagged as likely assessments.
+ * amounts that are clean multiples are flagged as likely assessments,
+ * and amounts matching (base * N) + (lateFee * N) are flagged as assessment + late fee.
  */
-export function getDistinctAmounts(rows: MatchedRow[]): {
+export function getDistinctAmounts(
+  rows: MatchedRow[],
+  lateFeeAmount: number = 0,
+): {
   amount: number;
   count: number;
   /** Whether this amount is likely an assessment (multiple of the base dues amount) */
   likelyAssessment: boolean;
+  /** Whether this amount looks like assessment + late fee */
+  likelyLateFee: boolean;
+  /** The detected late fee portion (cents) if likelyLateFee is true */
+  detectedLateFee: number;
+  /** The detected base assessment portion (cents) if likelyLateFee is true */
+  detectedBase: number;
 }[] {
   const counts = new Map<number, number>();
   for (const r of rows) {
@@ -607,24 +618,55 @@ export function getDistinctAmounts(rows: MatchedRow[]): {
   // The most frequent amount is likely the base monthly dues
   const baseAmount = entries.length > 0 ? entries[0].amount : 0;
 
-  return entries.map(({ amount, count }) => ({
-    amount,
-    count,
-    likelyAssessment:
-      baseAmount > 0 && amount > 0 && amount % baseAmount === 0,
-  }));
+  return entries.map(({ amount, count }) => {
+    const isMultipleOfBase = baseAmount > 0 && amount > 0 && amount % baseAmount === 0;
+
+    // Check if this amount = (N * base) + (N * lateFee) for some N
+    let likelyLateFee = false;
+    let detectedLateFee = 0;
+    let detectedBase = 0;
+
+    if (!isMultipleOfBase && lateFeeAmount > 0 && baseAmount > 0) {
+      // Try N = 1, 2, 3... to see if amount = N*base + N*lateFee
+      const perPeriod = baseAmount + lateFeeAmount;
+      if (amount % perPeriod === 0) {
+        const n = amount / perPeriod;
+        likelyLateFee = true;
+        detectedLateFee = lateFeeAmount * n;
+        detectedBase = baseAmount * n;
+      }
+      // Also try: amount = N*base + lateFee (single late fee regardless of periods)
+      else if (amount > baseAmount && (amount - lateFeeAmount) % baseAmount === 0) {
+        likelyLateFee = true;
+        detectedLateFee = lateFeeAmount;
+        detectedBase = amount - lateFeeAmount;
+      }
+    }
+
+    return {
+      amount,
+      count,
+      likelyAssessment: isMultipleOfBase,
+      likelyLateFee,
+      detectedLateFee,
+      detectedBase,
+    };
+  });
 }
 
 /**
- * Build a default chargeTypeMap: amounts that are multiples of the base dues default
- * to 'assessment', others are left unset (will show as needing review).
+ * Build a default chargeTypeMap using auto-detection results.
  */
 export function buildDefaultChargeTypeMap(
-  distinctAmounts: { amount: number; likelyAssessment: boolean }[],
+  distinctAmounts: { amount: number; likelyAssessment: boolean; likelyLateFee: boolean }[],
 ): Record<number, ChargeType> {
   const map: Record<number, ChargeType> = {};
-  for (const { amount, likelyAssessment } of distinctAmounts) {
-    map[amount] = likelyAssessment ? 'assessment' : 'assessment';
+  for (const { amount, likelyAssessment, likelyLateFee } of distinctAmounts) {
+    if (likelyLateFee) {
+      map[amount] = 'assessment_late_fee';
+    } else {
+      map[amount] = 'assessment';
+    }
   }
   return map;
 }

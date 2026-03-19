@@ -61,12 +61,20 @@ export function LedgerImportWizard({ onComplete, onSkip, showSkip = false }: Led
   const [members, setMembers] = useState<MemberRecord[]>([]);
   const [skipUnmatched, setSkipUnmatched] = useState(true);
 
+  // Get late fee amount from community settings
+  const communityLateFee = useMemo(() => {
+    const lfs = community.theme?.payment_settings?.late_fee_settings;
+    if (!lfs?.enabled || lfs.fee_type !== 'flat') return 0;
+    return lfs.fee_amount || 0; // already in cents
+  }, [community]);
+
   // Step 4 state
   const [config, setConfig] = useState<ImportConfig>({
     assessmentId: null,
     serviceFeeHandling: 'auto_detect',
     postGlEntries: true,
     chargeTypeMap: {},
+    lateFeeAmount: 0,
   });
   const [assessments, setAssessments] = useState<{ id: string; title: string }[]>([]);
 
@@ -144,11 +152,12 @@ export function LedgerImportWizard({ onComplete, onSkip, showSkip = false }: Led
       // Initialize charge type map when entering review step
       if (nextStep === 'review' && !hasChargeTypeColumn) {
         const importable = matchedRows.filter((r) => r.unitId);
-        const amounts = getDistinctAmounts(importable);
+        const amounts = getDistinctAmounts(importable, communityLateFee);
         const defaultMap = buildDefaultChargeTypeMap(amounts);
         setConfig((prev) => ({
           ...prev,
           chargeTypeMap: { ...defaultMap, ...prev.chargeTypeMap },
+          lateFeeAmount: communityLateFee,
         }));
       }
 

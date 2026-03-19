@@ -31,6 +31,8 @@ export interface ImportConfig {
   postGlEntries: boolean;
   /** Maps amount (cents) to charge type. Used when CSV has no chargeType column. */
   chargeTypeMap: Record<number, ChargeType>;
+  /** Community's configured late fee amount (cents). Used for auto-detection and GL splitting. */
+  lateFeeAmount: number;
 }
 
 interface Assessment {
@@ -111,8 +113,8 @@ export function StepReview({
 
   // Distinct amounts for charge type grouping
   const distinctAmounts = useMemo(
-    () => getDistinctAmounts(importableRows),
-    [importableRows],
+    () => getDistinctAmounts(importableRows, config.lateFeeAmount),
+    [importableRows, config.lateFeeAmount],
   );
 
   function handleChargeTypeChange(amountCents: number, chargeType: ChargeType) {
@@ -234,47 +236,56 @@ export function StepReview({
                 </tr>
               </thead>
               <tbody>
-                {distinctAmounts.map(({ amount, count, likelyAssessment }) => (
-                  <tr
-                    key={amount}
-                    className={`border-t border-stroke-light dark:border-stroke-dark ${
-                      !likelyAssessment
-                        ? 'bg-amber-50 dark:bg-amber-950/30'
-                        : ''
-                    }`}
-                  >
-                    <td className="px-3 py-2 font-mono text-text-primary-light dark:text-text-primary-dark">
-                      <span>{formatCents(amount)}</span>
-                      {!likelyAssessment && (
-                        <span className="ml-2 text-amber-600 dark:text-amber-400 font-normal">
-                          Not a multiple of base dues
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-right text-text-secondary-light dark:text-text-secondary-dark">
-                      {count}
-                    </td>
-                    <td className="px-3 py-2">
-                      <Select
-                        value={config.chargeTypeMap[amount] || 'assessment'}
-                        onValueChange={(val) =>
-                          handleChargeTypeChange(amount, val as ChargeType)
-                        }
-                      >
-                        <SelectTrigger className="h-7 text-meta">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CHARGE_TYPE_OPTIONS.map((opt) => (
-                            <SelectItem key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </td>
-                  </tr>
-                ))}
+                {distinctAmounts.map(({ amount, count, likelyAssessment, likelyLateFee, detectedLateFee, detectedBase }) => {
+                  const currentType = config.chargeTypeMap[amount] || 'assessment';
+                  const showLateFeeHint = likelyLateFee || currentType === 'assessment_late_fee';
+
+                  return (
+                    <tr
+                      key={amount}
+                      className={`border-t border-stroke-light dark:border-stroke-dark ${
+                        !likelyAssessment && !likelyLateFee
+                          ? 'bg-amber-50 dark:bg-amber-950/30'
+                          : ''
+                      }`}
+                    >
+                      <td className="px-3 py-2 text-text-primary-light dark:text-text-primary-dark">
+                        <span className="font-mono">{formatCents(amount)}</span>
+                        {showLateFeeHint && detectedBase > 0 ? (
+                          <span className="ml-2 text-text-muted-light dark:text-text-muted-dark font-normal text-meta">
+                            = {formatCents(detectedBase)} dues + {formatCents(detectedLateFee)} late fee
+                          </span>
+                        ) : !likelyAssessment && !likelyLateFee ? (
+                          <span className="ml-2 text-amber-600 dark:text-amber-400 font-normal">
+                            Not a multiple of base dues
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="px-3 py-2 text-right text-text-secondary-light dark:text-text-secondary-dark">
+                        {count}
+                      </td>
+                      <td className="px-3 py-2">
+                        <Select
+                          value={currentType}
+                          onValueChange={(val) =>
+                            handleChargeTypeChange(amount, val as ChargeType)
+                          }
+                        >
+                          <SelectTrigger className="h-7 text-meta">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {CHARGE_TYPE_OPTIONS.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

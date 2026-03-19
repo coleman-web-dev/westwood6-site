@@ -106,7 +106,19 @@ export function StepExecute({
             continue; // Skip invoice/payment creation for deposits
           }
 
-          // ─── Assessment / Other path ─────────────────
+          // ─── Assessment / Assessment+LateFee / Other path ─────────────────
+
+          // Calculate late fee split if applicable
+          let lateFeeForRow = 0;
+          let baseAmountDue = mapped.amountDue;
+          if (chargeType === 'assessment_late_fee' && config.lateFeeAmount > 0) {
+            // Try to detect the split: amount = N*base + N*lateFee or amount - lateFee
+            const remainder = mapped.amountDue - config.lateFeeAmount;
+            if (remainder > 0) {
+              lateFeeForRow = config.lateFeeAmount;
+              baseAmountDue = remainder;
+            }
+          }
 
           // Derive invoice status
           let invoiceStatus: string;
@@ -129,7 +141,7 @@ export function StepExecute({
             invoiceTitle = `${month} ${year} Assessment`;
           }
 
-          // 1. Create invoice
+          // 1. Create invoice (amount = base portion only, late fee stored separately)
           const { data: invoice, error: invError } = await supabase
             .from('invoices')
             .insert({
@@ -139,13 +151,13 @@ export function StepExecute({
               description: mapped.invoiceNumber
                 ? `Imported from ${fileName} (Ref: ${mapped.invoiceNumber})`
                 : `Imported from ${fileName}`,
-              amount: mapped.amountDue,
+              amount: baseAmountDue,
               amount_paid: mapped.amountPaid,
               due_date: mapped.dueDate || new Date().toISOString().split('T')[0],
               status: invoiceStatus,
               assessment_id: config.assessmentId || null,
               paid_at: invoiceStatus === 'paid' && mapped.paymentDate ? mapped.paymentDate : null,
-              late_fee_amount: 0,
+              late_fee_amount: lateFeeForRow,
             })
             .select('id')
             .single();
@@ -159,14 +171,33 @@ export function StepExecute({
 
           // Post GL: invoice created
           if (config.postGlEntries) {
+            // Post the base assessment amount
             await postInvoiceCreated(
               communityId,
               invoice.id,
               unitId,
-              mapped.amountDue,
+              baseAmountDue,
               invoiceTitle,
             );
             res.glEntriesPosted++;
+
+            // Post late fee GL if applicable: DR AR, CR Late Fee Revenue (4100)
+            if (lateFeeForRow > 0) {
+              await createJournalEntry({
+                communityId,
+                entryDate: mapped.dueDate || undefined,
+                description: `Late fee: ${invoiceTitle}`,
+                source: 'late_fee_applied',
+                referenceType: 'invoice',
+                referenceId: invoice.id,
+                unitId,
+                lines: [
+                  { accountCode: '1100', debit: lateFeeForRow, credit: 0, description: 'Accounts Receivable (late fee)' },
+                  { accountCode: '4100', debit: 0, credit: lateFeeForRow, description: 'Late Fee Revenue' },
+                ],
+              });
+              res.glEntriesPosted++;
+            }
           }
 
           // 2. Create payment (if paid)
