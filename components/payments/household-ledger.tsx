@@ -4,7 +4,9 @@ import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Badge } from '@/components/shared/ui/badge';
+import { Button } from '@/components/shared/ui/button';
 import { UnitPicker } from '@/components/shared/unit-picker';
+import { Printer, Download } from 'lucide-react';
 import type { Invoice, Payment, WalletTransaction, Unit, LedgerEntry } from '@/lib/types/database';
 
 interface HouseholdLedgerProps {
@@ -123,6 +125,90 @@ export function HouseholdLedger({ refreshKey, initialUnitId }: HouseholdLedgerPr
     bounced_reversal: { variant: 'destructive', label: 'Bounced' },
   };
 
+  // ─── Unit info for headers ────────────────────────────────
+  const [unitLabel, setUnitLabel] = useState('');
+  useEffect(() => {
+    if (!targetUnitId) return;
+    const supabase = createClient();
+    supabase
+      .from('units')
+      .select('unit_number, address')
+      .eq('id', targetUnitId)
+      .single()
+      .then(({ data }) => {
+        if (data) setUnitLabel(`Unit ${data.unit_number}${data.address ? ' - ' + data.address : ''}`);
+      });
+  }, [targetUnitId]);
+
+  const formatDate = (dateStr: string) =>
+    new Date(dateStr.includes('T') ? dateStr : dateStr + 'T00:00:00').toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+
+  const formatAmount = (cents: number) => (Math.abs(cents) / 100).toFixed(2);
+
+  // ─── Export CSV ──────────────────────────────────────────
+  const handleExport = () => {
+    if (entries.length === 0) return;
+    const header = 'Date,Type,Description,Amount,Balance\n';
+    const rows = entries.map((e) => {
+      const badge = TYPE_BADGE[e.entry_type] ?? { label: e.entry_type };
+      const sign = e.amount < 0 ? '-' : '';
+      return [
+        formatDate(e.entry_date),
+        badge.label,
+        `"${e.description.replace(/"/g, '""')}"`,
+        `${sign}$${formatAmount(e.amount)}`,
+        `$${(e.running_balance / 100).toFixed(2)}`,
+      ].join(',');
+    });
+    const blob = new Blob([header + rows.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ledger-${unitLabel.replace(/\s+/g, '-').toLowerCase() || 'unit'}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // ─── Print ───────────────────────────────────────────────
+  const handlePrint = () => {
+    if (entries.length === 0) return;
+    const tableRows = entries
+      .map((e) => {
+        const badge = TYPE_BADGE[e.entry_type] ?? { label: e.entry_type };
+        const isCredit = e.amount < 0;
+        const sign = isCredit ? '-' : '+';
+        const color = isCredit ? '#16a34a' : '#dc2626';
+        return `<tr>
+          <td style="padding:6px 10px;border-bottom:1px solid #eee">${formatDate(e.entry_date)}</td>
+          <td style="padding:6px 10px;border-bottom:1px solid #eee">${badge.label}</td>
+          <td style="padding:6px 10px;border-bottom:1px solid #eee">${e.description}</td>
+          <td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;color:${color}">${sign}$${formatAmount(e.amount)}</td>
+          <td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right">$${(e.running_balance / 100).toFixed(2)}</td>
+        </tr>`;
+      })
+      .join('');
+
+    const html = `<!DOCTYPE html><html><head><title>Ledger - ${unitLabel}</title>
+      <style>body{font-family:system-ui,sans-serif;padding:24px;color:#1a1a1a}
+      table{width:100%;border-collapse:collapse}th{text-align:left;padding:8px 10px;border-bottom:2px solid #333;font-size:13px}
+      td{font-size:13px}h2{margin:0 0 4px}p{margin:0 0 16px;color:#666;font-size:13px}
+      @media print{body{padding:0}}</style></head>
+      <body><h2>${community.name}</h2><p>${unitLabel}</p>
+      <table><thead><tr><th>Date</th><th>Type</th><th>Description</th><th style="text-align:right">Amount</th><th style="text-align:right">Balance</th></tr></thead>
+      <tbody>${tableRows}</tbody></table></body></html>`;
+
+    const w = window.open('', '_blank');
+    if (w) {
+      w.document.write(html);
+      w.document.close();
+      w.onload = () => { w.print(); };
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-3">
@@ -144,6 +230,20 @@ export function HouseholdLedger({ refreshKey, initialUnitId }: HouseholdLedgerPr
             onValueChange={setSelectedUnitId}
             placeholder="Select a unit..."
           />
+        </div>
+      )}
+
+      {/* Print / Export */}
+      {entries.length > 0 && (
+        <div className="flex gap-2 justify-end">
+          <Button variant="outline" size="sm" onClick={handlePrint}>
+            <Printer className="h-4 w-4 mr-1.5" />
+            Print
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExport}>
+            <Download className="h-4 w-4 mr-1.5" />
+            Export CSV
+          </Button>
         </div>
       )}
 
