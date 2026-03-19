@@ -163,7 +163,7 @@ export default function DashboardPage() {
           onLayoutChange={handleLayoutChange}
           onBreakpointChange={handleBreakpointChange}
           dragConfig={{ enabled: isDraggable, handle: '.drag-handle' }}
-          resizeConfig={{ enabled: false }}
+          resizeConfig={{ enabled: isDraggable }}
         >
           {visibleCards.map((cardId) => {
             const CardComponent = CARD_COMPONENTS[cardId];
