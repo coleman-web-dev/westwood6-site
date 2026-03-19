@@ -80,7 +80,7 @@ export function StepExecute({
           const { mapped, unitId } = mr;
           if (!unitId) continue;
 
-          const chargeType = resolveChargeType(mr, config.chargeTypeMap);
+          const chargeType = resolveChargeType(mr, config.chargeTypeMap, config.rowOverrides);
 
           // ─── Security Deposit path ───────────────────
           if (chargeType === 'security_deposit') {
@@ -296,7 +296,7 @@ export function StepExecute({
 
     // 4. Calculate and apply wallet credits/debits per unit (exclude security deposits)
     const assessmentRows = importableRows.filter(
-      (r) => resolveChargeType(r, config.chargeTypeMap) !== 'security_deposit',
+      (r) => resolveChargeType(r, config.chargeTypeMap, config.rowOverrides) !== 'security_deposit',
     );
     const unitBalances = calculateUnitBalances(assessmentRows);
     for (const ub of unitBalances) {

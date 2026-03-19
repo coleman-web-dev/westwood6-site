@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
-import { FileText, CreditCard, Wallet, AlertTriangle, Receipt, Shield } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { FileText, CreditCard, Wallet, AlertTriangle, Receipt, Shield, ChevronRight, ChevronDown } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -31,6 +31,8 @@ export interface ImportConfig {
   postGlEntries: boolean;
   /** Maps amount (cents) to charge type. Used when CSV has no chargeType column. */
   chargeTypeMap: Record<number, ChargeType>;
+  /** Per-row charge type overrides, keyed by row number. Takes priority over chargeTypeMap. */
+  rowOverrides: Record<number, ChargeType>;
   /** Community's configured late fee amount (cents). Used for auto-detection and GL splitting. */
   lateFeeAmount: number;
 }
@@ -75,7 +77,7 @@ export function StepReview({
     let totalFees = 0;
 
     for (const row of importableRows) {
-      const ct = resolveChargeType(row, config.chargeTypeMap);
+      const ct = resolveChargeType(row, config.chargeTypeMap, config.rowOverrides);
       if (ct === 'security_deposit') {
         deposits++;
         depositAmount += row.mapped.amountPaid;
@@ -91,12 +93,12 @@ export function StepReview({
     }
 
     return { invoices, payments, deposits, depositAmount, totalCharged, totalPaid, totalFees };
-  }, [importableRows, config.chargeTypeMap]);
+  }, [importableRows, config.chargeTypeMap, config.rowOverrides]);
 
   // Per-unit balances (exclude security deposits)
   const assessmentRows = useMemo(
-    () => importableRows.filter((r) => resolveChargeType(r, config.chargeTypeMap) !== 'security_deposit'),
-    [importableRows, config.chargeTypeMap],
+    () => importableRows.filter((r) => resolveChargeType(r, config.chargeTypeMap, config.rowOverrides) !== 'security_deposit'),
+    [importableRows, config.chargeTypeMap, config.rowOverrides],
   );
   const unitBalances: UnitBalance[] = useMemo(
     () => calculateUnitBalances(assessmentRows),
@@ -117,12 +119,56 @@ export function StepReview({
     [importableRows, config.lateFeeAmount],
   );
 
+  // Expand/collapse state for amount groups
+  const [expandedAmounts, setExpandedAmounts] = useState<Set<number>>(new Set());
+
+  // Group importable rows by amountDue for expanded detail view
+  const rowsByAmount = useMemo(() => {
+    const map = new Map<number, MatchedRow[]>();
+    for (const row of importableRows) {
+      const amt = row.mapped.amountDue;
+      const existing = map.get(amt) || [];
+      existing.push(row);
+      map.set(amt, existing);
+    }
+    return map;
+  }, [importableRows]);
+
+  function toggleExpanded(amount: number) {
+    setExpandedAmounts((prev) => {
+      const next = new Set(prev);
+      if (next.has(amount)) {
+        next.delete(amount);
+      } else {
+        next.add(amount);
+      }
+      return next;
+    });
+  }
+
   function handleChargeTypeChange(amountCents: number, chargeType: ChargeType) {
+    // When changing the group-level type, clear any row overrides for that amount
+    const newRowOverrides = { ...config.rowOverrides };
+    const rowsForAmount = rowsByAmount.get(amountCents) || [];
+    for (const r of rowsForAmount) {
+      delete newRowOverrides[r.row.rowNumber];
+    }
     onConfigChange({
       ...config,
       chargeTypeMap: {
         ...config.chargeTypeMap,
         [amountCents]: chargeType,
+      },
+      rowOverrides: newRowOverrides,
+    });
+  }
+
+  function handleRowOverride(rowNumber: number, chargeType: ChargeType) {
+    onConfigChange({
+      ...config,
+      rowOverrides: {
+        ...config.rowOverrides,
+        [rowNumber]: chargeType,
       },
     });
   }
@@ -239,51 +285,138 @@ export function StepReview({
                 {distinctAmounts.map(({ amount, count, likelyAssessment, likelyLateFee, detectedLateFee, detectedBase }) => {
                   const currentType = config.chargeTypeMap[amount] || 'assessment';
                   const showLateFeeHint = likelyLateFee || currentType === 'assessment_late_fee';
+                  const isExpanded = expandedAmounts.has(amount);
+                  const amountRows = rowsByAmount.get(amount) || [];
+                  // Check if any rows in this group have overrides
+                  const hasOverrides = amountRows.some((r) => config.rowOverrides[r.row.rowNumber] !== undefined);
 
                   return (
-                    <tr
-                      key={amount}
-                      className={`border-t border-stroke-light dark:border-stroke-dark ${
-                        !likelyAssessment && !likelyLateFee
-                          ? 'bg-amber-50 dark:bg-amber-950/30'
-                          : ''
-                      }`}
-                    >
-                      <td className="px-3 py-2 text-text-primary-light dark:text-text-primary-dark">
-                        <span className="font-mono">{formatCents(amount)}</span>
-                        {showLateFeeHint && detectedBase > 0 ? (
-                          <span className="ml-2 text-text-muted-light dark:text-text-muted-dark font-normal text-meta">
-                            = {formatCents(detectedBase)} dues + {formatCents(detectedLateFee)} late fee
-                          </span>
-                        ) : !likelyAssessment && !likelyLateFee ? (
-                          <span className="ml-2 text-amber-600 dark:text-amber-400 font-normal">
-                            Not a multiple of base dues
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="px-3 py-2 text-right text-text-secondary-light dark:text-text-secondary-dark">
-                        {count}
-                      </td>
-                      <td className="px-3 py-2">
-                        <Select
-                          value={currentType}
-                          onValueChange={(val) =>
-                            handleChargeTypeChange(amount, val as ChargeType)
-                          }
-                        >
-                          <SelectTrigger className="h-7 text-meta">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {CHARGE_TYPE_OPTIONS.map((opt) => (
-                              <SelectItem key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </td>
-                    </tr>
+                    <React.Fragment key={amount}>
+                      <tr
+                        className={`border-t border-stroke-light dark:border-stroke-dark ${
+                          !likelyAssessment && !likelyLateFee
+                            ? 'bg-amber-50 dark:bg-amber-950/30'
+                            : ''
+                        }`}
+                      >
+                        <td className="px-3 py-2 text-text-primary-light dark:text-text-primary-dark">
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => toggleExpanded(amount)}
+                              className="flex-shrink-0 p-0.5 rounded hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 text-text-muted-light dark:text-text-muted-dark"
+                            >
+                              {isExpanded ? (
+                                <ChevronDown className="h-3.5 w-3.5" />
+                              ) : (
+                                <ChevronRight className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                            <span className="font-mono">{formatCents(amount)}</span>
+                            {showLateFeeHint && detectedBase > 0 ? (
+                              <span className="ml-1 text-text-muted-light dark:text-text-muted-dark font-normal text-meta">
+                                = {formatCents(detectedBase)} dues + {formatCents(detectedLateFee)} late fee
+                              </span>
+                            ) : !likelyAssessment && !likelyLateFee ? (
+                              <span className="ml-1 text-amber-600 dark:text-amber-400 font-normal">
+                                Not a multiple of base dues
+                              </span>
+                            ) : null}
+                            {hasOverrides && (
+                              <span className="ml-1 text-meta text-secondary-500 font-medium">
+                                (mixed)
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 text-right text-text-secondary-light dark:text-text-secondary-dark">
+                          {count}
+                        </td>
+                        <td className="px-3 py-2">
+                          <Select
+                            value={currentType}
+                            onValueChange={(val) =>
+                              handleChargeTypeChange(amount, val as ChargeType)
+                            }
+                          >
+                            <SelectTrigger className="h-7 text-meta">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {CHARGE_TYPE_OPTIONS.map((opt) => (
+                                <SelectItem key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </td>
+                      </tr>
+                      {/* Expanded detail rows */}
+                      {isExpanded && (
+                        <>
+                          <tr className="bg-surface-light-2 dark:bg-surface-dark-2">
+                            <td colSpan={3} className="px-3 py-1.5">
+                              <div className="pl-6 grid grid-cols-[1fr_120px_100px_80px_160px] gap-2 text-meta font-semibold text-text-muted-light dark:text-text-muted-dark">
+                                <span>Unit / Address</span>
+                                <span>Due Date</span>
+                                <span>Paid</span>
+                                <span>Status</span>
+                                <span>Category</span>
+                              </div>
+                            </td>
+                          </tr>
+                          {amountRows.map((mr) => {
+                            const rowOverride = config.rowOverrides[mr.row.rowNumber];
+                            const effectiveType = rowOverride ?? currentType;
+                            const isOverridden = rowOverride !== undefined && rowOverride !== currentType;
+
+                            return (
+                              <tr
+                                key={mr.row.rowNumber}
+                                className={`border-t border-stroke-light/50 dark:border-stroke-dark/50 ${
+                                  isOverridden ? 'bg-secondary-50 dark:bg-secondary-950/20' : 'bg-surface-light dark:bg-surface-dark'
+                                }`}
+                              >
+                                <td colSpan={3} className="px-3 py-1.5">
+                                  <div className="pl-6 grid grid-cols-[1fr_120px_100px_80px_160px] gap-2 items-center text-meta">
+                                    <span className="text-text-primary-light dark:text-text-primary-dark truncate" title={mr.mapped.unitIdentifier}>
+                                      {mr.unitLabel || mr.mapped.unitIdentifier}
+                                    </span>
+                                    <span className="text-text-secondary-light dark:text-text-secondary-dark">
+                                      {mr.mapped.dueDate}
+                                    </span>
+                                    <span className="font-mono text-text-primary-light dark:text-text-primary-dark">
+                                      {formatCents(mr.mapped.amountPaid)}
+                                    </span>
+                                    <span className="text-text-secondary-light dark:text-text-secondary-dark capitalize">
+                                      {mr.mapped.status.toLowerCase()}
+                                    </span>
+                                    <Select
+                                      value={effectiveType}
+                                      onValueChange={(val) =>
+                                        handleRowOverride(mr.row.rowNumber, val as ChargeType)
+                                      }
+                                    >
+                                      <SelectTrigger className={`h-6 text-meta ${isOverridden ? 'border-secondary-400' : ''}`}>
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {CHARGE_TYPE_OPTIONS.map((opt) => (
+                                          <SelectItem key={opt.value} value={opt.value}>
+                                            {opt.label}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </>
+                      )}
+                    </React.Fragment>
                   );
                 })}
               </tbody>

@@ -74,6 +74,7 @@ export function LedgerImportWizard({ onComplete, onSkip, showSkip = false }: Led
     serviceFeeHandling: 'auto_detect',
     postGlEntries: true,
     chargeTypeMap: {},
+    rowOverrides: {},
     lateFeeAmount: 0,
   });
   const [assessments, setAssessments] = useState<{ id: string; title: string }[]>([]);

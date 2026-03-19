@@ -566,12 +566,17 @@ export function calculateUnitBalances(matchedRows: MatchedRow[]): UnitBalance[] 
 
 /**
  * Resolve the charge type for a row.
- * Priority: 1) CSV column value (if mapped), 2) amount-based map from review step, 3) default to 'assessment'
+ * Priority: 1) per-row override, 2) CSV column value (if mapped), 3) amount-based map, 4) default 'assessment'
  */
 export function resolveChargeType(
   row: MatchedRow,
   chargeTypeMap: Record<number, ChargeType>,
+  rowOverrides?: Record<number, ChargeType>,
 ): ChargeType {
+  // Check per-row override first (highest priority)
+  if (rowOverrides && rowOverrides[row.row.rowNumber] !== undefined) {
+    return rowOverrides[row.row.rowNumber];
+  }
   // If the CSV had a chargeType column mapped with a value, try to parse it
   if (row.mapped.chargeType) {
     const val = row.mapped.chargeType.toLowerCase();
