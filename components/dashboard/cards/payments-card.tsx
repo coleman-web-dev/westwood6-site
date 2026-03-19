@@ -6,11 +6,23 @@ import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { DashboardCardShell } from './dashboard-card-shell';
 import { CreditCard } from 'lucide-react';
-import type { Payment } from '@/lib/types/database';
+
+interface PaymentRow {
+  id: string;
+  unit_id: string;
+  amount: number;
+  created_at: string;
+  units: { unit_number: string; address: string | null } | null;
+}
+
+function formatDate(dateStr: string) {
+  const d = new Date(dateStr);
+  return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
+}
 
 export function PaymentsCard() {
   const { community, unit, isBoard, viewMode } = useCommunity();
-  const [payments, setPayments] = useState<Payment[]>([]);
+  const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const isAdminView = isBoard && viewMode === 'admin';
@@ -21,29 +33,31 @@ export function PaymentsCard() {
     const supabase = createClient();
 
     async function fetchPayments() {
-      let query = supabase
-        .from('payments')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(5);
-
       if (isAdminView) {
-        // Community-wide: join through invoices to get community_id
-        // payments don't have community_id, so filter by units in community
+        // Community-wide with unit address
         const { data: unitIds } = await supabase
           .from('units')
           .select('id')
           .eq('community_id', community.id);
         const ids = unitIds?.map((u: { id: string }) => u.id) ?? [];
         if (ids.length > 0) {
-          query = query.in('unit_id', ids);
+          const { data } = await supabase
+            .from('payments')
+            .select('id, unit_id, amount, created_at, units(unit_number, address)')
+            .in('unit_id', ids)
+            .order('created_at', { ascending: false })
+            .limit(5);
+          setPayments((data as PaymentRow[]) ?? []);
         }
       } else {
-        query = query.eq('unit_id', unit!.id);
+        const { data } = await supabase
+          .from('payments')
+          .select('id, unit_id, amount, created_at, units(unit_number, address)')
+          .eq('unit_id', unit!.id)
+          .order('created_at', { ascending: false })
+          .limit(5);
+        setPayments((data as PaymentRow[]) ?? []);
       }
-
-      const { data } = await query;
-      setPayments((data as Payment[]) ?? []);
       setLoading(false);
     }
 
@@ -63,15 +77,27 @@ export function PaymentsCard() {
         </div>
       ) : (
         <div className="space-y-3">
-          <ul className="space-y-3">
+          <ul className="space-y-2">
             {payments.map((p) => (
-              <li key={p.id} className="flex items-center justify-between">
-                <p className="text-meta text-text-secondary-light dark:text-text-secondary-dark">
-                  {new Date(p.created_at).toLocaleDateString()}
-                </p>
-                <p className="text-body font-medium tabular-nums">
-                  ${(p.amount / 100).toFixed(2)}
-                </p>
+              <li key={p.id}>
+                <Link
+                  href={`/${community.slug}/household?unit=${p.unit_id}`}
+                  className="flex items-center justify-between gap-2 py-1.5 px-2 -mx-2 rounded-md hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors"
+                >
+                  <div className="min-w-0">
+                    {isAdminView && p.units?.address && (
+                      <p className="text-body text-text-primary-light dark:text-text-primary-dark truncate">
+                        {p.units.address}
+                      </p>
+                    )}
+                    <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                      {formatDate(p.created_at)}
+                    </p>
+                  </div>
+                  <p className="text-body font-medium tabular-nums text-green-600 dark:text-green-400 shrink-0">
+                    ${(p.amount / 100).toFixed(2)}
+                  </p>
+                </Link>
               </li>
             ))}
           </ul>

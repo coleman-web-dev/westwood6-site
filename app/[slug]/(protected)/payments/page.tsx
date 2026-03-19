@@ -216,7 +216,7 @@ export default function PaymentsPage() {
   const outstandingInvoices = invoices.filter(
     (inv) => inv.status === 'pending' || inv.status === 'overdue' || inv.status === 'partial'
   );
-  const totalOutstanding = outstandingInvoices.reduce((sum, inv) => sum + inv.amount, 0);
+  const totalOutstanding = outstandingInvoices.reduce((sum, inv) => sum + (inv.amount - (inv.amount_paid ?? 0)), 0);
 
   // When navigating from household page with a unit filter, scope data to that unit
   const filteredInvoices = useMemo(() => {

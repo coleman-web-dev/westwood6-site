@@ -11,6 +11,7 @@ export function BalanceCard() {
   const [balance, setBalance] = useState<number | null>(null);
   const [walletCredit, setWalletCredit] = useState<number>(0);
   const [overdueCount, setOverdueCount] = useState(0);
+  const [outstandingCount, setOutstandingCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const isAdminView = isBoard && viewMode === 'admin';
@@ -35,6 +36,7 @@ export function BalanceCard() {
         const total = invoices?.reduce((sum: number, inv: { amount: number; amount_paid: number | null }) =>
           sum + (inv.amount - (inv.amount_paid ?? 0)), 0) ?? 0;
         setBalance(total);
+        setOutstandingCount(invoices?.length ?? 0);
         setOverdueCount(invoices?.filter((inv: { status: string }) => inv.status === 'overdue').length ?? 0);
         setWalletCredit(0);
       } else {
@@ -74,7 +76,7 @@ export function BalanceCard() {
             </p>
             <p className="text-meta text-text-secondary-light dark:text-text-secondary-dark mt-1">
               {isAdminView
-                ? `${overdueCount > 0 ? `${overdueCount} overdue` : 'No overdue invoices'}`
+                ? `${outstandingCount} outstanding invoice${outstandingCount !== 1 ? 's' : ''}${overdueCount > 0 ? ` (${overdueCount} overdue)` : ''}`
                 : 'Outstanding balance'}
             </p>
             {walletCredit > 0 && (
