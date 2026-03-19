@@ -36,6 +36,7 @@ export function ReconciliationWorkspace({
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState(false);
   const [selectedTxn, setSelectedTxn] = useState<BankTransaction | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'pending' | 'matched' | 'categorized' | 'excluded' | null>(null);
   const assignedRef = useRef(false);
 
   const fetchData = useCallback(async () => {
@@ -248,17 +249,22 @@ export function ReconciliationWorkspace({
         </div>
       </div>
 
-      {/* Transaction summary */}
+      {/* Transaction summary - clickable to filter */}
       <div className="grid grid-cols-4 gap-3">
-        {[
-          { label: 'Pending', count: pending.length, variant: 'outline' as const },
-          { label: 'Matched', count: matched.length, variant: 'secondary' as const },
-          { label: 'Categorized', count: categorized.length, variant: 'default' as const },
-          { label: 'Excluded', count: excluded.length, variant: 'destructive' as const },
-        ].map((s) => (
-          <div
+        {([
+          { label: 'Pending', key: 'pending' as const, count: pending.length, variant: 'outline' as const },
+          { label: 'Matched', key: 'matched' as const, count: matched.length, variant: 'secondary' as const },
+          { label: 'Categorized', key: 'categorized' as const, count: categorized.length, variant: 'default' as const },
+          { label: 'Excluded', key: 'excluded' as const, count: excluded.length, variant: 'destructive' as const },
+        ]).map((s) => (
+          <button
             key={s.label}
-            className="rounded-inner-card border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-3 text-center"
+            onClick={() => setStatusFilter(statusFilter === s.key ? null : s.key)}
+            className={`rounded-inner-card border p-3 text-center transition-all cursor-pointer ${
+              statusFilter === s.key
+                ? 'border-secondary-400 ring-2 ring-secondary-400/30 bg-surface-light-2 dark:bg-surface-dark-2'
+                : 'border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark hover:border-text-muted-light dark:hover:border-text-muted-dark'
+            }`}
           >
             <p className="text-metric-xl text-text-primary-light dark:text-text-primary-dark">
               {s.count}
@@ -266,7 +272,7 @@ export function ReconciliationWorkspace({
             <Badge variant={s.variant} className="text-meta mt-1">
               {s.label}
             </Badge>
-          </div>
+          </button>
         ))}
       </div>
 
@@ -285,7 +291,7 @@ export function ReconciliationWorkspace({
       )}
 
       {/* Pending transactions (action needed) */}
-      {pending.length > 0 && (
+      {pending.length > 0 && (!statusFilter || statusFilter === 'pending') && (
         <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark overflow-hidden">
           <div className="px-card-padding py-2 bg-surface-light-2 dark:bg-surface-dark-2 border-b border-stroke-light dark:border-stroke-dark">
             <h3 className="text-section-title text-text-primary-light dark:text-text-primary-dark">
@@ -338,15 +344,15 @@ export function ReconciliationWorkspace({
       )}
 
       {/* Cleared transactions */}
-      {(matched.length > 0 || categorized.length > 0) && (
+      {(matched.length > 0 || categorized.length > 0) && (!statusFilter || statusFilter === 'matched' || statusFilter === 'categorized') && (
         <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark overflow-hidden">
           <div className="px-card-padding py-2 bg-surface-light-2 dark:bg-surface-dark-2 border-b border-stroke-light dark:border-stroke-dark">
             <h3 className="text-section-title text-text-primary-light dark:text-text-primary-dark">
-              Cleared ({matched.length + categorized.length})
+              {statusFilter === 'matched' ? `Matched (${matched.length})` : statusFilter === 'categorized' ? `Categorized (${categorized.length})` : `Cleared (${matched.length + categorized.length})`}
             </h3>
           </div>
           <div className="divide-y divide-stroke-light dark:divide-stroke-dark">
-            {[...matched, ...categorized].map((txn) => {
+            {(statusFilter === 'matched' ? matched : statusFilter === 'categorized' ? categorized : [...matched, ...categorized]).map((txn) => {
               const amt = formatAmount(txn.amount);
               return (
                 <div
@@ -396,7 +402,7 @@ export function ReconciliationWorkspace({
       )}
 
       {/* Excluded transactions */}
-      {excluded.length > 0 && (
+      {excluded.length > 0 && (!statusFilter || statusFilter === 'excluded') && (
         <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark overflow-hidden">
           <div className="px-card-padding py-2 bg-surface-light-2 dark:bg-surface-dark-2 border-b border-stroke-light dark:border-stroke-dark">
             <h3 className="text-section-title text-text-muted-light dark:text-text-muted-dark">
