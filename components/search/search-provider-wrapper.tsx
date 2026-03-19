@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { useRegisterActions, useKBar } from '@shipixen/kbar';
+import { useRegisterActions } from '@shipixen/kbar';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { searchLinks } from '@/data/config/searchLinks';
@@ -29,13 +29,14 @@ interface UnitRow {
 
 export function SearchProviderWrapper({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { query } = useKBar();
   const { community, isBoard } = useCommunity();
   const basePath = `/${community.slug}`;
 
+  // KBar auto-closes the modal after perform() runs.
+  // Use window.location for reliable navigation (router.push
+  // can silently fail when only query params change).
   const navigate = (path: string) => {
-    query.toggle();
-    router.push(path);
+    window.location.href = path;
   };
 
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
