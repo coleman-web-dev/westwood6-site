@@ -350,7 +350,8 @@ export function ReconciliationWorkspace({
               return (
                 <div
                   key={txn.id}
-                  className="px-card-padding py-2.5 hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors flex items-center gap-3"
+                  onClick={() => setSelectedTxn(txn)}
+                  className="px-card-padding py-2.5 hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors flex items-center gap-3 cursor-pointer"
                 >
                   <MerchantLogo name={txn.merchant_name || txn.name} logoUrl={txn.logo_url} />
                   <div className="flex-1 min-w-0">
@@ -365,13 +366,15 @@ export function ReconciliationWorkspace({
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <AccountCombobox
-                      communityId={communityId}
-                      transactionId={txn.id}
-                      currentAccountId={txn.categorized_account_id}
-                      accounts={accounts}
-                      onUpdate={fetchData}
-                    />
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <AccountCombobox
+                        communityId={communityId}
+                        transactionId={txn.id}
+                        currentAccountId={txn.categorized_account_id}
+                        accounts={accounts}
+                        onUpdate={fetchData}
+                      />
+                    </div>
                     {txn.ai_confidence != null && txn.ai_confidence >= 0.5 && (
                       <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-500 text-[10px] font-medium">
                         <Sparkles className="h-2.5 w-2.5" />
@@ -403,7 +406,8 @@ export function ReconciliationWorkspace({
               return (
                 <div
                   key={txn.id}
-                  className="px-card-padding py-2.5 hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors flex items-center gap-3"
+                  onClick={() => setSelectedTxn(txn)}
+                  className="px-card-padding py-2.5 hover:bg-surface-light-2 dark:hover:bg-surface-dark-2 transition-colors flex items-center gap-3 cursor-pointer"
                 >
                   <MerchantLogo name={txn.merchant_name || txn.name} logoUrl={txn.logo_url} />
                   <div className="flex-1 min-w-0">
@@ -418,13 +422,15 @@ export function ReconciliationWorkspace({
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <AccountCombobox
-                      communityId={communityId}
-                      transactionId={txn.id}
-                      currentAccountId={txn.categorized_account_id}
-                      accounts={accounts}
-                      onUpdate={fetchData}
-                    />
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <AccountCombobox
+                        communityId={communityId}
+                        transactionId={txn.id}
+                        currentAccountId={txn.categorized_account_id}
+                        accounts={accounts}
+                        onUpdate={fetchData}
+                      />
+                    </div>
                     {txn.match_method === 'ai' && (
                       <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-500 text-[10px] font-medium">
                         <Sparkles className="h-2.5 w-2.5" />
@@ -461,7 +467,8 @@ export function ReconciliationWorkspace({
               return (
                 <div
                   key={txn.id}
-                  className="px-card-padding py-2.5 flex items-center gap-3 opacity-50"
+                  onClick={() => setSelectedTxn(txn)}
+                  className="px-card-padding py-2.5 flex items-center gap-3 opacity-50 hover:opacity-75 cursor-pointer transition-opacity"
                 >
                   <MerchantLogo name={txn.merchant_name || txn.name} logoUrl={txn.logo_url} size={24} />
                   <div className="flex-1 min-w-0">
