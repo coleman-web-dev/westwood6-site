@@ -193,11 +193,7 @@ export function StepExecute({
               invoice_id: invoice.id,
               unit_id: unitId,
               amount: mapped.amountPaid,
-              payment_method: 'other',
-              notes: `Imported from ${fileName}`,
-              created_at: mapped.paymentDate
-                ? new Date(mapped.paymentDate + 'T12:00:00').toISOString()
-                : new Date().toISOString(),
+              paid_by: 'imported',
             });
 
             if (payError) {
