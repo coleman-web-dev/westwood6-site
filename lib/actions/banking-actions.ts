@@ -511,6 +511,26 @@ export async function createJournalEntryFromBankTxn(
   return { entryId: entry.id };
 }
 
+export async function updateReconciliationPeriod(
+  communityId: string,
+  reconciliationId: string,
+  periodStart: string,
+  periodEnd: string,
+) {
+  await requirePermission(communityId, 'banking', 'write');
+  const admin = createAdminClient();
+
+  const { error } = await admin
+    .from('bank_reconciliations')
+    .update({ period_start: periodStart, period_end: periodEnd })
+    .eq('id', reconciliationId)
+    .eq('community_id', communityId)
+    .eq('status', 'in_progress');
+
+  if (error) throw new Error(error.message);
+  return { success: true };
+}
+
 export async function assignReconciliationTransactions(
   communityId: string,
   reconciliationId: string,

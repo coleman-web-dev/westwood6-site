@@ -4,12 +4,26 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/shared/ui/button';
 import { Badge } from '@/components/shared/ui/badge';
-import { ArrowLeft, CheckCircle2, Loader2, RefreshCw, Sparkles } from 'lucide-react';
+import { ArrowLeft, CalendarIcon, CheckCircle2, Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/shared/ui/select';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/shared/ui/popover';
+import { Calendar } from '@/components/shared/ui/calendar';
 import {
   completeReconciliation,
   updateReconciliationBalance,
   assignReconciliationTransactions,
+  updateReconciliationPeriod,
   resetSyncCursor,
 } from '@/lib/actions/banking-actions';
 import { BankTransactionDetail } from '@/components/accounting/bank-transaction-detail';
@@ -18,6 +32,72 @@ import { AccountCombobox } from '@/components/accounting/account-combobox';
 import type { BankReconciliation, BankTransaction } from '@/lib/types/banking';
 import type { Account } from '@/lib/types/accounting';
 import type { Vendor } from '@/lib/types/database';
+
+// ─── Date helpers ───────────────────────────────────────
+
+function fmtDate(d: Date): string {
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${mm}/${dd}/${d.getFullYear()}`;
+}
+
+function toISO(d: Date): string {
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
+function fromISO(s: string): Date {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+type RangePreset = '1m' | '3m' | '6m' | 'ytd' | 'custom';
+
+function detectPreset(start: string, end: string): RangePreset {
+  const now = new Date();
+  const today = toISO(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
+  const jan1 = `${now.getFullYear()}-01-01`;
+  if (start === jan1 && end === today) return 'ytd';
+
+  const endDate = fromISO(end);
+  const startDate = fromISO(start);
+  const diffMs = endDate.getTime() - startDate.getTime();
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+  if (end === today) {
+    if (diffDays >= 28 && diffDays <= 31) return '1m';
+    if (diffDays >= 89 && diffDays <= 92) return '3m';
+    if (diffDays >= 180 && diffDays <= 184) return '6m';
+  }
+  return 'custom';
+}
+
+function getPresetDates(preset: RangePreset): { start: string; end: string } {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const end = toISO(today);
+  switch (preset) {
+    case '1m': {
+      const s = new Date(today);
+      s.setMonth(s.getMonth() - 1);
+      return { start: toISO(s), end };
+    }
+    case '3m': {
+      const s = new Date(today);
+      s.setMonth(s.getMonth() - 3);
+      return { start: toISO(s), end };
+    }
+    case '6m': {
+      const s = new Date(today);
+      s.setMonth(s.getMonth() - 6);
+      return { start: toISO(s), end };
+    }
+    case 'ytd':
+    default:
+      return { start: `${today.getFullYear()}-01-01`, end };
+  }
+}
 
 interface ReconciliationWorkspaceProps {
   communityId: string;
@@ -39,6 +119,9 @@ export function ReconciliationWorkspace({
   const [syncing, setSyncing] = useState(false);
   const [selectedTxn, setSelectedTxn] = useState<BankTransaction | null>(null);
   const [statusFilter, setStatusFilter] = useState<'pending' | 'matched' | 'categorized' | 'excluded' | null>(null);
+  const [rangePreset, setRangePreset] = useState<RangePreset>('custom');
+  const [startPickerOpen, setStartPickerOpen] = useState(false);
+  const [endPickerOpen, setEndPickerOpen] = useState(false);
   const assignedRef = useRef(false);
 
   const fetchData = useCallback(async () => {
@@ -105,6 +188,34 @@ export function ReconciliationWorkspace({
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Detect preset from current recon dates
+  useEffect(() => {
+    if (recon) {
+      setRangePreset(detectPreset(recon.period_start, recon.period_end));
+    }
+  }, [recon?.period_start, recon?.period_end]);
+
+  async function handlePresetChange(preset: RangePreset) {
+    setRangePreset(preset);
+    if (preset !== 'custom') {
+      const { start, end } = getPresetDates(preset);
+      await handlePeriodUpdate(start, end);
+    }
+  }
+
+  async function handlePeriodUpdate(newStart: string, newEnd: string) {
+    if (!recon) return;
+    try {
+      await updateReconciliationPeriod(communityId, reconciliationId, newStart, newEnd);
+      // Re-assign transactions for new date range
+      assignedRef.current = false;
+      await fetchData();
+      toast.success('Date range updated.');
+    } catch {
+      toast.error('Failed to update date range.');
+    }
+  }
 
   async function handleRefreshBalance() {
     try {
@@ -233,18 +344,74 @@ export function ReconciliationWorkspace({
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <Button size="sm" variant="ghost" onClick={onClose}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div>
+        <div className="flex-1 min-w-0">
           <h2 className="text-page-title text-text-primary-light dark:text-text-primary-dark">
             Bank Reconciliation
           </h2>
-          <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-            {new Date(recon.period_start + 'T00:00:00').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })} -{' '}
-            {new Date(recon.period_end + 'T00:00:00').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}
-          </p>
+        </div>
+        {/* Date range selector */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Select value={rangePreset} onValueChange={(v) => handlePresetChange(v as RangePreset)}>
+            <SelectTrigger className="w-[180px] h-8 text-meta">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ytd">Year to Date</SelectItem>
+              <SelectItem value="1m">Last 1 Month</SelectItem>
+              <SelectItem value="3m">Last 3 Months</SelectItem>
+              <SelectItem value="6m">Last 6 Months</SelectItem>
+              <SelectItem value="custom">Custom Range</SelectItem>
+            </SelectContent>
+          </Select>
+          <Popover open={startPickerOpen} onOpenChange={setStartPickerOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 text-meta font-normal gap-1.5">
+                <CalendarIcon className="h-3 w-3 opacity-50" />
+                {fmtDate(fromISO(recon.period_start))}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="single"
+                selected={fromISO(recon.period_start)}
+                onSelect={(d) => {
+                  if (d) {
+                    setRangePreset('custom');
+                    handlePeriodUpdate(toISO(d), recon.period_end);
+                  }
+                  setStartPickerOpen(false);
+                }}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+          <span className="text-meta text-text-muted-light dark:text-text-muted-dark">to</span>
+          <Popover open={endPickerOpen} onOpenChange={setEndPickerOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 text-meta font-normal gap-1.5">
+                <CalendarIcon className="h-3 w-3 opacity-50" />
+                {fmtDate(fromISO(recon.period_end))}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="single"
+                selected={fromISO(recon.period_end)}
+                onSelect={(d) => {
+                  if (d) {
+                    setRangePreset('custom');
+                    handlePeriodUpdate(recon.period_start, toISO(d));
+                  }
+                  setEndPickerOpen(false);
+                }}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 
