@@ -19,6 +19,8 @@ For each transaction, determine:
 For checks written BY the HOA (expenses), set is_vendor_check=true and try to identify the payee.
 For checks written TO the HOA by homeowners (income), set is_homeowner_check=true and try to identify the payer from the check image.
 
+IMPORTANT: For each check, include the 1-indexed "page_number" where the check image appears in the PDF. This is critical for extracting the check image. If the bank statement includes scanned check images, note which page they appear on.
+
 Return your results as JSON matching this exact structure:
 {
   "transactions": [
@@ -43,7 +45,10 @@ Return your results as JSON matching this exact structure:
       "memo": "January lawn maintenance",
       "is_vendor_check": true,
       "is_homeowner_check": false,
-      "page_number": 3
+      "page_number": 3,
+      "matched_vendor_id": "uuid-if-matched",
+      "matched_member_id": null,
+      "matched_unit_id": null
     }
   ],
   "summary": {
@@ -189,6 +194,7 @@ Return ONLY valid JSON, no markdown code fences.`,
         matched_member_id: (c.matched_member_id as string) || null,
         matched_unit_id: (c.matched_unit_id as string) || null,
         document_saved: false,
+        page_number: (c.page_number as number) || undefined,
       }),
     );
 

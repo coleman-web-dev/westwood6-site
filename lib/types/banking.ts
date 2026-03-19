@@ -181,6 +181,7 @@ export interface AIExtractedCheck {
   matched_member_id: string | null;
   matched_unit_id: string | null;
   document_saved: boolean; // whether image was saved as vendor/household doc
+  page_number?: number; // 1-indexed page in the PDF where check image appears
 }
 
 // ─── Plaid Statement Fetch ───────────────────────────────────────

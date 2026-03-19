@@ -139,6 +139,128 @@ export async function batchApplyAICategorizations(
 }
 
 /**
+ * Internal: save a check image as a vendor document without auth check.
+ * Used by the automated Plaid statement pipeline.
+ */
+export async function saveCheckImageToVendorInternal(
+  admin: SupabaseClient,
+  communityId: string,
+  vendorId: string,
+  checkNumber: string,
+  checkDate: string,
+  imageData: Buffer,
+  mimeType: string,
+) {
+  const ext = mimeType === 'image/png' ? 'png' : 'jpg';
+  const storagePath = `${communityId}/vendor-docs/${vendorId}/check_${checkNumber}_${checkDate}.${ext}`;
+
+  const { error: uploadError } = await admin.storage
+    .from('hoa-documents')
+    .upload(storagePath, imageData, { contentType: mimeType, upsert: true });
+
+  if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
+
+  await admin.from('vendor_documents').insert({
+    vendor_id: vendorId,
+    community_id: communityId,
+    document_type: 'check_image',
+    title: `Check #${checkNumber} - ${checkDate}`,
+    file_path: storagePath,
+    file_size: imageData.length,
+  });
+
+  return { success: true, path: storagePath };
+}
+
+/**
+ * Internal: save a check image as a household document without auth check.
+ * Used by the automated Plaid statement pipeline.
+ */
+export async function saveCheckImageToHouseholdInternal(
+  admin: SupabaseClient,
+  communityId: string,
+  unitId: string,
+  checkNumber: string,
+  checkDate: string,
+  payerName: string,
+  imageData: Buffer,
+  mimeType: string,
+) {
+  const ext = mimeType === 'image/png' ? 'png' : 'jpg';
+  const storagePath = `${communityId}/household-docs/${unitId}/check_${checkNumber}_${checkDate}.${ext}`;
+
+  const { error: uploadError } = await admin.storage
+    .from('hoa-documents')
+    .upload(storagePath, imageData, { contentType: mimeType, upsert: true });
+
+  if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
+
+  await admin.from('household_documents').insert({
+    community_id: communityId,
+    unit_id: unitId,
+    title: `Check #${checkNumber} from ${payerName} - ${checkDate}`,
+    file_type: 'check_image',
+    file_path: storagePath,
+  });
+
+  return { success: true, path: storagePath };
+}
+
+/**
+ * Internal: process and store check images extracted from a statement PDF.
+ * Saves each check image to the appropriate vendor or household documents.
+ */
+export async function processAndStoreCheckImagesInternal(
+  admin: SupabaseClient,
+  communityId: string,
+  checks: AIExtractedCheck[],
+  extractedImages: Map<string, Buffer>,
+): Promise<{ vendor_docs_saved: number; household_docs_saved: number; skipped: number }> {
+  const results = { vendor_docs_saved: 0, household_docs_saved: 0, skipped: 0 };
+
+  for (const check of checks) {
+    const imageBuffer = extractedImages.get(check.check_number);
+    if (!imageBuffer) {
+      results.skipped++;
+      continue;
+    }
+
+    try {
+      // Upload to temporary storage path
+      const storagePath = `${communityId}/check-images/check_${check.check_number}_${check.date}.png`;
+      await admin.storage
+        .from('hoa-documents')
+        .upload(storagePath, imageBuffer, { contentType: 'image/png', upsert: true });
+
+      check.image_path = storagePath;
+
+      if (check.is_vendor_check && check.matched_vendor_id) {
+        await saveCheckImageToVendorInternal(
+          admin, communityId, check.matched_vendor_id,
+          check.check_number, check.date, imageBuffer, 'image/png',
+        );
+        check.document_saved = true;
+        results.vendor_docs_saved++;
+      } else if (check.is_homeowner_check && check.matched_unit_id) {
+        await saveCheckImageToHouseholdInternal(
+          admin, communityId, check.matched_unit_id,
+          check.check_number, check.date, check.payer, imageBuffer, 'image/png',
+        );
+        check.document_saved = true;
+        results.household_docs_saved++;
+      } else {
+        results.skipped++;
+      }
+    } catch (err) {
+      console.error(`Failed to save check #${check.check_number} image:`, err);
+      results.skipped++;
+    }
+  }
+
+  return results;
+}
+
+/**
  * Save a check image as a document on the vendor's account.
  */
 export async function saveCheckImageToVendor(

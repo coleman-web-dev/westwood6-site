@@ -37,6 +37,10 @@
       "schedule": "0 7 * * *"
     },
     {
+      "path": "/api/cron/sync-bank-transactions",
+      "schedule": "0 6 * * *"
+    },
+    {
       "path": "/api/cron/fetch-statements",
       "schedule": "0 8 5 * *"
     },

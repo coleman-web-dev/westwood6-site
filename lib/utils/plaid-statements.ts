@@ -1,7 +1,12 @@
 import { getPlaidClient } from '@/lib/plaid';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { processStatementWithAI } from '@/lib/ai/process-statement';
-import { batchApplyAICategorizationsInternal } from '@/lib/actions/ai-statement-actions';
+import {
+  batchApplyAICategorizationsInternal,
+  processAndStoreCheckImagesInternal,
+} from '@/lib/actions/ai-statement-actions';
+import { extractCheckImagesFromPDF } from '@/lib/utils/extract-check-images';
+import { reconcileChecksFromStatement } from '@/lib/utils/check-reconciliation';
 import type { StatementFetchResult } from '@/lib/types/banking';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -159,14 +164,35 @@ export async function fetchAndProcessStatements(
         }
 
         // Process with AI
-        await processStatementWithAI({
+        const aiResults = await processStatementWithAI({
           communityId,
           statementUploadId: upload.id,
           fileData: pdfBuffer,
           mimeType: 'application/pdf',
         });
 
-        // Auto-apply categorizations
+        // Extract check images from the PDF and store them
+        if (aiResults.checks.length > 0) {
+          try {
+            const extractedImages = await extractCheckImagesFromPDF(pdfBuffer, aiResults.checks);
+
+            // Build map of check_number -> image buffer
+            const imageMap = new Map<string, Buffer>();
+            for (const img of extractedImages) {
+              imageMap.set(img.checkNumber, img.imageData);
+            }
+
+            // Store check images to vendor/household documents
+            await processAndStoreCheckImagesInternal(admin, communityId, aiResults.checks, imageMap);
+
+            // Reconcile checks: match to bank transactions + auto-categorize
+            await reconcileChecksFromStatement(admin, communityId, aiResults.checks);
+          } catch (checkErr) {
+            console.error('Check image extraction/reconciliation failed (non-fatal):', checkErr);
+          }
+        }
+
+        // Auto-apply categorizations for non-check transactions
         await batchApplyAICategorizationsInternal(admin, communityId, upload.id);
 
         result.processed++;
