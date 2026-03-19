@@ -21,6 +21,8 @@ import {
   type MemberRecord,
   autoMapLedgerColumns,
   matchRowsToUnits,
+  getDistinctAmounts,
+  buildDefaultChargeTypeMap,
   LEDGER_FIELDS,
 } from '@/lib/utils/ledger-import';
 
@@ -64,6 +66,7 @@ export function LedgerImportWizard({ onComplete, onSkip, showSkip = false }: Led
     assessmentId: null,
     serviceFeeHandling: 'auto_detect',
     postGlEntries: true,
+    chargeTypeMap: {},
   });
   const [assessments, setAssessments] = useState<{ id: string; title: string }[]>([]);
 
@@ -120,6 +123,12 @@ export function LedgerImportWizard({ onComplete, onSkip, showSkip = false }: Led
     setMatchedRows(matched);
   }, [rows, columnMapping, units, members]);
 
+  // Check if chargeType column is mapped
+  const hasChargeTypeColumn = useMemo(
+    () => Object.values(columnMapping).includes('chargeType'),
+    [columnMapping],
+  );
+
   // Step navigation
   function goNext() {
     const stepIndex = STEPS.findIndex((s) => s.key === currentStep);
@@ -130,6 +139,17 @@ export function LedgerImportWizard({ onComplete, onSkip, showSkip = false }: Led
       // Run matching before showing match step
       if (nextStep === 'match') {
         runMatching();
+      }
+
+      // Initialize charge type map when entering review step
+      if (nextStep === 'review' && !hasChargeTypeColumn) {
+        const importable = matchedRows.filter((r) => r.unitId);
+        const amounts = getDistinctAmounts(importable);
+        const defaultMap = buildDefaultChargeTypeMap(amounts);
+        setConfig((prev) => ({
+          ...prev,
+          chargeTypeMap: { ...defaultMap, ...prev.chargeTypeMap },
+        }));
       }
 
       setCurrentStep(nextStep);
@@ -257,6 +277,7 @@ export function LedgerImportWizard({ onComplete, onSkip, showSkip = false }: Led
             config={config}
             onConfigChange={setConfig}
             assessments={assessments}
+            hasChargeTypeColumn={hasChargeTypeColumn}
           />
         )}
         {currentStep === 'import' && (

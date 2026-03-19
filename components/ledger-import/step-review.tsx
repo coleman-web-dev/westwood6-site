@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { FileText, CreditCard, Wallet, AlertTriangle, Receipt } from 'lucide-react';
+import { FileText, CreditCard, Wallet, AlertTriangle, Receipt, Shield } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -14,8 +14,13 @@ import { Switch } from '@/components/shared/ui/switch';
 import {
   type MatchedRow,
   type UnitBalance,
+  type ChargeType,
   calculateUnitBalances,
   formatCents,
+  getDistinctAmounts,
+  resolveChargeType,
+  CHARGE_TYPE_OPTIONS,
+  buildDefaultChargeTypeMap,
 } from '@/lib/utils/ledger-import';
 
 export type ServiceFeeHandling = 'hoa_absorbed' | 'member_paid' | 'auto_detect' | 'ignore';
@@ -24,6 +29,8 @@ export interface ImportConfig {
   assessmentId: string | null;
   serviceFeeHandling: ServiceFeeHandling;
   postGlEntries: boolean;
+  /** Maps amount (cents) to charge type. Used when CSV has no chargeType column. */
+  chargeTypeMap: Record<number, ChargeType>;
 }
 
 interface Assessment {
@@ -37,6 +44,8 @@ interface StepReviewProps {
   config: ImportConfig;
   onConfigChange: (config: ImportConfig) => void;
   assessments: Assessment[];
+  /** Whether the CSV had a chargeType column mapped. If false, show amount-grouping UI. */
+  hasChargeTypeColumn: boolean;
 }
 
 export function StepReview({
@@ -45,6 +54,7 @@ export function StepReview({
   config,
   onConfigChange,
   assessments,
+  hasChargeTypeColumn,
 }: StepReviewProps) {
   // Only include matched rows (or all if not skipping)
   const importableRows = useMemo(
@@ -52,31 +62,43 @@ export function StepReview({
     [matchedRows, skipUnmatched],
   );
 
-  // Summary stats
+  // Summary stats (split by charge type)
   const stats = useMemo(() => {
     let invoices = 0;
     let payments = 0;
+    let deposits = 0;
+    let depositAmount = 0;
     let totalCharged = 0;
     let totalPaid = 0;
     let totalFees = 0;
 
     for (const row of importableRows) {
-      invoices++;
-      totalCharged += row.mapped.amountDue;
-      if (row.mapped.amountPaid > 0) {
-        payments++;
-        totalPaid += row.mapped.amountPaid;
+      const ct = resolveChargeType(row, config.chargeTypeMap);
+      if (ct === 'security_deposit') {
+        deposits++;
+        depositAmount += row.mapped.amountPaid;
+      } else {
+        invoices++;
+        totalCharged += row.mapped.amountDue;
+        if (row.mapped.amountPaid > 0) {
+          payments++;
+          totalPaid += row.mapped.amountPaid;
+        }
+        totalFees += row.mapped.serviceFee;
       }
-      totalFees += row.mapped.serviceFee;
     }
 
-    return { invoices, payments, totalCharged, totalPaid, totalFees };
-  }, [importableRows]);
+    return { invoices, payments, deposits, depositAmount, totalCharged, totalPaid, totalFees };
+  }, [importableRows, config.chargeTypeMap]);
 
-  // Per-unit balances
+  // Per-unit balances (exclude security deposits)
+  const assessmentRows = useMemo(
+    () => importableRows.filter((r) => resolveChargeType(r, config.chargeTypeMap) !== 'security_deposit'),
+    [importableRows, config.chargeTypeMap],
+  );
   const unitBalances: UnitBalance[] = useMemo(
-    () => calculateUnitBalances(importableRows),
-    [importableRows],
+    () => calculateUnitBalances(assessmentRows),
+    [assessmentRows],
   );
 
   const overpaidUnits = unitBalances.filter((b) => b.balance < 0);
@@ -86,6 +108,22 @@ export function StepReview({
   const totalOwing = owingUnits.reduce((sum, b) => sum + b.balance, 0);
 
   const skippedRows = matchedRows.filter((r) => !r.unitId);
+
+  // Distinct amounts for charge type grouping
+  const distinctAmounts = useMemo(
+    () => getDistinctAmounts(importableRows),
+    [importableRows],
+  );
+
+  function handleChargeTypeChange(amountCents: number, chargeType: ChargeType) {
+    onConfigChange({
+      ...config,
+      chargeTypeMap: {
+        ...config.chargeTypeMap,
+        [amountCents]: chargeType,
+      },
+    });
+  }
 
   return (
     <div className="space-y-4">
@@ -99,7 +137,7 @@ export function StepReview({
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className={`grid grid-cols-2 ${stats.deposits > 0 ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-3`}>
         <div className="rounded-inner-card border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-3">
           <div className="flex items-center gap-2 mb-1">
             <FileText className="h-4 w-4 text-secondary-500" />
@@ -124,6 +162,22 @@ export function StepReview({
             {formatCents(stats.totalPaid)} total
           </p>
         </div>
+        {stats.deposits > 0 && (
+          <div className="rounded-inner-card border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Shield className="h-4 w-4 text-indigo-500" />
+              <span className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                Deposits
+              </span>
+            </div>
+            <p className="text-card-title text-text-primary-light dark:text-text-primary-dark">
+              {stats.deposits}
+            </p>
+            <p className="text-meta text-indigo-600 dark:text-indigo-400">
+              {formatCents(stats.depositAmount)} held
+            </p>
+          </div>
+        )}
         <div className="rounded-inner-card border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-3">
           <div className="flex items-center gap-2 mb-1">
             <Wallet className="h-4 w-4 text-blue-500" />
@@ -151,6 +205,81 @@ export function StepReview({
           <p className="text-meta text-red-600 dark:text-red-400">{formatCents(totalOwing)} owed</p>
         </div>
       </div>
+
+      {/* Charge type assignment (when no CSV column mapped) */}
+      {!hasChargeTypeColumn && distinctAmounts.length > 1 && (
+        <div className="rounded-inner-card border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-4 space-y-3">
+          <div>
+            <h3 className="text-label font-semibold text-text-primary-light dark:text-text-primary-dark">
+              Categorize Charges
+            </h3>
+            <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+              Your file contains different charge amounts. Assign a category to each so they are
+              accounted for correctly (e.g. security deposits go to a liability account, not revenue).
+            </p>
+          </div>
+          <div className="rounded-inner-card border border-stroke-light dark:border-stroke-dark overflow-hidden">
+            <table className="w-full text-meta">
+              <thead>
+                <tr className="bg-surface-light-2 dark:bg-surface-dark-2">
+                  <th className="px-3 py-2 text-left font-semibold text-text-secondary-light dark:text-text-secondary-dark">
+                    Amount
+                  </th>
+                  <th className="px-3 py-2 text-right font-semibold text-text-secondary-light dark:text-text-secondary-dark">
+                    Rows
+                  </th>
+                  <th className="px-3 py-2 text-left font-semibold text-text-secondary-light dark:text-text-secondary-dark min-w-[180px]">
+                    Category
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {distinctAmounts.map(({ amount, count, likelyAssessment }) => (
+                  <tr
+                    key={amount}
+                    className={`border-t border-stroke-light dark:border-stroke-dark ${
+                      !likelyAssessment
+                        ? 'bg-amber-50 dark:bg-amber-950/30'
+                        : ''
+                    }`}
+                  >
+                    <td className="px-3 py-2 font-mono text-text-primary-light dark:text-text-primary-dark">
+                      <span>{formatCents(amount)}</span>
+                      {!likelyAssessment && (
+                        <span className="ml-2 text-amber-600 dark:text-amber-400 font-normal">
+                          Not a multiple of base dues
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-right text-text-secondary-light dark:text-text-secondary-dark">
+                      {count}
+                    </td>
+                    <td className="px-3 py-2">
+                      <Select
+                        value={config.chargeTypeMap[amount] || 'assessment'}
+                        onValueChange={(val) =>
+                          handleChargeTypeChange(amount, val as ChargeType)
+                        }
+                      >
+                        <SelectTrigger className="h-7 text-meta">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CHARGE_TYPE_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Configuration */}
       <div className="rounded-inner-card border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-4 space-y-4">

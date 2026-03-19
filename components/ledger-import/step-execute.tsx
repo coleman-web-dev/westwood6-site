@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { CheckCircle, AlertCircle, Loader2, FileText, CreditCard, Wallet, BookOpen, Download } from 'lucide-react';
+import { CheckCircle, AlertCircle, Loader2, FileText, CreditCard, Wallet, BookOpen, Download, Shield } from 'lucide-react';
 import { Button } from '@/components/shared/ui/button';
 import { Progress } from '@/components/shared/ui/progress';
 import { createClient } from '@/lib/supabase/client';
@@ -10,6 +10,7 @@ import {
   type ImportResult,
   calculateUnitBalances,
   formatCents,
+  resolveChargeType,
 } from '@/lib/utils/ledger-import';
 import type { ImportConfig, ServiceFeeHandling } from './step-review';
 import {
@@ -41,6 +42,8 @@ export function StepExecute({
   const [result, setResult] = useState<ImportResult>({
     invoicesCreated: 0,
     paymentsRecorded: 0,
+    depositsRecorded: 0,
+    depositAmount: 0,
     walletCredits: 0,
     walletCreditAmount: 0,
     outstandingAmount: 0,
@@ -57,6 +60,8 @@ export function StepExecute({
     const res: ImportResult = {
       invoicesCreated: 0,
       paymentsRecorded: 0,
+      depositsRecorded: 0,
+      depositAmount: 0,
       walletCredits: 0,
       walletCreditAmount: 0,
       outstandingAmount: 0,
@@ -74,6 +79,34 @@ export function StepExecute({
         try {
           const { mapped, unitId } = mr;
           if (!unitId) continue;
+
+          const chargeType = resolveChargeType(mr, config.chargeTypeMap);
+
+          // ─── Security Deposit path ───────────────────
+          if (chargeType === 'security_deposit') {
+            if (mapped.amountPaid > 0 && config.postGlEntries) {
+              // Security deposit received: DR Cash, CR Security Deposits Held
+              await createJournalEntry({
+                communityId,
+                entryDate: mapped.paymentDate || mapped.dueDate || undefined,
+                description: `Security deposit received (imported from ${fileName})`,
+                source: 'bank_sync',
+                referenceType: 'invoice',
+                referenceId: undefined,
+                unitId,
+                lines: [
+                  { accountCode: '1000', debit: mapped.amountPaid, credit: 0, description: 'Operating Cash' },
+                  { accountCode: '2210', debit: 0, credit: mapped.amountPaid, description: 'Security Deposits Held' },
+                ],
+              });
+              res.glEntriesPosted++;
+            }
+            res.depositsRecorded++;
+            res.depositAmount += mapped.amountPaid;
+            continue; // Skip invoice/payment creation for deposits
+          }
+
+          // ─── Assessment / Other path ─────────────────
 
           // Derive invoice status
           let invoiceStatus: string;
@@ -230,8 +263,11 @@ export function StepExecute({
       setResult({ ...res });
     }
 
-    // 4. Calculate and apply wallet credits/debits per unit
-    const unitBalances = calculateUnitBalances(importableRows);
+    // 4. Calculate and apply wallet credits/debits per unit (exclude security deposits)
+    const assessmentRows = importableRows.filter(
+      (r) => resolveChargeType(r, config.chargeTypeMap) !== 'security_deposit',
+    );
+    const unitBalances = calculateUnitBalances(assessmentRows);
     for (const ub of unitBalances) {
       if (ub.balance < 0) {
         // Overpaid: credit the wallet
@@ -342,7 +378,7 @@ export function StepExecute({
 
       {/* Results */}
       {(running || done) && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           <div className="rounded-inner-card border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-3 text-center">
             <FileText className="h-5 w-5 mx-auto mb-1 text-secondary-500" />
             <p className="text-card-title text-text-primary-light dark:text-text-primary-dark">
@@ -357,6 +393,17 @@ export function StepExecute({
             </p>
             <p className="text-meta text-text-muted-light dark:text-text-muted-dark">Payments</p>
           </div>
+          {result.depositsRecorded > 0 && (
+            <div className="rounded-inner-card border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-3 text-center">
+              <Shield className="h-5 w-5 mx-auto mb-1 text-indigo-500" />
+              <p className="text-card-title text-text-primary-light dark:text-text-primary-dark">
+                {result.depositsRecorded}
+              </p>
+              <p className="text-meta text-indigo-600 dark:text-indigo-400">
+                {formatCents(result.depositAmount)} deposits
+              </p>
+            </div>
+          )}
           <div className="rounded-inner-card border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-3 text-center">
             <Wallet className="h-5 w-5 mx-auto mb-1 text-blue-500" />
             <p className="text-card-title text-text-primary-light dark:text-text-primary-dark">

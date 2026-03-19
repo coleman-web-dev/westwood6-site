@@ -66,6 +66,20 @@ export const LEDGER_FIELDS: LedgerField[] = [
     required: false,
     keywords: ['service fee', 'processing fee', 'fee', 'service fee paid', 'convenience fee', 'transaction fee'],
   },
+  {
+    key: 'chargeType',
+    label: 'Charge Type',
+    required: false,
+    keywords: ['type', 'charge type', 'category', 'description', 'item type', 'transaction type'],
+  },
+];
+
+export type ChargeType = 'assessment' | 'security_deposit' | 'other';
+
+export const CHARGE_TYPE_OPTIONS: { value: ChargeType; label: string }[] = [
+  { value: 'assessment', label: 'Assessment / Dues' },
+  { value: 'security_deposit', label: 'Security Deposit' },
+  { value: 'other', label: 'Other Fee' },
 ];
 
 export type LedgerFieldKey = (typeof LEDGER_FIELDS)[number]['key'];
@@ -96,6 +110,8 @@ export interface MatchedRow {
     paymentDate: string | null;
     invoiceNumber: string | null;
     serviceFee: number; // cents
+    /** Raw charge type value from CSV (if column was mapped) */
+    chargeType: string;
   };
 }
 
@@ -112,6 +128,8 @@ export interface UnitBalance {
 export interface ImportResult {
   invoicesCreated: number;
   paymentsRecorded: number;
+  depositsRecorded: number;
+  depositAmount: number; // cents
   walletCredits: number;
   walletCreditAmount: number; // cents
   outstandingAmount: number; // cents
@@ -327,6 +345,7 @@ export function applyMapping(
     paymentDate: parseDateString(get('paymentDate')),
     invoiceNumber: get('invoiceNumber') || null,
     serviceFee: parseDollarsToCents(get('serviceFee')),
+    chargeType: get('chargeType'),
   };
 }
 
@@ -540,6 +559,74 @@ export function calculateUnitBalances(matchedRows: MatchedRow[]): UnitBalance[] 
   // Sort: owing (positive balance) first, then by amount
   balances.sort((a, b) => b.balance - a.balance);
   return balances;
+}
+
+// ─── Charge Type Helpers ────────────────────────────
+
+/**
+ * Resolve the charge type for a row.
+ * Priority: 1) CSV column value (if mapped), 2) amount-based map from review step, 3) default to 'assessment'
+ */
+export function resolveChargeType(
+  row: MatchedRow,
+  chargeTypeMap: Record<number, ChargeType>,
+): ChargeType {
+  // If the CSV had a chargeType column mapped with a value, try to parse it
+  if (row.mapped.chargeType) {
+    const val = row.mapped.chargeType.toLowerCase();
+    if (val.includes('deposit') || val.includes('security')) return 'security_deposit';
+    if (val.includes('assessment') || val.includes('due') || val.includes('fee')) return 'assessment';
+  }
+  // Fall back to amount-based mapping from review step
+  const fromAmount = chargeTypeMap[row.mapped.amountDue];
+  if (fromAmount) return fromAmount;
+  return 'assessment';
+}
+
+/**
+ * Get distinct charge amounts from matched rows (for the amount-grouping UI).
+ * Includes auto-detection: the most common amount is assumed to be monthly dues,
+ * and amounts that are clean multiples are flagged as likely assessments.
+ */
+export function getDistinctAmounts(rows: MatchedRow[]): {
+  amount: number;
+  count: number;
+  /** Whether this amount is likely an assessment (multiple of the base dues amount) */
+  likelyAssessment: boolean;
+}[] {
+  const counts = new Map<number, number>();
+  for (const r of rows) {
+    if (!r.unitId) continue;
+    counts.set(r.mapped.amountDue, (counts.get(r.mapped.amountDue) || 0) + 1);
+  }
+
+  const entries = Array.from(counts.entries())
+    .map(([amount, count]) => ({ amount, count }))
+    .sort((a, b) => b.count - a.count);
+
+  // The most frequent amount is likely the base monthly dues
+  const baseAmount = entries.length > 0 ? entries[0].amount : 0;
+
+  return entries.map(({ amount, count }) => ({
+    amount,
+    count,
+    likelyAssessment:
+      baseAmount > 0 && amount > 0 && amount % baseAmount === 0,
+  }));
+}
+
+/**
+ * Build a default chargeTypeMap: amounts that are multiples of the base dues default
+ * to 'assessment', others are left unset (will show as needing review).
+ */
+export function buildDefaultChargeTypeMap(
+  distinctAmounts: { amount: number; likelyAssessment: boolean }[],
+): Record<number, ChargeType> {
+  const map: Record<number, ChargeType> = {};
+  for (const { amount, likelyAssessment } of distinctAmounts) {
+    map[amount] = likelyAssessment ? 'assessment' : 'assessment';
+  }
+  return map;
 }
 
 // ─── Formatting Helpers ─────────────────────────────
