@@ -182,6 +182,58 @@ export async function mapBankAccountToGL(
   return { success: true };
 }
 
+export async function overrideTransactionDirection(
+  communityId: string,
+  transactionId: string,
+  direction: 'inflow' | 'outflow',
+  applyToSimilar?: boolean,
+): Promise<{ success: boolean; updatedCount?: number; error?: string }> {
+  try {
+    await requirePermission(communityId, 'banking', 'write');
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Permission denied';
+    return { success: false, error: msg };
+  }
+
+  const admin = createAdminClient();
+
+  // Update the target transaction
+  const { error } = await admin
+    .from('bank_transactions')
+    .update({ direction_override: direction })
+    .eq('id', transactionId)
+    .eq('community_id', communityId);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  let updatedCount = 1;
+
+  // Optionally apply to all transactions with the same name in this bank account
+  if (applyToSimilar) {
+    const { data: txn } = await admin
+      .from('bank_transactions')
+      .select('name, plaid_bank_account_id')
+      .eq('id', transactionId)
+      .single();
+
+    if (txn) {
+      const { count } = await admin
+        .from('bank_transactions')
+        .update({ direction_override: direction })
+        .eq('community_id', communityId)
+        .eq('plaid_bank_account_id', txn.plaid_bank_account_id)
+        .eq('name', txn.name)
+        .is('direction_override', null);
+
+      updatedCount += (count || 0);
+    }
+  }
+
+  return { success: true, updatedCount };
+}
+
 export async function updateBankAccountSignSource(
   communityId: string,
   bankAccountId: string,
@@ -487,7 +539,7 @@ export async function createJournalEntryFromBankTxn(
 
   const signSource = (bankAcct?.amount_sign_source as 'sign' | 'name' | 'abs') || 'name';
   const amountCents = Math.abs(txn.amount);
-  const isDebit = isOutflow(txn.amount, txn.name, txn.plaid_category, signSource);
+  const isDebit = isOutflow(txn.amount, txn.name, txn.plaid_category, signSource, txn.direction_override);
 
   // Create journal entry
   const { data: entry, error: entryError } = await admin

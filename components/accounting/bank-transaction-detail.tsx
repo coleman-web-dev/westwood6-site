@@ -70,6 +70,7 @@ export function BankTransactionDetail({
     transaction.name,
     transaction.plaid_category,
     amountSignSource,
+    transaction.direction_override,
   );
 
   async function handleCategorize() {

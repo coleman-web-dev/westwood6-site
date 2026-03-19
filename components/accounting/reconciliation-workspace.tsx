@@ -19,17 +19,20 @@ import {
   PopoverTrigger,
 } from '@/components/shared/ui/popover';
 import { Calendar } from '@/components/shared/ui/calendar';
+import { Checkbox } from '@/components/shared/ui/checkbox';
+import { Label } from '@/components/shared/ui/label';
 import {
   completeReconciliation,
   updateReconciliationBalance,
   assignReconciliationTransactions,
   updateReconciliationPeriod,
   resetSyncCursor,
+  overrideTransactionDirection,
 } from '@/lib/actions/banking-actions';
 import { BankTransactionDetail } from '@/components/accounting/bank-transaction-detail';
 import { MerchantLogo } from '@/components/accounting/merchant-logo';
 import { AccountCombobox } from '@/components/accounting/account-combobox';
-import { formatBankAmount } from '@/lib/utils/transaction-direction';
+import { formatBankAmount, isOutflow } from '@/lib/utils/transaction-direction';
 import type { BankReconciliation, BankTransaction } from '@/lib/types/banking';
 import type { Account } from '@/lib/types/accounting';
 import type { Vendor } from '@/lib/types/database';
@@ -124,6 +127,9 @@ export function ReconciliationWorkspace({
   const [startPickerOpen, setStartPickerOpen] = useState(false);
   const [endPickerOpen, setEndPickerOpen] = useState(false);
   const [amountSignSource, setAmountSignSource] = useState<'sign' | 'name' | 'abs'>('name');
+  const [overrideTxnId, setOverrideTxnId] = useState<string | null>(null);
+  const [overrideApplyAll, setOverrideApplyAll] = useState(false);
+  const [overrideSaving, setOverrideSaving] = useState(false);
   const assignedRef = useRef(false);
 
   const fetchData = useCallback(async () => {
@@ -319,7 +325,112 @@ export function ReconciliationWorkspace({
   }
 
   function formatAmount(txn: BankTransaction) {
-    return formatBankAmount(txn.amount, txn.name, txn.plaid_category, amountSignSource);
+    return formatBankAmount(txn.amount, txn.name, txn.plaid_category, amountSignSource, txn.direction_override);
+  }
+
+  async function handleDirectionOverride(txnId: string) {
+    const txn = transactions.find((t) => t.id === txnId);
+    if (!txn) return;
+
+    // Determine current direction and flip it
+    const currentlyOutflow = isOutflow(txn.amount, txn.name, txn.plaid_category, amountSignSource, txn.direction_override);
+    const newDirection = currentlyOutflow ? 'inflow' : 'outflow';
+
+    setOverrideSaving(true);
+    const result = await overrideTransactionDirection(
+      communityId,
+      txnId,
+      newDirection as 'inflow' | 'outflow',
+      overrideApplyAll,
+    );
+    setOverrideSaving(false);
+
+    if (result.success) {
+      const count = result.updatedCount || 1;
+      toast.success(
+        count > 1
+          ? `Updated ${count} transactions to ${newDirection}.`
+          : `Transaction marked as ${newDirection}.`,
+      );
+      setOverrideTxnId(null);
+      setOverrideApplyAll(false);
+      fetchData();
+    } else {
+      toast.error(result.error || 'Failed to update direction.');
+    }
+  }
+
+  function AmountCell({ txn }: { txn: BankTransaction }) {
+    const amt = formatAmount(txn);
+    const currentlyOutflow = isOutflow(txn.amount, txn.name, txn.plaid_category, amountSignSource, txn.direction_override);
+    const isOpen = overrideTxnId === txn.id;
+    const newDirection = currentlyOutflow ? 'inflow' : 'outflow';
+
+    return (
+      <Popover
+        open={isOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setOverrideTxnId(null);
+            setOverrideApplyAll(false);
+          }
+        }}
+      >
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setOverrideTxnId(isOpen ? null : txn.id);
+              setOverrideApplyAll(false);
+            }}
+            className={`text-body tabular-nums font-medium w-24 text-right cursor-pointer hover:underline ${amt.className}`}
+          >
+            {amt.text}
+            {txn.direction_override && (
+              <span className="ml-0.5 text-[9px] opacity-60" title="Manually overridden">*</span>
+            )}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-64 p-3" align="end" side="bottom">
+          <p className="text-body text-text-primary-light dark:text-text-primary-dark mb-2">
+            Change to <strong>{newDirection === 'inflow' ? 'inflow (+)' : 'outflow (-)'}</strong>?
+          </p>
+          <div className="flex items-start gap-2 mb-3">
+            <Checkbox
+              id={`apply-all-${txn.id}`}
+              checked={overrideApplyAll}
+              onCheckedChange={(checked) => setOverrideApplyAll(checked === true)}
+            />
+            <Label htmlFor={`apply-all-${txn.id}`} className="text-meta leading-tight cursor-pointer">
+              Apply to all &ldquo;{txn.name}&rdquo; transactions
+            </Label>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 text-meta"
+              onClick={() => {
+                setOverrideTxnId(null);
+                setOverrideApplyAll(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className="h-7 text-meta"
+              disabled={overrideSaving}
+              onClick={() => handleDirectionOverride(txn.id)}
+            >
+              {overrideSaving && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
+              Confirm
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+    );
   }
 
   if (loading) {
@@ -548,9 +659,7 @@ export function ReconciliationWorkspace({
             </h3>
           </div>
           <div className="divide-y divide-stroke-light dark:divide-stroke-dark">
-            {pending.map((txn) => {
-              const amt = formatAmount(txn);
-              return (
+            {pending.map((txn) => (
                 <div
                   key={txn.id}
                   onClick={() => setSelectedTxn(txn)}
@@ -584,13 +693,10 @@ export function ReconciliationWorkspace({
                         {(txn.ai_confidence * 100).toFixed(0)}%
                       </span>
                     )}
-                    <span className={`text-body tabular-nums font-medium w-24 text-right ${amt.className}`}>
-                      {amt.text}
-                    </span>
+                    <AmountCell txn={txn} />
                   </div>
                 </div>
-              );
-            })}
+            ))}
           </div>
         </div>
       )}
@@ -604,9 +710,7 @@ export function ReconciliationWorkspace({
             </h3>
           </div>
           <div className="divide-y divide-stroke-light dark:divide-stroke-dark">
-            {(statusFilter === 'matched' ? matched : statusFilter === 'categorized' ? categorized : [...matched, ...categorized]).map((txn) => {
-              const amt = formatAmount(txn);
-              return (
+            {(statusFilter === 'matched' ? matched : statusFilter === 'categorized' ? categorized : [...matched, ...categorized]).map((txn) => (
                 <div
                   key={txn.id}
                   onClick={() => setSelectedTxn(txn)}
@@ -645,13 +749,10 @@ export function ReconciliationWorkspace({
                         Rule
                       </Badge>
                     )}
-                    <span className={`text-body tabular-nums font-medium w-24 text-right ${amt.className}`}>
-                      {amt.text}
-                    </span>
+                    <AmountCell txn={txn} />
                   </div>
                 </div>
-              );
-            })}
+            ))}
           </div>
         </div>
       )}
@@ -666,7 +767,6 @@ export function ReconciliationWorkspace({
           </div>
           <div className="divide-y divide-stroke-light dark:divide-stroke-dark">
             {excluded.map((txn) => {
-              const amt = formatAmount(txn);
               return (
                 <div
                   key={txn.id}
@@ -685,9 +785,7 @@ export function ReconciliationWorkspace({
                       )}
                     </p>
                   </div>
-                  <span className={`text-body tabular-nums font-medium w-24 text-right ${amt.className} opacity-70`}>
-                    {amt.text}
-                  </span>
+                  <AmountCell txn={txn} />
                 </div>
               );
             })}

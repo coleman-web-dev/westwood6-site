@@ -66,6 +66,7 @@ export interface BankTransaction {
   ai_reasoning: string | null;
   logo_url: string | null;
   plaid_category: string | null;
+  direction_override: 'inflow' | 'outflow' | null;
   created_at: string;
   updated_at: string;
 }

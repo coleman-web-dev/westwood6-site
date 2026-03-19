@@ -1,13 +1,16 @@
 /**
  * Determines if a bank transaction represents an outflow (money leaving the account).
  *
- * Three modes controlled by the bank account's `amount_sign_source` setting:
+ * Priority: manual override > account-level sign source setting > default
+ *
+ * Sign source modes (per bank account):
  * - 'sign'  — Trust the Plaid amount sign (positive = outflow)
  * - 'name'  — Parse transaction name keywords to determine direction
  * - 'abs'   — No direction (always returns false, amounts shown as absolute)
  */
 
 type SignSource = 'sign' | 'name' | 'abs';
+type DirectionOverride = 'inflow' | 'outflow' | null;
 
 /**
  * Returns true if the transaction represents money leaving the account.
@@ -17,7 +20,12 @@ export function isOutflow(
   name: string,
   plaidCategory: string | null,
   signSource: SignSource,
+  directionOverride?: DirectionOverride,
 ): boolean {
+  // Manual override takes priority
+  if (directionOverride === 'outflow') return true;
+  if (directionOverride === 'inflow') return false;
+
   if (signSource === 'abs') return false;
 
   if (signSource === 'sign') {
@@ -52,18 +60,19 @@ export function formatBankAmount(
   name: string,
   plaidCategory: string | null,
   signSource: SignSource,
+  directionOverride?: DirectionOverride,
 ): { text: string; className: string } {
   const absDollars = Math.abs(amount / 100);
   const formatted = absDollars.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 
-  if (signSource === 'abs') {
+  if (signSource === 'abs' && !directionOverride) {
     return {
       text: formatted,
       className: 'text-text-primary-light dark:text-text-primary-dark',
     };
   }
 
-  const outflow = isOutflow(amount, name, plaidCategory, signSource);
+  const outflow = isOutflow(amount, name, plaidCategory, signSource, directionOverride);
   return {
     text: outflow ? `-${formatted}` : `+${formatted}`,
     className: outflow
