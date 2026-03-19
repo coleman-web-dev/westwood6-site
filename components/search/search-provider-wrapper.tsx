@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { useRegisterActions } from '@shipixen/kbar';
+import { useRegisterActions, useKBar } from '@shipixen/kbar';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { searchLinks } from '@/data/config/searchLinks';
@@ -29,8 +29,14 @@ interface UnitRow {
 
 export function SearchProviderWrapper({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const { query } = useKBar();
   const { community, isBoard } = useCommunity();
   const basePath = `/${community.slug}`;
+
+  const navigate = (path: string) => {
+    query.toggle();
+    router.push(path);
+  };
 
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [documents, setDocuments] = useState<DocType[]>([]);
@@ -83,7 +89,7 @@ export function SearchProviderWrapper({ children }: { children: React.ReactNode 
       name: link.name,
       keywords: link.keywords,
       section: link.section,
-      perform: () => router.push(`${basePath}${link.href}`),
+      perform: () => navigate(`${basePath}${link.href}`),
     }));
 
     // Dynamic announcement actions
@@ -92,7 +98,7 @@ export function SearchProviderWrapper({ children }: { children: React.ReactNode 
       name: a.title,
       keywords: 'announcement news',
       section: 'Announcements',
-      perform: () => router.push(`${basePath}/announcements`),
+      perform: () => navigate(`${basePath}/announcements`),
     }));
 
     // Dynamic document actions
@@ -101,7 +107,7 @@ export function SearchProviderWrapper({ children }: { children: React.ReactNode 
       name: d.title,
       keywords: 'document file',
       section: 'Documents',
-      perform: () => router.push(`${basePath}/documents`),
+      perform: () => navigate(`${basePath}/documents`),
     }));
 
     // Member actions - searchable by name, email, unit number, address
@@ -127,9 +133,9 @@ export function SearchProviderWrapper({ children }: { children: React.ReactNode 
         subtitle: m.email ?? undefined,
         perform: () => {
           if (isBoard && m.unit_id) {
-            router.push(`${basePath}/household?unit=${m.unit_id}`);
+            navigate(`${basePath}/household?unit=${m.unit_id}`);
           } else {
-            router.push(`${basePath}/directory`);
+            navigate(`${basePath}/directory`);
           }
         },
       };
@@ -156,8 +162,8 @@ export function SearchProviderWrapper({ children }: { children: React.ReactNode 
         section: 'Lots',
         perform: () =>
           isBoard
-            ? router.push(`${basePath}/household?unit=${u.id}`)
-            : router.push(`${basePath}/household`),
+            ? navigate(`${basePath}/household?unit=${u.id}`)
+            : navigate(`${basePath}/household`),
       };
     });
 
