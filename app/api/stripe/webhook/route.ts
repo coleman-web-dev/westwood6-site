@@ -369,13 +369,18 @@ export async function POST(req: NextRequest) {
           .single();
 
         if (community?.slug) {
+          const overpaid = totalPaid > invoice.amount;
+          const desc = overpaid
+            ? `$${(stripeTotalAmount / 100).toFixed(2)} paid online. $${((totalPaid - invoice.amount) / 100).toFixed(2)} credited to your account.`
+            : `$${(stripeTotalAmount / 100).toFixed(2)} paid online`;
           await queuePaymentConfirmation(
             communityId,
             community.slug,
             invoice.unit_id,
             invoice.title,
             stripeTotalAmount,
-            new Date().toISOString()
+            new Date().toISOString(),
+            desc
           );
         }
 
@@ -509,13 +514,18 @@ export async function POST(req: NextRequest) {
           .single();
 
         if (community?.slug) {
+          const overpaid = duesiqInvoice.amount_paid + amountPaid > duesiqInvoice.amount;
+          const desc = overpaid
+            ? `$${(amountPaid / 100).toFixed(2)} auto-paid. $${((duesiqInvoice.amount_paid + amountPaid - duesiqInvoice.amount) / 100).toFixed(2)} credited to your account.`
+            : `$${(amountPaid / 100).toFixed(2)} auto-paid`;
           await queuePaymentConfirmation(
             unit.community_id,
             community.slug,
             unit.id,
             duesiqInvoice.title,
             amountPaid,
-            new Date().toISOString()
+            new Date().toISOString(),
+            desc
           );
         }
 

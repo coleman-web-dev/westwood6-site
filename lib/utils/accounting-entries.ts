@@ -216,6 +216,27 @@ export async function postLateFeeApplied(
   });
 }
 
+/** Late fee removed: DR Late Fee Revenue, CR Accounts Receivable */
+export async function postLateFeeRemoved(
+  communityId: string,
+  invoiceId: string,
+  unitId: string,
+  amount: number,
+) {
+  return createJournalEntry({
+    communityId,
+    description: 'Late fee removed',
+    source: 'late_fee_removed',
+    referenceType: 'invoice',
+    referenceId: invoiceId,
+    unitId,
+    lines: [
+      { accountCode: '4100', debit: amount, credit: 0, description: 'Late Fee Revenue' },
+      { accountCode: '1100', debit: 0, credit: amount, description: 'Accounts Receivable' },
+    ],
+  });
+}
+
 /** Invoice waived: DR Bad Debt Expense, CR Accounts Receivable */
 export async function postInvoiceWaived(
   communityId: string,

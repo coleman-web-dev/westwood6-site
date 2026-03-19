@@ -35,6 +35,7 @@ interface DelinquentUnit {
   email: string | null;
   phone: string | null;
   invoiceCount: number;
+  pastDueCount: number;
   amountOwed: number;
   oldestDueDate: string;
 }
@@ -53,6 +54,7 @@ const delinquentColumns: CsvColumn<DelinquentUnit>[] = [
   { header: 'Email', value: (d) => d.email },
   { header: 'Phone', value: (d) => d.phone },
   { header: 'Invoice Count', value: (d) => d.invoiceCount },
+  { header: 'Past Due', value: (d) => d.pastDueCount },
   { header: 'Amount Owed', value: (d) => (d.amountOwed / 100).toFixed(2) },
   { header: 'Oldest Due Date', value: (d) => d.oldestDueDate },
 ];
@@ -96,18 +98,21 @@ export function DelinquentUnitsTable({ invoices, units, members, saveConfig }: D
   };
 
   const delinquents = useMemo(() => {
-    const overdueInvoices = invoices.filter(
-      (inv) => inv.status === 'overdue' || inv.status === 'partial'
+    const outstandingInvoices = invoices.filter(
+      (inv) => inv.status === 'overdue' || inv.status === 'partial' || inv.status === 'pending'
     );
 
     const unitMap = new Map<string, DelinquentUnit>();
 
-    for (const inv of overdueInvoices) {
+    for (const inv of outstandingInvoices) {
       const owed = inv.amount - inv.amount_paid;
+      if (owed <= 0) continue;
+      const isPastDue = inv.status === 'overdue' || inv.status === 'partial';
       const existing = unitMap.get(inv.unit_id);
 
       if (existing) {
         existing.invoiceCount += 1;
+        if (isPastDue) existing.pastDueCount += 1;
         existing.amountOwed += owed;
         if (inv.due_date < existing.oldestDueDate) {
           existing.oldestDueDate = inv.due_date;
@@ -126,6 +131,7 @@ export function DelinquentUnitsTable({ invoices, units, members, saveConfig }: D
           email: owner?.email ?? null,
           phone: owner?.phone ?? null,
           invoiceCount: 1,
+          pastDueCount: isPastDue ? 1 : 0,
           amountOwed: owed,
           oldestDueDate: inv.due_date,
         });
@@ -142,7 +148,7 @@ export function DelinquentUnitsTable({ invoices, units, members, saveConfig }: D
     <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-section-title text-text-primary-light dark:text-text-primary-dark">
-          Delinquent Units
+          Outstanding Units
         </h3>
         {delinquents.length > 0 && (
           <ExportCsvButton
@@ -182,6 +188,9 @@ export function DelinquentUnitsTable({ invoices, units, members, saveConfig }: D
                 <TableHead className={`${headClass} text-right`} onClick={() => toggleSort('invoiceCount')}>
                   Invoices <SortIcon sortKey="invoiceCount" currentKey={sortKey} dir={sortDir} />
                 </TableHead>
+                <TableHead className={`${headClass} text-right`} onClick={() => toggleSort('pastDueCount')}>
+                  Past Due <SortIcon sortKey="pastDueCount" currentKey={sortKey} dir={sortDir} />
+                </TableHead>
                 <TableHead className={`${headClass} text-right`} onClick={() => toggleSort('amountOwed')}>
                   Amount Owed <SortIcon sortKey="amountOwed" currentKey={sortKey} dir={sortDir} />
                 </TableHead>
@@ -209,6 +218,9 @@ export function DelinquentUnitsTable({ invoices, units, members, saveConfig }: D
                     {d.phone ?? '-'}
                   </TableCell>
                   <TableCell className="text-body text-right tabular-nums">{d.invoiceCount}</TableCell>
+                  <TableCell className={`text-body text-right tabular-nums ${d.pastDueCount > 0 ? 'text-red-500 font-medium' : ''}`}>
+                    {d.pastDueCount}
+                  </TableCell>
                   <TableCell className="text-body text-right tabular-nums font-medium text-red-500">
                     ${formatDollars(d.amountOwed)}
                   </TableCell>

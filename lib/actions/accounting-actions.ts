@@ -16,6 +16,7 @@ import {
   postAmenityDepositReturned,
   postAmenityDepositRetained,
   postOverpaymentWalletCredit,
+  postLateFeeRemoved,
 } from '@/lib/utils/accounting-entries';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
@@ -69,6 +70,22 @@ export async function postInvoiceVoidedAction(
     return { success: true };
   } catch (error) {
     console.error('Failed to post invoice voided journal entry:', error);
+    return { success: false };
+  }
+}
+
+/** Post journal entry when a late fee is removed from an invoice (called from client component) */
+export async function postLateFeeRemovedAction(
+  communityId: string,
+  invoiceId: string,
+  unitId: string,
+  amount: number,
+) {
+  try {
+    await postLateFeeRemoved(communityId, invoiceId, unitId, amount);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to post late fee removed journal entry:', error);
     return { success: false };
   }
 }

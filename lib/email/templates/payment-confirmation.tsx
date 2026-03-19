@@ -4,9 +4,10 @@ import { EmailLayout } from './layout';
 interface PaymentConfirmationProps {
   communityName: string;
   invoiceTitle: string;
-  amount: number; // in cents
+  amount: number; // amount paid in cents
   paidAt: string;
   walletBalance?: number; // in cents
+  paymentDescription?: string; // e.g. "$168.00 paid via credit card"
   unsubscribeUrl?: string;
 }
 
@@ -16,6 +17,7 @@ export function PaymentConfirmationEmail({
   amount,
   paidAt,
   walletBalance,
+  paymentDescription,
   unsubscribeUrl,
 }: PaymentConfirmationProps) {
   const formattedAmount = `$${(amount / 100).toFixed(2)}`;
@@ -24,6 +26,11 @@ export function PaymentConfirmationEmail({
     month: 'long',
     day: 'numeric',
   });
+
+  const walletLine =
+    walletBalance !== undefined && walletBalance > 0
+      ? `Account credit balance: $${(walletBalance / 100).toFixed(2)}`
+      : null;
 
   return (
     <EmailLayout
@@ -39,16 +46,18 @@ export function PaymentConfirmationEmail({
       <Section style={detailsBoxStyle}>
         <Text style={detailLabelStyle}>Invoice</Text>
         <Text style={detailValueStyle}>{invoiceTitle}</Text>
-        <Text style={detailLabelStyle}>Amount Paid</Text>
-        <Text style={amountStyle}>{formattedAmount}</Text>
+        <Text style={detailLabelStyle}>Amount Due</Text>
+        <Text style={zeroDueStyle}>$0.00</Text>
+        <Text style={detailLabelStyle}>Payment</Text>
+        <Text style={detailValueStyle}>
+          {paymentDescription || `${formattedAmount} paid`}
+        </Text>
         <Text style={detailLabelStyle}>Date</Text>
         <Text style={detailValueStyle}>{formattedDate}</Text>
       </Section>
 
-      {walletBalance !== undefined && walletBalance > 0 && (
-        <Text style={walletStyle}>
-          Your account credit balance: ${(walletBalance / 100).toFixed(2)}
-        </Text>
+      {walletLine && (
+        <Text style={walletStyle}>{walletLine}</Text>
       )}
 
       <Text style={textStyle}>
@@ -94,10 +103,10 @@ const detailValueStyle: React.CSSProperties = {
   margin: '0 0 12px 0',
 };
 
-const amountStyle: React.CSSProperties = {
+const zeroDueStyle: React.CSSProperties = {
   fontSize: '24px',
   fontWeight: '700',
-  color: '#1a1a2e',
+  color: '#16a34a',
   margin: '0 0 12px 0',
 };
 

@@ -214,6 +214,7 @@ export async function queuePaymentConfirmation(
   invoiceTitle: string,
   amount: number,
   paidAt: string,
+  paymentDescription?: string,
 ) {
   const supabase = createAdminClient();
 
@@ -257,6 +258,7 @@ export async function queuePaymentConfirmation(
       amount,
       paidAt,
       walletBalance: wallet?.balance || 0,
+      paymentDescription: paymentDescription || `$${(amount / 100).toFixed(2)} paid`,
       unsubscribeUrl: buildUnsubscribeUrl(m.id, 'payment_confirmation', communitySlug),
     },
   }));

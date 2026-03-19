@@ -27,7 +27,7 @@ import {
   AlertDialogTitle,
 } from '@/components/shared/ui/alert-dialog';
 import { downloadCsv } from '@/lib/utils/export-csv';
-import { postInvoiceWaivedAction, postInvoiceVoidedAction } from '@/lib/actions/accounting-actions';
+import { postInvoiceWaivedAction, postInvoiceVoidedAction, postLateFeeRemovedAction } from '@/lib/actions/accounting-actions';
 import { logAuditEvent } from '@/lib/audit';
 import { BounceInvoiceDialog } from '@/components/payments/bounce-invoice-dialog';
 import { RecordPaymentDialog } from '@/components/payments/record-payment-dialog';
@@ -176,6 +176,50 @@ export function InvoiceList({
       metadata: { title: invoice.title, amount: invoice.amount },
     });
     await postInvoiceVoidedAction(community.id, invoice.id, invoice.unit_id, invoice.amount, invoice.title);
+    onInvoiceUpdated();
+  }
+
+  async function handleRemoveLateFee(invoice: Invoice) {
+    if (invoice.late_fee_amount <= 0) return;
+    setUpdatingId(invoice.id);
+    const supabase = createClient();
+
+    const newAmount = invoice.amount - invoice.late_fee_amount;
+    const newStatus =
+      invoice.amount_paid >= newAmount
+        ? 'paid'
+        : invoice.amount_paid > 0
+          ? 'partial'
+          : invoice.status;
+
+    const { error } = await supabase
+      .from('invoices')
+      .update({
+        amount: newAmount,
+        late_fee_amount: 0,
+        status: newStatus,
+        ...(newStatus === 'paid' ? { paid_at: new Date().toISOString() } : {}),
+      })
+      .eq('id', invoice.id);
+
+    setUpdatingId(null);
+
+    if (error) {
+      toast.error('Failed to remove late fee. Please try again.');
+      return;
+    }
+
+    toast.success(`Late fee of $${(invoice.late_fee_amount / 100).toFixed(2)} removed.`);
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'late_fee_removed',
+      targetType: 'invoice',
+      targetId: invoice.id,
+      metadata: { title: invoice.title, late_fee_amount: invoice.late_fee_amount },
+    });
+    postLateFeeRemovedAction(community.id, invoice.id, invoice.unit_id, invoice.late_fee_amount);
     onInvoiceUpdated();
   }
 
@@ -593,6 +637,16 @@ export function InvoiceList({
                   >
                     Record Payment
                   </Button>
+                  {invoice.late_fee_amount > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveLateFee(invoice)}
+                      disabled={isUpdating}
+                    >
+                      Remove Late Fee
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"
