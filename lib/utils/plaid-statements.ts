@@ -7,9 +7,116 @@ import {
 } from '@/lib/actions/ai-statement-actions';
 import { extractCheckImagesFromPDF } from '@/lib/utils/extract-check-images';
 import { reconcileChecksFromStatement } from '@/lib/utils/check-reconciliation';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { StatementFetchResult } from '@/lib/types/banking';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// ─── Year folder helpers ──────────────────────────────────────────
+
+const MONTH_NAMES = [
+  '', 'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+/**
+ * Find or create the "Financial > {year} Financials" subfolder.
+ * Also pre-creates next year's folder if current month is October or later.
+ */
+async function getOrCreateYearFolder(
+  admin: SupabaseClient,
+  communityId: string,
+  year: number,
+): Promise<string | null> {
+  // Find the "Financial" root folder
+  const { data: financialFolder } = await admin
+    .from('document_folders')
+    .select('id')
+    .eq('community_id', communityId)
+    .eq('name', 'Financial')
+    .is('parent_id', null)
+    .single();
+
+  if (!financialFolder) return null;
+
+  const folderName = `${year} Financials`;
+
+  // Check if year folder already exists
+  const { data: existing } = await admin
+    .from('document_folders')
+    .select('id')
+    .eq('community_id', communityId)
+    .eq('parent_id', financialFolder.id)
+    .eq('name', folderName)
+    .maybeSingle();
+
+  if (existing) return existing.id;
+
+  // Create it
+  const { data: created } = await admin
+    .from('document_folders')
+    .insert({
+      community_id: communityId,
+      name: folderName,
+      parent_id: financialFolder.id,
+      sort_order: year, // Natural sort by year
+    })
+    .select('id')
+    .single();
+
+  return created?.id || null;
+}
+
+/**
+ * Save a statement PDF as a document in "Financial > {year} Financials".
+ * Also pre-creates next year's folder if we're in October or later.
+ */
+async function saveStatementToDocuments(
+  admin: SupabaseClient,
+  communityId: string,
+  storagePath: string,
+  fileSize: number,
+  year: number,
+  month: number,
+): Promise<void> {
+  const folderId = await getOrCreateYearFolder(admin, communityId, year);
+  if (!folderId) {
+    console.error('Could not find or create year folder for statements');
+    return;
+  }
+
+  const monthName = MONTH_NAMES[month] || `Month ${month}`;
+  const title = `Bank Statement - ${monthName} ${year}`;
+
+  // Check for duplicate (same title + folder)
+  const { data: existingDoc } = await admin
+    .from('documents')
+    .select('id')
+    .eq('community_id', communityId)
+    .eq('folder_id', folderId)
+    .eq('title', title)
+    .maybeSingle();
+
+  if (existingDoc) return; // Already saved
+
+  await admin.from('documents').insert({
+    community_id: communityId,
+    title,
+    category: 'financial',
+    folder_id: folderId,
+    file_path: storagePath,
+    file_size: fileSize,
+    is_public: false,
+    visibility: 'private',
+  });
+
+  // Pre-create next year's folder if October or later
+  const currentMonth = new Date().getMonth() + 1; // 1-indexed
+  if (currentMonth >= 10) {
+    const nextYear = new Date().getFullYear() + 1;
+    await getOrCreateYearFolder(admin, communityId, nextYear);
+  }
+}
 
 /**
  * Fetch available bank statements from Plaid, download new ones,
@@ -161,6 +268,15 @@ export async function fetchAndProcessStatements(
         if (!upload) {
           result.errors.push(`Failed to create upload record for ${stmtId}`);
           continue;
+        }
+
+        // Save statement PDF to Financial > {year} Financials documents folder
+        try {
+          await saveStatementToDocuments(
+            admin, communityId, storagePath, pdfBuffer.length, stmt.year, stmt.month,
+          );
+        } catch (docErr) {
+          console.error('Failed to save statement to documents (non-fatal):', docErr);
         }
 
         // Process with AI
