@@ -125,8 +125,9 @@ export function HouseholdLedger({ refreshKey, initialUnitId }: HouseholdLedgerPr
     bounced_reversal: { variant: 'destructive', label: 'Bounced' },
   };
 
-  // ─── Unit info for headers ────────────────────────────────
+  // ─── Unit info + owner name for headers ───────────────────
   const [unitLabel, setUnitLabel] = useState('');
+  const [ownerName, setOwnerName] = useState('');
   useEffect(() => {
     if (!targetUnitId) return;
     const supabase = createClient();
@@ -137,6 +138,17 @@ export function HouseholdLedger({ refreshKey, initialUnitId }: HouseholdLedgerPr
       .single()
       .then(({ data }) => {
         if (data) setUnitLabel(`Unit ${data.unit_number}${data.address ? ' - ' + data.address : ''}`);
+      });
+    supabase
+      .from('members')
+      .select('first_name, last_name')
+      .eq('unit_id', targetUnitId)
+      .eq('member_role', 'owner')
+      .limit(1)
+      .single()
+      .then(({ data }) => {
+        if (data) setOwnerName(`${data.first_name} ${data.last_name}`);
+        else setOwnerName('');
       });
   }, [targetUnitId]);
 
@@ -152,7 +164,8 @@ export function HouseholdLedger({ refreshKey, initialUnitId }: HouseholdLedgerPr
   // ─── Export CSV ──────────────────────────────────────────
   const handleExport = () => {
     if (entries.length === 0) return;
-    const header = 'Date,Type,Description,Amount,Balance\n';
+    const ownerLine = ownerName ? `"${ownerName} - ${unitLabel}"\n` : `"${unitLabel}"\n`;
+    const header = ownerLine + 'Date,Type,Description,Amount,Balance\n';
     const rows = entries.map((e) => {
       const badge = TYPE_BADGE[e.entry_type] ?? { label: e.entry_type };
       const sign = e.amount < 0 ? '-' : '';
@@ -224,7 +237,7 @@ export function HouseholdLedger({ refreshKey, initialUnitId }: HouseholdLedgerPr
       <body>
         <div class="header">
           <h1>${community.name}</h1>
-          <p>${unitLabel}</p>
+          <p>${ownerName ? ownerName + ' &middot; ' : ''}${unitLabel}</p>
         </div>
         <div class="summary">
           <div class="summary-item">
@@ -277,6 +290,13 @@ export function HouseholdLedger({ refreshKey, initialUnitId }: HouseholdLedgerPr
             placeholder="Select a unit..."
           />
         </div>
+      )}
+
+      {/* Owner + unit label */}
+      {ownerName && (
+        <p className="text-body text-text-secondary-light dark:text-text-secondary-dark">
+          {ownerName} &middot; {unitLabel}
+        </p>
       )}
 
       {/* Print / Export */}
