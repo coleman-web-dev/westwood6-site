@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/shared/ui/button';
 import { Badge } from '@/components/shared/ui/badge';
-import { ArrowLeft, CheckCircle2, Loader2, Sparkles } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   completeReconciliation,
@@ -35,6 +35,7 @@ export function ReconciliationWorkspace({
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [selectedTxn, setSelectedTxn] = useState<BankTransaction | null>(null);
   const [statusFilter, setStatusFilter] = useState<'pending' | 'matched' | 'categorized' | 'excluded' | null>(null);
   const assignedRef = useRef(false);
@@ -126,6 +127,47 @@ export function ReconciliationWorkspace({
       toast.error(err instanceof Error ? err.message : 'Failed to complete reconciliation.');
     }
     setCompleting(false);
+  }
+
+  async function handleSyncTransactions() {
+    if (!recon) return;
+    setSyncing(true);
+    try {
+      // Look up the Plaid connection for this bank account
+      const supabase = createClient();
+      const { data: bankAccount } = await supabase
+        .from('plaid_bank_accounts')
+        .select('plaid_connection_id')
+        .eq('id', recon.plaid_bank_account_id)
+        .single();
+
+      if (!bankAccount) {
+        toast.error('Bank account connection not found.');
+        setSyncing(false);
+        return;
+      }
+
+      const res = await fetch('/api/plaid/sync-transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          communityId,
+          connectionId: bankAccount.plaid_connection_id,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || 'Sync failed');
+      } else {
+        toast.success(`Synced: ${data.added} new, ${data.modified} updated`);
+        await fetchData();
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to sync transactions.');
+    }
+    setSyncing(false);
   }
 
   function formatCents(cents: number | null) {
@@ -222,6 +264,10 @@ export function ReconciliationWorkspace({
           </div>
         </div>
         <div className="flex gap-2 mt-4">
+          <Button size="sm" variant="outline" onClick={handleSyncTransactions} disabled={syncing}>
+            {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <RefreshCw className="h-3.5 w-3.5 mr-1" />}
+            Sync Transactions
+          </Button>
           <Button size="sm" variant="outline" onClick={handleRefreshBalance}>
             Refresh Balance
           </Button>
