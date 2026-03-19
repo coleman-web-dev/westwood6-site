@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { useRegisterActions } from '@shipixen/kbar';
+import { useRegisterActions, useKBar, VisualState } from '@shipixen/kbar';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { searchLinks } from '@/data/config/searchLinks';
@@ -29,13 +29,15 @@ interface UnitRow {
 
 export function SearchProviderWrapper({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const { query } = useKBar();
   const { community, isBoard } = useCommunity();
   const basePath = `/${community.slug}`;
 
-  // KBar auto-closes the modal after perform() runs.
-  // Use window.location for reliable navigation (router.push
-  // can silently fail when only query params change).
+  // Explicitly hide KBar modal then navigate.
+  // KBar does NOT auto-close after perform(), and toggle() can
+  // double-toggle. setVisualState is the reliable way to close it.
   const navigate = (path: string) => {
+    query.setVisualState(VisualState.hidden);
     window.location.href = path;
   };
 
