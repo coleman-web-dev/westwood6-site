@@ -26,6 +26,7 @@ import {
   unmatchTransaction,
 } from '@/lib/actions/banking-actions';
 import { MatchTransactionDialog } from '@/components/accounting/match-transaction-dialog';
+import { formatBankAmount } from '@/lib/utils/transaction-direction';
 import type { BankTransaction } from '@/lib/types/banking';
 import type { Account } from '@/lib/types/accounting';
 import type { Vendor } from '@/lib/types/database';
@@ -35,6 +36,7 @@ interface BankTransactionDetailProps {
   communityId: string;
   accounts: Account[];
   vendors: Vendor[];
+  amountSignSource?: 'sign' | 'name' | 'abs';
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdate: () => void;
@@ -45,6 +47,7 @@ export function BankTransactionDetail({
   communityId,
   accounts,
   vendors,
+  amountSignSource = 'name',
   open,
   onOpenChange,
   onUpdate,
@@ -62,10 +65,12 @@ export function BankTransactionDetail({
 
   const isProcessed = ['matched', 'categorized', 'reconciled'].includes(transaction.status);
 
-  function formatAmount(amount: number) {
-    const abs = Math.abs(amount) / 100;
-    return abs.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-  }
+  const amt = formatBankAmount(
+    transaction.amount,
+    transaction.name,
+    transaction.plaid_category,
+    amountSignSource,
+  );
 
   async function handleCategorize() {
     if (!selectedAccountId) {
@@ -158,15 +163,8 @@ export function BankTransactionDetail({
                 <span className="text-meta text-text-muted-light dark:text-text-muted-dark">
                   Amount
                 </span>
-                <span
-                  className={`text-body font-semibold ${
-                    transaction.amount < 0
-                      ? 'text-red-500 dark:text-red-400'
-                      : 'text-green-600 dark:text-green-400'
-                  }`}
-                >
-                  {transaction.amount < 0 ? '-' : ''}
-                  {formatAmount(transaction.amount)}
+                <span className={`text-body font-semibold ${amt.className}`}>
+                  {amt.text}
                 </span>
               </div>
               <div className="flex justify-between">

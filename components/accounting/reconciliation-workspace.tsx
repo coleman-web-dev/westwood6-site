@@ -29,6 +29,7 @@ import {
 import { BankTransactionDetail } from '@/components/accounting/bank-transaction-detail';
 import { MerchantLogo } from '@/components/accounting/merchant-logo';
 import { AccountCombobox } from '@/components/accounting/account-combobox';
+import { formatBankAmount } from '@/lib/utils/transaction-direction';
 import type { BankReconciliation, BankTransaction } from '@/lib/types/banking';
 import type { Account } from '@/lib/types/accounting';
 import type { Vendor } from '@/lib/types/database';
@@ -122,6 +123,7 @@ export function ReconciliationWorkspace({
   const [rangePreset, setRangePreset] = useState<RangePreset>('custom');
   const [startPickerOpen, setStartPickerOpen] = useState(false);
   const [endPickerOpen, setEndPickerOpen] = useState(false);
+  const [amountSignSource, setAmountSignSource] = useState<'sign' | 'name' | 'abs'>('name');
   const assignedRef = useRef(false);
 
   const fetchData = useCallback(async () => {
@@ -141,6 +143,17 @@ export function ReconciliationWorkspace({
     }
 
     setRecon(reconData as BankReconciliation);
+
+    // Fetch bank account sign source setting
+    const { data: bankAcct } = await supabase
+      .from('plaid_bank_accounts')
+      .select('amount_sign_source')
+      .eq('id', reconData.plaid_bank_account_id)
+      .single();
+
+    if (bankAcct?.amount_sign_source) {
+      setAmountSignSource(bankAcct.amount_sign_source as 'sign' | 'name' | 'abs');
+    }
 
     // Now fetch transactions for this bank account within the period
     const [txnResult, { data: accts }, { data: vndrs }] = await Promise.all([
@@ -305,19 +318,8 @@ export function ReconciliationWorkspace({
     return (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
   }
 
-  function formatAmount(amount: number) {
-    // Display the raw signed amount from Plaid.
-    // Plaid standard: positive = money leaving (debit), negative = money entering (credit).
-    // Some banks invert this convention. Show the actual stored value.
-    const dollars = amount / 100;
-    const isNeg = dollars < 0;
-    const formatted = Math.abs(dollars).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-    return {
-      text: isNeg ? `-${formatted}` : formatted,
-      className: isNeg
-        ? 'text-red-500 dark:text-red-400'
-        : 'text-green-600 dark:text-green-400',
-    };
+  function formatAmount(txn: BankTransaction) {
+    return formatBankAmount(txn.amount, txn.name, txn.plaid_category, amountSignSource);
   }
 
   if (loading) {
@@ -547,7 +549,7 @@ export function ReconciliationWorkspace({
           </div>
           <div className="divide-y divide-stroke-light dark:divide-stroke-dark">
             {pending.map((txn) => {
-              const amt = formatAmount(txn.amount);
+              const amt = formatAmount(txn);
               return (
                 <div
                   key={txn.id}
@@ -603,7 +605,7 @@ export function ReconciliationWorkspace({
           </div>
           <div className="divide-y divide-stroke-light dark:divide-stroke-dark">
             {(statusFilter === 'matched' ? matched : statusFilter === 'categorized' ? categorized : [...matched, ...categorized]).map((txn) => {
-              const amt = formatAmount(txn.amount);
+              const amt = formatAmount(txn);
               return (
                 <div
                   key={txn.id}
@@ -664,7 +666,7 @@ export function ReconciliationWorkspace({
           </div>
           <div className="divide-y divide-stroke-light dark:divide-stroke-dark">
             {excluded.map((txn) => {
-              const amt = formatAmount(txn.amount);
+              const amt = formatAmount(txn);
               return (
                 <div
                   key={txn.id}
@@ -699,6 +701,7 @@ export function ReconciliationWorkspace({
           communityId={communityId}
           accounts={accounts}
           vendors={vendors}
+          amountSignSource={amountSignSource}
           open={!!selectedTxn}
           onOpenChange={(open) => !open && setSelectedTxn(null)}
           onUpdate={() => {

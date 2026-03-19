@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { requirePermission } from '@/lib/actions/auth-guard';
 import { normalizeTransactionName } from '@/lib/ai/categorize-transactions';
+import { isOutflow } from '@/lib/utils/transaction-direction';
 
 export async function categorizeTransaction(
   communityId: string,
@@ -175,6 +176,33 @@ export async function mapBankAccountToGL(
 
   if (error) {
     console.error('mapBankAccountToGL error:', error);
+    return { success: false, error: error.message };
+  }
+
+  return { success: true };
+}
+
+export async function updateBankAccountSignSource(
+  communityId: string,
+  bankAccountId: string,
+  source: 'sign' | 'name' | 'abs',
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await requirePermission(communityId, 'banking', 'write');
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Permission denied';
+    return { success: false, error: msg };
+  }
+
+  const admin = createAdminClient();
+
+  const { error } = await admin
+    .from('plaid_bank_accounts')
+    .update({ amount_sign_source: source })
+    .eq('id', bankAccountId)
+    .eq('community_id', communityId);
+
+  if (error) {
     return { success: false, error: error.message };
   }
 
@@ -450,8 +478,16 @@ export async function createJournalEntryFromBankTxn(
 
   if (!txn) throw new Error('Transaction not found');
 
+  // Fetch the bank account's sign source setting
+  const { data: bankAcct } = await admin
+    .from('plaid_bank_accounts')
+    .select('amount_sign_source')
+    .eq('id', txn.plaid_bank_account_id)
+    .single();
+
+  const signSource = (bankAcct?.amount_sign_source as 'sign' | 'name' | 'abs') || 'name';
   const amountCents = Math.abs(txn.amount);
-  const isDebit = txn.amount > 0; // Positive = money leaving account (expense)
+  const isDebit = isOutflow(txn.amount, txn.name, txn.plaid_category, signSource);
 
   // Create journal entry
   const { data: entry, error: entryError } = await admin

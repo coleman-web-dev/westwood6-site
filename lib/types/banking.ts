@@ -39,6 +39,7 @@ export interface PlaidBankAccount {
   current_balance: number | null;
   available_balance: number | null;
   gl_account_id: string | null;
+  amount_sign_source: 'sign' | 'name' | 'abs';
   is_active: boolean;
   created_at: string;
   updated_at: string;

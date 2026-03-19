@@ -24,7 +24,7 @@ import {
 } from '@/components/shared/ui/alert-dialog';
 import { Building2, Loader2, RefreshCw, Unlink, Landmark, ShieldAlert, FileText } from 'lucide-react';
 import { toast } from 'sonner';
-import { mapBankAccountToGL } from '@/lib/actions/banking-actions';
+import { mapBankAccountToGL, updateBankAccountSignSource } from '@/lib/actions/banking-actions';
 import type { PlaidBankAccount, PlaidConnection } from '@/lib/types/banking';
 import type { Account } from '@/lib/types/accounting';
 
@@ -298,6 +298,16 @@ export function BankConnectionManager({ communityId, onSync }: BankConnectionMan
     setFetchingStatements(null);
   }
 
+  async function handleSignSourceChange(bankAccountId: string, source: 'sign' | 'name' | 'abs') {
+    const result = await updateBankAccountSignSource(communityId, bankAccountId, source);
+    if (result.success) {
+      toast.success('Amount detection updated.');
+      fetchData();
+    } else {
+      toast.error(result.error || 'Failed to update setting.');
+    }
+  }
+
   async function handleMapToGL(bankAccountId: string, glAccountId: string) {
     const result = await mapBankAccountToGL(communityId, bankAccountId, glAccountId);
     if (result.success) {
@@ -469,6 +479,21 @@ export function BankConnectionManager({ communityId, onSync }: BankConnectionMan
                     </div>
                   </div>
 
+                  <div className="w-36 shrink-0">
+                    <Select
+                      value={account.amount_sign_source || 'name'}
+                      onValueChange={(value) => handleSignSourceChange(account.id, value as 'sign' | 'name' | 'abs')}
+                    >
+                      <SelectTrigger className="h-8 text-meta">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="name">Name-based +/-</SelectItem>
+                        <SelectItem value="sign">Sign-based +/-</SelectItem>
+                        <SelectItem value="abs">Absolute</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="w-48 shrink-0">
                     <Select
                       value={account.gl_account_id || ''}
