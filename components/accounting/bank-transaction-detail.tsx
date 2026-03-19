@@ -160,12 +160,12 @@ export function BankTransactionDetail({
                 </span>
                 <span
                   className={`text-body font-semibold ${
-                    transaction.amount > 0
+                    transaction.amount < 0
                       ? 'text-red-500 dark:text-red-400'
                       : 'text-green-600 dark:text-green-400'
                   }`}
                 >
-                  {transaction.amount > 0 ? '-' : '+'}
+                  {transaction.amount < 0 ? '-' : ''}
                   {formatAmount(transaction.amount)}
                 </span>
               </div>
@@ -233,7 +233,7 @@ export function BankTransactionDetail({
                 </div>
 
                 {/* Vendor assignment (optional, for expense tracking / 1099) */}
-                {transaction.amount > 0 && vendors.length > 0 && (
+                {vendors.length > 0 && (
                   <div>
                     <Label className="text-meta">Vendor (optional)</Label>
                     <Select value={selectedVendorId} onValueChange={setSelectedVendorId}>

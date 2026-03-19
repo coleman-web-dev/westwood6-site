@@ -306,11 +306,17 @@ export function ReconciliationWorkspace({
   }
 
   function formatAmount(amount: number) {
-    // Plaid: positive = money leaving (debit), negative = money entering (credit)
-    const isDebit = amount > 0;
+    // Display the raw signed amount from Plaid.
+    // Plaid standard: positive = money leaving (debit), negative = money entering (credit).
+    // Some banks invert this convention. Show the actual stored value.
+    const dollars = amount / 100;
+    const isNeg = dollars < 0;
+    const formatted = Math.abs(dollars).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
     return {
-      text: `${isDebit ? '-' : '+'}${(Math.abs(amount) / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}`,
-      className: isDebit ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400',
+      text: isNeg ? `-${formatted}` : formatted,
+      className: isNeg
+        ? 'text-red-500 dark:text-red-400'
+        : 'text-green-600 dark:text-green-400',
     };
   }
 
