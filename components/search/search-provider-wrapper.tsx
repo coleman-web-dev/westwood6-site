@@ -10,6 +10,7 @@ import type { Announcement, Document as DocType } from '@/lib/types/database';
 
 interface MemberRow {
   id: string;
+  unit_id: string | null;
   first_name: string;
   last_name: string;
   email: string | null;
@@ -59,7 +60,7 @@ export function SearchProviderWrapper({ children }: { children: React.ReactNode 
     // Fetch members with their unit info
     supabase
       .from('members')
-      .select('id, first_name, last_name, email, phone, member_role, system_role, units(unit_number, address)')
+      .select('id, unit_id, first_name, last_name, email, phone, member_role, system_role, units(unit_number, address)')
       .eq('community_id', community.id)
       .eq('is_approved', true)
       .order('last_name', { ascending: true })
@@ -124,7 +125,13 @@ export function SearchProviderWrapper({ children }: { children: React.ReactNode 
         keywords,
         section: 'Members',
         subtitle: m.email ?? undefined,
-        perform: () => router.push(`${basePath}/household`),
+        perform: () => {
+          if (isBoard && m.unit_id) {
+            router.push(`${basePath}/household?unit=${m.unit_id}`);
+          } else {
+            router.push(`${basePath}/directory`);
+          }
+        },
       };
     });
 
@@ -149,7 +156,7 @@ export function SearchProviderWrapper({ children }: { children: React.ReactNode 
         section: 'Lots',
         perform: () =>
           isBoard
-            ? router.push(`${basePath}/household?unit=${u.unit_number}`)
+            ? router.push(`${basePath}/household?unit=${u.id}`)
             : router.push(`${basePath}/household`),
       };
     });

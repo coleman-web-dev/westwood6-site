@@ -20,7 +20,7 @@ export const searchLinks: Array<{
   { id: 'directory', name: 'Directory', keywords: 'members residents contacts', section: 'Navigation', href: '/directory' },
   { id: 'reports', name: 'Reports', keywords: 'analytics data charts financial', section: 'Navigation', href: '/reports' },
   { id: 'violations', name: 'Violations', keywords: 'compliance enforcement notice', section: 'Navigation', href: '/violations' },
-  { id: 'arc-requests', name: 'ARC Requests', keywords: 'architectural review modifications', section: 'Navigation', href: '/arc-requests' },
+  { id: 'arc-requests', name: 'ARC Requests', keywords: 'arc architectural review modifications', section: 'Navigation', href: '/arc-requests' },
   { id: 'budget', name: 'Budget', keywords: 'financial planning reserves income expenses', section: 'Navigation', href: '/budget' },
   { id: 'vendors', name: 'Vendors', keywords: 'contractors service providers', section: 'Navigation', href: '/vendors' },
 ];
