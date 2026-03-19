@@ -297,7 +297,7 @@ export default function ReportsPage() {
           <TabsContent value="financial" className="space-y-grid-gap mt-4">
             <CollectionSummary invoices={invoices} payments={payments} />
             <AssessmentPerformance assessments={assessments} invoices={invoices} />
-            <RevenueTrendChart payments={payments} />
+            <RevenueTrendChart payments={payments} invoices={invoices} />
             <AgingReport invoices={invoices} />
             <DelinquentUnitsTable
               invoices={invoices}

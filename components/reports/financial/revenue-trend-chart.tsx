@@ -8,10 +8,11 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/shared/ui/chart';
-import type { Payment } from '@/lib/types/database';
+import type { Invoice, Payment } from '@/lib/types/database';
 
 interface RevenueTrendChartProps {
   payments: Payment[];
+  invoices?: Invoice[];
 }
 
 const chartConfig = {
@@ -21,7 +22,7 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-export function RevenueTrendChart({ payments }: RevenueTrendChartProps) {
+export function RevenueTrendChart({ payments, invoices }: RevenueTrendChartProps) {
   const chartData = useMemo(() => {
     const now = new Date();
     const months: { label: string; key: string; amount: number }[] = [];
@@ -33,12 +34,26 @@ export function RevenueTrendChart({ payments }: RevenueTrendChartProps) {
       months.push({ label, key, amount: 0 });
     }
 
-    for (const p of payments) {
-      const d = new Date(p.created_at);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const month = months.find((m) => m.key === key);
-      if (month) {
-        month.amount += p.amount;
+    // Prefer payments table if data exists, otherwise derive from invoices
+    if (payments.length > 0) {
+      for (const p of payments) {
+        const d = new Date(p.created_at);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        const month = months.find((m) => m.key === key);
+        if (month) {
+          month.amount += p.amount;
+        }
+      }
+    } else if (invoices) {
+      // Use invoice amount_paid grouped by due_date month as fallback
+      const nonVoided = invoices.filter((inv) => inv.status !== 'voided' && inv.amount_paid > 0);
+      for (const inv of nonVoided) {
+        const d = new Date(inv.due_date);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        const month = months.find((m) => m.key === key);
+        if (month) {
+          month.amount += inv.amount_paid;
+        }
       }
     }
 
@@ -46,14 +61,16 @@ export function RevenueTrendChart({ payments }: RevenueTrendChartProps) {
       month: m.label,
       amount: m.amount / 100,
     }));
-  }, [payments]);
+  }, [payments, invoices]);
+
+  const hasData = payments.length > 0 || (invoices && invoices.some((inv) => inv.status !== 'voided' && inv.amount_paid > 0));
 
   return (
     <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding">
       <h3 className="text-section-title text-text-primary-light dark:text-text-primary-dark mb-4">
         Revenue Trend
       </h3>
-      {payments.length === 0 ? (
+      {!hasData ? (
         <p className="text-body text-text-muted-light dark:text-text-muted-dark text-center py-6">
           No payment data available.
         </p>

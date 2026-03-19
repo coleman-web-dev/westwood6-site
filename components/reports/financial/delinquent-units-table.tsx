@@ -1,6 +1,8 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -10,6 +12,7 @@ import {
   TableRow,
 } from '@/components/shared/ui/table';
 import { ExportCsvButton } from '@/components/documents/export-csv-button';
+import { useCommunity } from '@/lib/providers/community-provider';
 import type { CsvColumn } from '@/lib/utils/export-csv';
 import type { Invoice, Unit, Member, DocumentFolder } from '@/lib/types/database';
 
@@ -25,7 +28,9 @@ interface DelinquentUnitsTableProps {
 }
 
 interface DelinquentUnit {
+  unitId: string;
   unitNumber: string;
+  address: string | null;
   ownerName: string;
   email: string | null;
   phone: string | null;
@@ -34,12 +39,16 @@ interface DelinquentUnit {
   oldestDueDate: string;
 }
 
+type SortKey = keyof DelinquentUnit;
+type SortDir = 'asc' | 'desc';
+
 function formatDollars(cents: number): string {
   return (cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
 }
 
 const delinquentColumns: CsvColumn<DelinquentUnit>[] = [
   { header: 'Unit Number', value: (d) => d.unitNumber },
+  { header: 'Address', value: (d) => d.address },
   { header: 'Owner Name', value: (d) => d.ownerName },
   { header: 'Email', value: (d) => d.email },
   { header: 'Phone', value: (d) => d.phone },
@@ -48,7 +57,44 @@ const delinquentColumns: CsvColumn<DelinquentUnit>[] = [
   { header: 'Oldest Due Date', value: (d) => d.oldestDueDate },
 ];
 
+function compareFn(a: DelinquentUnit, b: DelinquentUnit, key: SortKey, dir: SortDir): number {
+  const av = a[key];
+  const bv = b[key];
+  const nullA = av == null || av === '';
+  const nullB = bv == null || bv === '';
+  if (nullA && nullB) return 0;
+  if (nullA) return 1;
+  if (nullB) return -1;
+  let cmp = 0;
+  if (typeof av === 'number' && typeof bv === 'number') {
+    cmp = av - bv;
+  } else {
+    cmp = String(av).localeCompare(String(bv), undefined, { numeric: true });
+  }
+  return dir === 'asc' ? cmp : -cmp;
+}
+
+function SortIcon({ sortKey, currentKey, dir }: { sortKey: SortKey; currentKey: SortKey; dir: SortDir }) {
+  const cls = 'inline h-3 w-3 ml-1';
+  if (sortKey !== currentKey) return <ArrowUpDown className={`${cls} opacity-30`} />;
+  return dir === 'asc' ? <ArrowUp className={cls} /> : <ArrowDown className={cls} />;
+}
+
 export function DelinquentUnitsTable({ invoices, units, members, saveConfig }: DelinquentUnitsTableProps) {
+  const router = useRouter();
+  const { community } = useCommunity();
+  const [sortKey, setSortKey] = useState<SortKey>('amountOwed');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  const toggleSort = (key: SortKey) => {
+    if (key === sortKey) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir(key === 'amountOwed' || key === 'invoiceCount' ? 'desc' : 'asc');
+    }
+  };
+
   const delinquents = useMemo(() => {
     const overdueInvoices = invoices.filter(
       (inv) => inv.status === 'overdue' || inv.status === 'partial'
@@ -73,7 +119,9 @@ export function DelinquentUnitsTable({ invoices, units, members, saveConfig }: D
         );
 
         unitMap.set(inv.unit_id, {
+          unitId: inv.unit_id,
           unitNumber: unit?.unit_number ?? 'Unknown',
+          address: unit?.address ?? null,
           ownerName: owner ? `${owner.first_name} ${owner.last_name}` : 'N/A',
           email: owner?.email ?? null,
           phone: owner?.phone ?? null,
@@ -84,8 +132,11 @@ export function DelinquentUnitsTable({ invoices, units, members, saveConfig }: D
       }
     }
 
-    return Array.from(unitMap.values()).sort((a, b) => b.amountOwed - a.amountOwed);
-  }, [invoices, units, members]);
+    return Array.from(unitMap.values()).sort((a, b) => compareFn(a, b, sortKey, sortDir));
+  }, [invoices, units, members, sortKey, sortDir]);
+
+  const headClass =
+    'text-meta cursor-pointer select-none hover:text-text-primary-light dark:hover:text-text-primary-dark transition-colors';
 
   return (
     <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding">
@@ -113,19 +164,43 @@ export function DelinquentUnitsTable({ invoices, units, members, saveConfig }: D
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="text-meta">Unit #</TableHead>
-                <TableHead className="text-meta">Owner</TableHead>
-                <TableHead className="text-meta hidden sm:table-cell">Email</TableHead>
-                <TableHead className="text-meta hidden lg:table-cell">Phone</TableHead>
-                <TableHead className="text-meta text-right">Invoices</TableHead>
-                <TableHead className="text-meta text-right">Amount Owed</TableHead>
-                <TableHead className="text-meta hidden sm:table-cell">Oldest Due</TableHead>
+                <TableHead className={headClass} onClick={() => toggleSort('unitNumber')}>
+                  Unit # <SortIcon sortKey="unitNumber" currentKey={sortKey} dir={sortDir} />
+                </TableHead>
+                <TableHead className={`${headClass} hidden md:table-cell`} onClick={() => toggleSort('address')}>
+                  Address <SortIcon sortKey="address" currentKey={sortKey} dir={sortDir} />
+                </TableHead>
+                <TableHead className={headClass} onClick={() => toggleSort('ownerName')}>
+                  Owner <SortIcon sortKey="ownerName" currentKey={sortKey} dir={sortDir} />
+                </TableHead>
+                <TableHead className={`${headClass} hidden sm:table-cell`} onClick={() => toggleSort('email')}>
+                  Email <SortIcon sortKey="email" currentKey={sortKey} dir={sortDir} />
+                </TableHead>
+                <TableHead className={`${headClass} hidden lg:table-cell`} onClick={() => toggleSort('phone')}>
+                  Phone <SortIcon sortKey="phone" currentKey={sortKey} dir={sortDir} />
+                </TableHead>
+                <TableHead className={`${headClass} text-right`} onClick={() => toggleSort('invoiceCount')}>
+                  Invoices <SortIcon sortKey="invoiceCount" currentKey={sortKey} dir={sortDir} />
+                </TableHead>
+                <TableHead className={`${headClass} text-right`} onClick={() => toggleSort('amountOwed')}>
+                  Amount Owed <SortIcon sortKey="amountOwed" currentKey={sortKey} dir={sortDir} />
+                </TableHead>
+                <TableHead className={`${headClass} hidden sm:table-cell`} onClick={() => toggleSort('oldestDueDate')}>
+                  Oldest Due <SortIcon sortKey="oldestDueDate" currentKey={sortKey} dir={sortDir} />
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {delinquents.map((d) => (
-                <TableRow key={d.unitNumber + d.ownerName}>
+                <TableRow
+                  key={d.unitId}
+                  className="cursor-pointer hover:bg-surface-light-2 dark:hover:bg-surface-dark-2"
+                  onClick={() => router.push(`/${community.slug}/household?unit=${d.unitId}`)}
+                >
                   <TableCell className="text-body font-medium">{d.unitNumber}</TableCell>
+                  <TableCell className="text-meta text-text-secondary-light dark:text-text-secondary-dark hidden md:table-cell">
+                    {d.address ?? '-'}
+                  </TableCell>
                   <TableCell className="text-body">{d.ownerName}</TableCell>
                   <TableCell className="text-meta text-text-secondary-light dark:text-text-secondary-dark hidden sm:table-cell">
                     {d.email ?? '-'}

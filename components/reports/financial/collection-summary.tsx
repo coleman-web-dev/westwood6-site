@@ -12,10 +12,10 @@ function formatDollars(cents: number): string {
   return (cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
 }
 
-export function CollectionSummary({ invoices, payments }: CollectionSummaryProps) {
+export function CollectionSummary({ invoices }: CollectionSummaryProps) {
   const nonVoided = invoices.filter((inv) => inv.status !== 'voided');
   const totalBilled = nonVoided.reduce((sum, inv) => sum + inv.amount, 0);
-  const totalCollected = payments.reduce((sum, p) => sum + p.amount, 0);
+  const totalCollected = nonVoided.reduce((sum, inv) => sum + inv.amount_paid, 0);
   const collectionRate = totalBilled > 0 ? (totalCollected / totalBilled) * 100 : 0;
   const outstanding = nonVoided
     .filter((inv) => inv.status === 'pending' || inv.status === 'overdue' || inv.status === 'partial')
