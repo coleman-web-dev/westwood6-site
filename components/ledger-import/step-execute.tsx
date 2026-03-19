@@ -193,7 +193,6 @@ export function StepExecute({
               invoice_id: invoice.id,
               unit_id: unitId,
               amount: mapped.amountPaid,
-              paid_by: 'imported',
             });
 
             if (payError) {
