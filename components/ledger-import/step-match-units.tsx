@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Check, X, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, X, Search, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
 import { Button } from '@/components/shared/ui/button';
 import {
   Select,
@@ -20,6 +20,8 @@ import {
   formatCents,
 } from '@/lib/utils/ledger-import';
 
+const PAGE_SIZE = 25;
+
 interface StepMatchUnitsProps {
   matchedRows: MatchedRow[];
   units: UnitRecord[];
@@ -37,6 +39,8 @@ export function StepMatchUnits({
 }: StepMatchUnitsProps) {
   const [showAll, setShowAll] = useState(false);
   const [searchFilter, setSearchFilter] = useState('');
+  const [page, setPage] = useState(0);
+  const [editingRow, setEditingRow] = useState<number | null>(null);
 
   // Count by confidence
   const counts = useMemo(() => {
@@ -70,6 +74,24 @@ export function StepMatchUnits({
 
     return rows;
   }, [matchedRows, showAll, searchFilter]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredRows.length / PAGE_SIZE);
+  const pagedRows = useMemo(
+    () => filteredRows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
+    [filteredRows, page],
+  );
+
+  // Reset page when filters change
+  useMemo(() => {
+    setPage(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showAll, searchFilter]);
+
+  function handleSelectUnit(rowNumber: number, value: string) {
+    onUpdateMatch(rowNumber, value === '__none__' ? null : value);
+    setEditingRow(null);
+  }
 
   return (
     <div className="space-y-4">
@@ -163,9 +185,9 @@ export function StepMatchUnits({
 
       {/* Match table */}
       <div className="rounded-inner-card border border-stroke-light dark:border-stroke-dark overflow-hidden">
-        <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+        <div className="overflow-x-auto">
           <table className="w-full text-meta">
-            <thead className="sticky top-0 z-10">
+            <thead>
               <tr className="bg-surface-light-2 dark:bg-surface-dark-2">
                 <th className="px-3 py-2 text-left font-semibold text-text-secondary-light dark:text-text-secondary-dark whitespace-nowrap">
                   #
@@ -188,61 +210,75 @@ export function StepMatchUnits({
               </tr>
             </thead>
             <tbody>
-              {filteredRows.map((mr) => (
-                <tr
-                  key={mr.row.rowNumber}
-                  className={`border-t border-stroke-light dark:border-stroke-dark ${confidenceBg(mr.confidence)}`}
-                >
-                  <td className="px-3 py-2 text-text-muted-light dark:text-text-muted-dark">
-                    {mr.row.rowNumber}
-                  </td>
-                  <td className="px-3 py-2 text-text-primary-light dark:text-text-primary-dark whitespace-nowrap">
-                    {mr.mapped.unitIdentifier}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    <span className={`font-medium ${confidenceColor(mr.confidence)}`}>
-                      {confidenceLabel(mr.confidence)}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2">
-                    {mr.confidence === 'unmatched' || mr.confidence === 'fuzzy' || mr.confidence === 'name' ? (
-                      <Select
-                        value={mr.unitId || '__none__'}
-                        onValueChange={(val) =>
-                          onUpdateMatch(mr.row.rowNumber, val === '__none__' ? null : val)
-                        }
-                      >
-                        <SelectTrigger className="h-7 text-meta">
-                          <SelectValue placeholder="Select unit..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">
-                            <span className="text-text-muted-light dark:text-text-muted-dark">
-                              No match
-                            </span>
-                          </SelectItem>
-                          {units.map((u) => (
-                            <SelectItem key={u.id} value={u.id}>
-                              Unit {u.unit_number}
-                              {u.address ? ` - ${u.address}` : ''}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <span className="text-text-primary-light dark:text-text-primary-dark">
-                        {mr.unitLabel}
+              {pagedRows.map((mr) => {
+                const isEditing = editingRow === mr.row.rowNumber;
+                const needsReview = mr.confidence === 'unmatched' || mr.confidence === 'fuzzy' || mr.confidence === 'name';
+
+                return (
+                  <tr
+                    key={mr.row.rowNumber}
+                    className={`border-t border-stroke-light dark:border-stroke-dark ${confidenceBg(mr.confidence)}`}
+                  >
+                    <td className="px-3 py-2 text-text-muted-light dark:text-text-muted-dark">
+                      {mr.row.rowNumber}
+                    </td>
+                    <td className="px-3 py-2 text-text-primary-light dark:text-text-primary-dark whitespace-nowrap">
+                      {mr.mapped.unitIdentifier}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <span className={`font-medium ${confidenceColor(mr.confidence)}`}>
+                        {confidenceLabel(mr.confidence)}
                       </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-right text-text-primary-light dark:text-text-primary-dark whitespace-nowrap font-mono">
-                    {formatCents(mr.mapped.amountDue)}
-                  </td>
-                  <td className="px-3 py-2 text-right text-text-primary-light dark:text-text-primary-dark whitespace-nowrap font-mono">
-                    {mr.mapped.amountPaid > 0 ? formatCents(mr.mapped.amountPaid) : '-'}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-3 py-2">
+                      {isEditing ? (
+                        <Select
+                          value={mr.unitId || '__none__'}
+                          onValueChange={(val) => handleSelectUnit(mr.row.rowNumber, val)}
+                        >
+                          <SelectTrigger className="h-7 text-meta" autoFocus>
+                            <SelectValue placeholder="Select unit..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">
+                              <span className="text-text-muted-light dark:text-text-muted-dark">
+                                No match
+                              </span>
+                            </SelectItem>
+                            {units.map((u) => (
+                              <SelectItem key={u.id} value={u.id}>
+                                Unit {u.unit_number}
+                                {u.address ? ` - ${u.address}` : ''}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : needsReview ? (
+                        <button
+                          type="button"
+                          onClick={() => setEditingRow(mr.row.rowNumber)}
+                          className="flex items-center gap-1.5 text-left group"
+                        >
+                          <span className="text-text-primary-light dark:text-text-primary-dark">
+                            {mr.unitLabel || 'No match'}
+                          </span>
+                          <Pencil className="h-3 w-3 text-text-muted-light dark:text-text-muted-dark opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </button>
+                      ) : (
+                        <span className="text-text-primary-light dark:text-text-primary-dark">
+                          {mr.unitLabel}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-right text-text-primary-light dark:text-text-primary-dark whitespace-nowrap font-mono">
+                      {formatCents(mr.mapped.amountDue)}
+                    </td>
+                    <td className="px-3 py-2 text-right text-text-primary-light dark:text-text-primary-dark whitespace-nowrap font-mono">
+                      {mr.mapped.amountPaid > 0 ? formatCents(mr.mapped.amountPaid) : '-'}
+                    </td>
+                  </tr>
+                );
+              })}
               {filteredRows.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-3 py-8 text-center text-body text-text-muted-light dark:text-text-muted-dark">
@@ -256,6 +292,39 @@ export function StepMatchUnits({
           </table>
         </div>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+            Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, filteredRows.length)} of{' '}
+            {filteredRows.length}
+          </p>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              disabled={page === 0}
+              onClick={() => setPage((p) => p - 1)}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-meta text-text-secondary-light dark:text-text-secondary-dark px-2">
+              {page + 1} / {totalPages}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              disabled={page >= totalPages - 1}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
