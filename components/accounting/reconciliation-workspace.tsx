@@ -10,6 +10,7 @@ import {
   completeReconciliation,
   updateReconciliationBalance,
   assignReconciliationTransactions,
+  resetSyncCursor,
 } from '@/lib/actions/banking-actions';
 import { BankTransactionDetail } from '@/components/accounting/bank-transaction-detail';
 import { MerchantLogo } from '@/components/accounting/merchant-logo';
@@ -129,31 +130,37 @@ export function ReconciliationWorkspace({
     setCompleting(false);
   }
 
-  async function handleSyncTransactions() {
+  async function getConnectionId(): Promise<string | null> {
+    const supabase = createClient();
+    const { data: bankAccount } = await supabase
+      .from('plaid_bank_accounts')
+      .select('plaid_connection_id')
+      .eq('id', recon!.plaid_bank_account_id)
+      .single();
+    return bankAccount?.plaid_connection_id || null;
+  }
+
+  async function handleSyncTransactions(withReset = false) {
     if (!recon) return;
     setSyncing(true);
     try {
-      // Look up the Plaid connection for this bank account
-      const supabase = createClient();
-      const { data: bankAccount } = await supabase
-        .from('plaid_bank_accounts')
-        .select('plaid_connection_id')
-        .eq('id', recon.plaid_bank_account_id)
-        .single();
-
-      if (!bankAccount) {
+      const connectionId = await getConnectionId();
+      if (!connectionId) {
         toast.error('Bank account connection not found.');
         setSyncing(false);
         return;
       }
 
+      // If resetting cursor, clear it first so Plaid does a full historical re-sync
+      if (withReset) {
+        await resetSyncCursor(communityId, connectionId);
+        toast.info('Cursor reset. Running full re-sync...');
+      }
+
       const res = await fetch('/api/plaid/sync-transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          communityId,
-          connectionId: bankAccount.plaid_connection_id,
-        }),
+        body: JSON.stringify({ communityId, connectionId }),
       });
 
       const data = await res.json();
@@ -264,9 +271,18 @@ export function ReconciliationWorkspace({
           </div>
         </div>
         <div className="flex gap-2 mt-4">
-          <Button size="sm" variant="outline" onClick={handleSyncTransactions} disabled={syncing}>
+          <Button size="sm" variant="outline" onClick={() => handleSyncTransactions(false)} disabled={syncing}>
             {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <RefreshCw className="h-3.5 w-3.5 mr-1" />}
             Sync Transactions
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => handleSyncTransactions(true)}
+            disabled={syncing}
+            title="Clears the sync cursor and pulls all historical transactions from Plaid"
+          >
+            Reset & Re-sync
           </Button>
           <Button size="sm" variant="outline" onClick={handleRefreshBalance}>
             Refresh Balance

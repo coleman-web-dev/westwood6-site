@@ -397,6 +397,23 @@ export async function deleteCategorizationRule(communityId: string, ruleId: stri
   return { success: true };
 }
 
+export async function resetSyncCursor(
+  communityId: string,
+  connectionId: string,
+) {
+  await requirePermission(communityId, 'banking', 'write');
+  const admin = createAdminClient();
+
+  const { error } = await admin
+    .from('plaid_connections')
+    .update({ last_sync_cursor: null })
+    .eq('id', connectionId)
+    .eq('community_id', communityId);
+
+  if (error) throw new Error(error.message);
+  return { success: true };
+}
+
 export async function toggleCategorizationRule(
   communityId: string,
   ruleId: string,
