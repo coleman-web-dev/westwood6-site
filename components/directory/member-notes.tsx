@@ -84,15 +84,24 @@ export function MemberNotes({ memberId, noteCount, onCountChange }: MemberNotesP
 
   return (
     <div className="mt-2 pt-2 border-t border-stroke-light dark:border-stroke-dark">
-      <button
+      <Button
+        variant="outline"
+        size="sm"
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-1.5 text-meta text-text-secondary-light dark:text-text-secondary-dark hover:text-secondary-500 dark:hover:text-secondary-400 transition-colors w-full"
+        className="h-7 text-meta"
       >
-        <StickyNote className="h-3 w-3" />
-        <span>
-          {noteCount === 0 ? 'Add note' : `${noteCount} note${noteCount !== 1 ? 's' : ''}`}
-        </span>
-      </button>
+        {noteCount === 0 ? (
+          <>
+            <Plus className="h-3 w-3 mr-1" />
+            Add Note
+          </>
+        ) : (
+          <>
+            <StickyNote className="h-3 w-3 mr-1" />
+            Notes ({noteCount})
+          </>
+        )}
+      </Button>
 
       {expanded && (
         <div className="mt-2 space-y-2">

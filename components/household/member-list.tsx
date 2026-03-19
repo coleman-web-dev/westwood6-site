@@ -182,15 +182,6 @@ export function MemberList({
                       )}
                     </span>
                     <span>Joined {format(new Date(m.created_at), 'MMM d, yyyy')}</span>
-                    {isBoard && (
-                      <button
-                        onClick={() => setNotesForMember({ id: m.id, name: `${m.first_name} ${m.last_name}` })}
-                        className="inline-flex items-center gap-1 text-secondary-500 hover:text-secondary-600 dark:hover:text-secondary-400"
-                      >
-                        <StickyNote className="h-3 w-3" />
-                        Notes
-                      </button>
-                    )}
                     {m.use_unit_address === false && (
                       <span className="text-meta text-text-muted-light dark:text-text-muted-dark">
                         Alt. address
@@ -200,6 +191,17 @@ export function MemberList({
                 </div>
 
                 <div className="flex items-center gap-1 shrink-0">
+                  {isBoard && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setNotesForMember({ id: m.id, name: `${m.first_name} ${m.last_name}` })}
+                      title="Member notes"
+                    >
+                      <StickyNote className="h-4 w-4" />
+                      <span className="sr-only">Notes for {m.first_name}</span>
+                    </Button>
+                  )}
                   {(isBoard || isSelf) && (
                     <Button
                       variant="ghost"

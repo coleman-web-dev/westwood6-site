@@ -12,6 +12,7 @@ import { HouseholdFinancialSummary } from '@/components/household/household-fina
 import { HouseholdVotingHistory } from '@/components/household/household-voting-history';
 import { HouseholdPaymentHistory } from '@/components/household/household-payment-history';
 import { HouseholdDocuments } from '@/components/household/household-documents';
+import { HouseholdNotesCard } from '@/components/household/household-notes-card';
 import { LeaseSection } from '@/components/household/lease-section';
 import { AddUnitDialog } from '@/components/household/add-unit-dialog';
 import { EditUnitDialog } from '@/components/household/edit-unit-dialog';
@@ -381,11 +382,18 @@ export default function HouseholdPage() {
           )}
         </div>
 
-        {/* Right column: Financial + Voting */}
+        {/* Right column: Financial + Voting + Notes */}
         {activeUnit && (
           <div className="space-y-6">
             <HouseholdFinancialSummary unitId={activeUnit.id} communityId={community.id} />
             <HouseholdVotingHistory unitId={activeUnit.id} communityId={community.id} />
+            {isBoard && (
+              <HouseholdNotesCard
+                unitId={activeUnit.id}
+                communityId={community.id}
+                members={members}
+              />
+            )}
           </div>
         )}
       </div>
