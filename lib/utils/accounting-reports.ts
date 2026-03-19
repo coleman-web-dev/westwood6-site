@@ -30,19 +30,13 @@ export async function getTrialBalance(
   if (!accounts || accounts.length === 0) return [];
 
   // Get summed journal lines for posted entries up to the cutoff date
+  // Use inner join to avoid .in() with many UUIDs (PostgREST URL limit)
   const { data: lines } = await supabase
     .from('journal_lines')
-    .select('account_id, debit, credit, journal_entry_id')
-    .in(
-      'journal_entry_id',
-      (await supabase
-        .from('journal_entries')
-        .select('id')
-        .eq('community_id', communityId)
-        .eq('status', 'posted')
-        .lte('entry_date', cutoff)
-      ).data?.map((e) => e.id) || [],
-    );
+    .select('account_id, debit, credit, journal_entry_id, journal_entries!inner()')
+    .eq('journal_entries.community_id', communityId)
+    .eq('journal_entries.status', 'posted')
+    .lte('journal_entries.entry_date', cutoff);
 
   // Aggregate by account
   const accountTotals = new Map<string, { debit: number; credit: number }>();
@@ -131,24 +125,15 @@ export async function getIncomeStatement(
     };
   }
 
-  // Get journal entry IDs in date range
-  const { data: entries } = await supabase
-    .from('journal_entries')
-    .select('id')
-    .eq('community_id', communityId)
-    .eq('status', 'posted')
-    .gte('entry_date', startDate)
-    .lte('entry_date', endDate);
-
-  const entryIds = entries?.map((e) => e.id) || [];
-
-  // Get lines for those entries
-  const { data: lines } = entryIds.length > 0
-    ? await supabase
-        .from('journal_lines')
-        .select('account_id, debit, credit')
-        .in('journal_entry_id', entryIds)
-    : { data: [] };
+  // Get journal lines for posted entries in date range
+  // Use inner join to avoid .in() with many UUIDs (PostgREST URL limit)
+  const { data: lines } = await supabase
+    .from('journal_lines')
+    .select('account_id, debit, credit, journal_entries!inner()')
+    .eq('journal_entries.community_id', communityId)
+    .eq('journal_entries.status', 'posted')
+    .gte('journal_entries.entry_date', startDate)
+    .lte('journal_entries.entry_date', endDate);
 
   const accountTotals = new Map<string, { debit: number; credit: number }>();
   for (const line of lines || []) {
