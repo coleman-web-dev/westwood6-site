@@ -75,7 +75,7 @@ export function RevenueTrendChart({ payments, invoices }: RevenueTrendChartProps
           No payment data available.
         </p>
       ) : (
-        <ChartContainer config={chartConfig} className="aspect-[2/1] w-full">
+        <ChartContainer config={chartConfig} className="aspect-[4/1] w-full max-h-[280px]">
           <BarChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
             <XAxis
