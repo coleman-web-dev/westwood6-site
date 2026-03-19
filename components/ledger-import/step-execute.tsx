@@ -13,12 +13,7 @@ import {
   resolveChargeType,
 } from '@/lib/utils/ledger-import';
 import type { ImportConfig, ServiceFeeHandling } from './step-review';
-import {
-  postInvoiceCreated,
-  postPaymentReceived,
-  postOverpaymentWalletCredit,
-  createJournalEntry,
-} from '@/lib/utils/accounting-entries';
+import { postLedgerGlBatch, type GlPostRequest } from '@/lib/actions/ledger-gl-actions';
 
 interface StepExecuteProps {
   matchedRows: MatchedRow[];
@@ -75,6 +70,8 @@ export function StepExecute({
     for (let i = 0; i < importableRows.length; i += BATCH_SIZE) {
       const batch = importableRows.slice(i, i + BATCH_SIZE);
 
+      const glRequests: GlPostRequest[] = [];
+
       for (const mr of batch) {
         try {
           const { mapped, unitId } = mr;
@@ -85,34 +82,29 @@ export function StepExecute({
           // ─── Security Deposit path ───────────────────
           if (chargeType === 'security_deposit') {
             if (mapped.amountPaid > 0 && config.postGlEntries) {
-              // Security deposit received: DR Cash, CR Security Deposits Held
-              await createJournalEntry({
+              glRequests.push({
+                type: 'security_deposit',
                 communityId,
-                entryDate: mapped.paymentDate || mapped.dueDate || undefined,
-                description: `Security deposit received (imported from ${fileName})`,
-                source: 'bank_sync',
-                referenceType: 'invoice',
-                referenceId: undefined,
                 unitId,
+                amount: mapped.amountPaid,
+                description: `Security deposit received (imported from ${fileName})`,
+                entryDate: mapped.paymentDate || mapped.dueDate || undefined,
                 lines: [
                   { accountCode: '1000', debit: mapped.amountPaid, credit: 0, description: 'Operating Cash' },
                   { accountCode: '2210', debit: 0, credit: mapped.amountPaid, description: 'Security Deposits Held' },
                 ],
               });
-              res.glEntriesPosted++;
             }
             res.depositsRecorded++;
             res.depositAmount += mapped.amountPaid;
-            continue; // Skip invoice/payment creation for deposits
+            continue;
           }
 
           // ─── Assessment / Assessment+LateFee / Other path ─────────────────
 
-          // Calculate late fee split if applicable
           let lateFeeForRow = 0;
           let baseAmountDue = mapped.amountDue;
           if (chargeType === 'assessment_late_fee' && config.lateFeeAmount > 0) {
-            // Try to detect the split: amount = N*base + N*lateFee or amount - lateFee
             const remainder = mapped.amountDue - config.lateFeeAmount;
             if (remainder > 0) {
               lateFeeForRow = config.lateFeeAmount;
@@ -120,7 +112,6 @@ export function StepExecute({
             }
           }
 
-          // Derive invoice status
           let invoiceStatus: string;
           if (mapped.amountPaid >= mapped.amountDue && mapped.amountDue > 0) {
             invoiceStatus = 'paid';
@@ -132,7 +123,6 @@ export function StepExecute({
             invoiceStatus = 'pending';
           }
 
-          // Build invoice title
           let invoiceTitle = 'Imported Invoice';
           if (mapped.dueDate) {
             const d = new Date(mapped.dueDate + 'T00:00:00');
@@ -141,7 +131,7 @@ export function StepExecute({
             invoiceTitle = `${month} ${year} Assessment`;
           }
 
-          // 1. Create invoice (amount = base portion only, late fee stored separately)
+          // 1. Create invoice
           const { data: invoice, error: invError } = await supabase
             .from('invoices')
             .insert({
@@ -169,34 +159,31 @@ export function StepExecute({
 
           res.invoicesCreated++;
 
-          // Post GL: invoice created
+          // Queue GL: invoice created
           if (config.postGlEntries) {
-            // Post the base assessment amount
-            await postInvoiceCreated(
+            glRequests.push({
+              type: 'invoice_created',
               communityId,
-              invoice.id,
+              invoiceId: invoice.id,
               unitId,
-              baseAmountDue,
-              invoiceTitle,
-            );
-            res.glEntriesPosted++;
+              amount: baseAmountDue,
+              description: invoiceTitle,
+            });
 
-            // Post late fee GL if applicable: DR AR, CR Late Fee Revenue (4100)
             if (lateFeeForRow > 0) {
-              await createJournalEntry({
+              glRequests.push({
+                type: 'late_fee',
                 communityId,
-                entryDate: mapped.dueDate || undefined,
-                description: `Late fee: ${invoiceTitle}`,
-                source: 'late_fee_applied',
-                referenceType: 'invoice',
-                referenceId: invoice.id,
+                invoiceId: invoice.id,
                 unitId,
+                amount: lateFeeForRow,
+                description: `Late fee: ${invoiceTitle}`,
+                entryDate: mapped.dueDate || undefined,
                 lines: [
                   { accountCode: '1100', debit: lateFeeForRow, credit: 0, description: 'Accounts Receivable (late fee)' },
                   { accountCode: '4100', debit: 0, credit: lateFeeForRow, description: 'Late Fee Revenue' },
                 ],
               });
-              res.glEntriesPosted++;
             }
           }
 
@@ -219,18 +206,17 @@ export function StepExecute({
             } else {
               res.paymentsRecorded++;
 
-              // Post GL: payment received
               if (config.postGlEntries) {
                 const paymentGlAmount = Math.min(mapped.amountPaid, mapped.amountDue);
                 if (paymentGlAmount > 0) {
-                  await postPaymentReceived(
+                  glRequests.push({
+                    type: 'payment_received',
                     communityId,
-                    invoice.id,
+                    invoiceId: invoice.id,
                     unitId,
-                    paymentGlAmount,
-                    invoiceTitle,
-                  );
-                  res.glEntriesPosted++;
+                    amount: paymentGlAmount,
+                    description: invoiceTitle,
+                  });
                 }
               }
             }
@@ -246,37 +232,33 @@ export function StepExecute({
             );
 
             if (feeHandling === 'hoa_absorbed') {
-              // HOA pays: DR Processing Fees expense, CR Operating Cash
-              await createJournalEntry({
+              glRequests.push({
+                type: 'service_fee_absorbed',
                 communityId,
-                entryDate: mapped.paymentDate || mapped.dueDate || undefined,
-                description: `Processing fee: ${invoiceTitle}`,
-                source: 'bank_sync',
-                referenceType: 'invoice',
-                referenceId: invoice.id,
+                invoiceId: invoice.id,
                 unitId,
+                amount: mapped.serviceFee,
+                description: `Processing fee: ${invoiceTitle}`,
+                entryDate: mapped.paymentDate || mapped.dueDate || undefined,
                 lines: [
                   { accountCode: '5700', debit: mapped.serviceFee, credit: 0, description: 'Processing Fee Expense' },
                   { accountCode: '1000', debit: 0, credit: mapped.serviceFee, description: 'Operating Cash' },
                 ],
               });
-              res.glEntriesPosted++;
             } else {
-              // Member pays: DR Operating Cash, CR Processing Fee Revenue
-              await createJournalEntry({
+              glRequests.push({
+                type: 'service_fee_revenue',
                 communityId,
-                entryDate: mapped.paymentDate || mapped.dueDate || undefined,
-                description: `Processing fee revenue: ${invoiceTitle}`,
-                source: 'bank_sync',
-                referenceType: 'invoice',
-                referenceId: invoice.id,
+                invoiceId: invoice.id,
                 unitId,
+                amount: mapped.serviceFee,
+                description: `Processing fee revenue: ${invoiceTitle}`,
+                entryDate: mapped.paymentDate || mapped.dueDate || undefined,
                 lines: [
                   { accountCode: '1000', debit: mapped.serviceFee, credit: 0, description: 'Operating Cash' },
                   { accountCode: '4700', debit: 0, credit: mapped.serviceFee, description: 'Processing Fee Revenue' },
                 ],
               });
-              res.glEntriesPosted++;
             }
           }
         } catch (err) {
@@ -284,6 +266,15 @@ export function StepExecute({
             row: mr.row.rowNumber,
             message: `Unexpected error: ${err instanceof Error ? err.message : 'unknown'}`,
           });
+        }
+      }
+
+      // Post GL entries for this batch via server action
+      if (glRequests.length > 0) {
+        const glResult = await postLedgerGlBatch(glRequests);
+        res.glEntriesPosted += glResult.posted;
+        if (glResult.errors.length > 0) {
+          res.errors.push(...glResult.errors.map((e) => ({ row: 0, message: e })));
         }
       }
 
@@ -337,10 +328,20 @@ export function StepExecute({
         res.walletCredits++;
         res.walletCreditAmount += creditAmount;
 
-        // GL entry for overpayment
+        // GL entry for overpayment (via server action)
         if (config.postGlEntries) {
-          await postOverpaymentWalletCredit(communityId, '', ub.unitId, creditAmount);
-          res.glEntriesPosted++;
+          const glResult = await postLedgerGlBatch([{
+            type: 'overpayment',
+            communityId,
+            unitId: ub.unitId,
+            amount: creditAmount,
+            description: `Overpayment from ledger import (${fileName})`,
+            lines: [
+              { accountCode: '1000', debit: creditAmount, credit: 0, description: 'Operating Cash' },
+              { accountCode: '2110', debit: 0, credit: creditAmount, description: 'Wallet Credits' },
+            ],
+          }]);
+          res.glEntriesPosted += glResult.posted;
         }
       } else if (ub.balance > 0) {
         res.outstandingAmount += ub.balance;
