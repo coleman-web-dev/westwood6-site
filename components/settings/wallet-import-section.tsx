@@ -1,10 +1,16 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { createClient } from '@/lib/supabase/client';
 import { compareAddresses } from '@/lib/utils/address-normalize';
-import { importWalletBalances, type WalletImportRow } from '@/lib/actions/wallet-import-actions';
+import {
+  importWalletBalances,
+  checkPreviousWalletImport,
+  undoWalletImport,
+  type WalletImportRow,
+  type PreviousImportInfo,
+} from '@/lib/actions/wallet-import-actions';
 import { Button } from '@/components/shared/ui/button';
 import { Input } from '@/components/shared/ui/input';
 import {
@@ -26,6 +32,7 @@ import {
   ChevronRight,
   X,
   Loader2,
+  Undo2,
 } from 'lucide-react';
 
 // ─── Types ──────────────────────────────────────────
@@ -208,6 +215,36 @@ export function WalletImportSection() {
     errors: string[];
   } | null>(null);
 
+  // Previous import detection
+  const [previousImport, setPreviousImport] = useState<PreviousImportInfo | null>(null);
+  const [undoing, setUndoing] = useState(false);
+
+  useEffect(() => {
+    if (community?.id) {
+      checkPreviousWalletImport(community.id).then(setPreviousImport);
+    }
+  }, [community?.id]);
+
+  const handleUndo = useCallback(async () => {
+    if (!community?.id) return;
+    setUndoing(true);
+    try {
+      const result = await undoWalletImport(community.id);
+      if (result.success) {
+        toast.success(`Reversed ${result.reversed} wallet imports. Balances reset.`);
+        setPreviousImport({ found: false, count: 0, totalCents: 0, importedAt: null });
+      } else {
+        toast.error(`Reversed ${result.reversed} of ${previousImport?.count || 0}. ${result.errors.length} error(s).`);
+        // Refresh state
+        checkPreviousWalletImport(community.id).then(setPreviousImport);
+      }
+    } catch (err) {
+      toast.error('Undo failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setUndoing(false);
+    }
+  }, [community?.id, previousImport?.count]);
+
   // Stats
   const stats = useMemo(() => {
     const matched = matches.filter((m) => m.unitId && m.netCents > 0);
@@ -340,6 +377,42 @@ export function WalletImportSection() {
           </p>
         </div>
       </div>
+
+      {/* Previous Import Warning / Undo */}
+      {previousImport?.found && (
+        <div className="flex items-center justify-between p-4 rounded-inner-card bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/30">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+            <div>
+              <p className="text-body font-semibold text-amber-700 dark:text-amber-300">
+                Previous Import Detected
+              </p>
+              <p className="text-meta text-amber-600 dark:text-amber-400">
+                {previousImport.count} wallet credits totaling $
+                {(previousImport.totalCents / 100).toLocaleString('en-US', {
+                  minimumFractionDigits: 2,
+                })}
+                {previousImport.importedAt &&
+                  ` (imported ${new Date(previousImport.importedAt).toLocaleDateString()})`}
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleUndo}
+            disabled={undoing}
+            className="gap-2 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+          >
+            {undoing ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Undo2 className="h-4 w-4" />
+            )}
+            {undoing ? 'Reversing...' : 'Undo Import'}
+          </Button>
+        </div>
+      )}
 
       {/* Upload Step */}
       {step === 'upload' && (
