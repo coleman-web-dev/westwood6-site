@@ -3,12 +3,13 @@ import type { BudgetCategory } from '@/lib/types/database';
 
 const BUDGET_SYSTEM_PROMPT = `You are an AI assistant for DuesIQ, an HOA management platform. You are extracting budget line items from a Homeowners Association budget document.
 
-Your job is to identify every income and expense line item in the document, categorize it, and extract the annual budgeted amount.
+Your job is to identify every income and expense line item in the document, categorize it, and extract the annual budgeted amount AND the actual amount (if present).
 
 For each line item, determine:
 - name: A descriptive name for the line item (e.g., "Monthly Dues", "Landscaping Contract", "General Liability Insurance")
 - category: One of these exact values: dues, assessments, amenity_fees, interest, maintenance, landscaping, insurance, utilities, management, legal, reserves, other
 - budgeted_amount: The annual budgeted amount in CENTS (e.g., $15,000.00 = 1500000). If the document shows monthly amounts, multiply by 12 to get annual. If quarterly, multiply by 4.
+- actual_amount: The actual/YTD amount spent or received in CENTS. If the document has an "Actual", "YTD", "Year to Date", or similar column, use that value. If no actual amount is present, use 0.
 - is_income: true if this is revenue/income (dues, fees collected, interest earned), false if it is an expense
 
 Category guidance:
@@ -30,6 +31,7 @@ Important:
 - If the document has subtotals or totals, do NOT include those as line items
 - If a line item could fit multiple categories, pick the most specific one
 - Convert all amounts to annual figures in cents
+- Many budget documents have both a "Budget" and "Actual" column. Extract BOTH values.
 
 Return ONLY a valid JSON object with this structure (no markdown code fences):
 {
@@ -38,6 +40,7 @@ Return ONLY a valid JSON object with this structure (no markdown code fences):
       "name": "Monthly Dues",
       "category": "dues",
       "budgeted_amount": 1500000,
+      "actual_amount": 1350000,
       "is_income": true
     }
   ]
@@ -47,6 +50,7 @@ export interface ParsedBudgetItem {
   name: string;
   category: BudgetCategory;
   budgeted_amount: number;
+  actual_amount: number;
   is_income: boolean;
 }
 
@@ -133,6 +137,9 @@ export async function parseBudgetDocument(
         ? (item.category as BudgetCategory)
         : 'other',
       budgeted_amount: Math.round(Math.abs(Number(item.budgeted_amount))),
+      actual_amount: typeof item.actual_amount === 'number'
+        ? Math.round(Math.abs(Number(item.actual_amount)))
+        : 0,
       is_income: Boolean(item.is_income),
     }));
 

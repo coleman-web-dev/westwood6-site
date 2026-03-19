@@ -69,7 +69,9 @@ export default function BudgetPage() {
           const actualById = new Map(rows.filter((r) => r.id).map((r) => [r.id!, r.actual]));
           for (const item of items) {
             const glActual = actualById.get(item.id);
-            if (glActual !== undefined) {
+            // Only override stored actual if GL has a non-zero value
+            // This preserves imported actuals when no journal entries exist
+            if (glActual !== undefined && glActual !== 0) {
               item.actual_amount = glActual;
             }
           }

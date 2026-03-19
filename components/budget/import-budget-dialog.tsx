@@ -45,6 +45,7 @@ interface ParsedItem {
   name: string;
   category: BudgetCategory;
   budgeted_amount: number; // cents
+  actual_amount: number; // cents
   is_income: boolean;
 }
 
@@ -123,7 +124,7 @@ export function ImportBudgetDialog({
   function addItem() {
     setItems((prev) => [
       ...prev,
-      { name: '', category: 'other', budgeted_amount: 0, is_income: false },
+      { name: '', category: 'other', budgeted_amount: 0, actual_amount: 0, is_income: false },
     ]);
   }
 
@@ -143,7 +144,7 @@ export function ImportBudgetDialog({
       category: item.category,
       name: item.name.trim(),
       budgeted_amount: item.budgeted_amount,
-      actual_amount: 0,
+      actual_amount: item.actual_amount,
       is_income: item.is_income,
       notes: null,
     }));
@@ -171,6 +172,7 @@ export function ImportBudgetDialog({
 
   const incomeTotal = items.filter((i) => i.is_income).reduce((s, i) => s + i.budgeted_amount, 0);
   const expenseTotal = items.filter((i) => !i.is_income).reduce((s, i) => s + i.budgeted_amount, 0);
+  const hasActuals = items.some((i) => i.actual_amount > 0);
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) resetAndClose(); else onOpenChange(v); }}>
@@ -263,7 +265,7 @@ export function ImportBudgetDialog({
               {items.map((item, index) => (
                 <div
                   key={index}
-                  className="grid grid-cols-[auto_1fr_1fr_120px_auto] gap-2 items-center rounded-inner-card bg-surface-light-2 dark:bg-surface-dark-2 px-3 py-2"
+                  className="grid grid-cols-[auto_1fr_1fr_110px_110px_auto] gap-2 items-center rounded-inner-card bg-surface-light-2 dark:bg-surface-dark-2 px-3 py-2"
                 >
                   <div className="flex flex-col items-center gap-0.5">
                     <Switch
@@ -313,6 +315,26 @@ export function ImportBudgetDialog({
                           budgeted_amount: Math.round(Number(e.target.value) * 100),
                         })
                       }
+                      placeholder="Budget"
+                      className="h-8 text-body pl-5 text-right tabular-nums"
+                    />
+                  </div>
+
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-text-muted-light dark:text-text-muted-dark text-body">
+                      $
+                    </span>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      value={(item.actual_amount / 100).toFixed(2)}
+                      onChange={(e) =>
+                        updateItem(index, {
+                          actual_amount: Math.round(Number(e.target.value) * 100),
+                        })
+                      }
+                      placeholder="Actual"
                       className="h-8 text-body pl-5 text-right tabular-nums"
                     />
                   </div>
