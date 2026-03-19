@@ -178,19 +178,15 @@ export async function syncBankTransactions(
     // Auto-categorize new pending transactions (rule-based, fast + free)
     await applyCategorization(admin, communityId);
 
-    // AI categorization for remaining pending transactions
-    let aiResult = { auto_categorized: 0, suggested: 0, uncertain: 0 };
-    try {
-      aiResult = await categorizeAndApplyAI(admin, communityId);
-    } catch (aiError) {
-      // AI failures should not break the sync pipeline
-      console.error('AI categorization failed (non-fatal):', aiError);
-    }
-
-    // Auto-match transactions to journal entries
+    // Auto-match transactions to journal entries (fast)
     await autoMatchTransactions(admin, communityId);
 
-    // Auto-fetch bank statements if Statements product is consented (fire-and-forget)
+    // Fire-and-forget: AI categorization + statement fetch run in background
+    // so the sync response returns quickly
+    categorizeAndApplyAI(admin, communityId).catch((aiError) => {
+      console.error('AI categorization failed (non-fatal):', aiError);
+    });
+
     if (connection.has_statements_consent) {
       fetchAndProcessStatements(communityId, connectionId).catch((err) => {
         console.error('Statement fetch failed (non-fatal):', err);
@@ -201,8 +197,8 @@ export async function syncBankTransactions(
       added,
       modified,
       removed,
-      ai_categorized: aiResult.auto_categorized,
-      ai_suggested: aiResult.suggested,
+      ai_categorized: 0, // AI runs in background, count not available immediately
+      ai_suggested: 0,
       synced_at: new Date().toISOString(),
     };
   } catch (error: unknown) {
