@@ -192,7 +192,6 @@ export function StepExecute({
             const { error: payError } = await supabase.from('payments').insert({
               invoice_id: invoice.id,
               unit_id: unitId,
-              community_id: communityId,
               amount: mapped.amountPaid,
               payment_method: 'other',
               notes: `Imported from ${fileName}`,
