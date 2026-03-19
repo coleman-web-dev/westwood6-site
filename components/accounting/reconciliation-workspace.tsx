@@ -242,8 +242,8 @@ export function ReconciliationWorkspace({
             Bank Reconciliation
           </h2>
           <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-            {new Date(recon.period_start).toLocaleDateString()} -{' '}
-            {new Date(recon.period_end).toLocaleDateString()}
+            {new Date(recon.period_start + 'T00:00:00').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })} -{' '}
+            {new Date(recon.period_end + 'T00:00:00').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}
           </p>
         </div>
       </div>
@@ -355,8 +355,8 @@ export function ReconciliationWorkspace({
         <div className="rounded-panel border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-card-padding text-center py-8">
           <p className="text-body text-text-muted-light dark:text-text-muted-dark">
             No transactions found for this bank account between{' '}
-            {new Date(recon.period_start).toLocaleDateString()} and{' '}
-            {new Date(recon.period_end).toLocaleDateString()}.
+            {new Date(recon.period_start + 'T00:00:00').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })} and{' '}
+            {new Date(recon.period_end + 'T00:00:00').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}.
           </p>
           <p className="text-meta text-text-muted-light dark:text-text-muted-dark mt-2">
             Make sure you have synced transactions and the date range covers your bank statement period.
