@@ -176,6 +176,10 @@ export function HouseholdLedger({ refreshKey, initialUnitId }: HouseholdLedgerPr
   // ─── Print ───────────────────────────────────────────────
   const handlePrint = () => {
     if (entries.length === 0) return;
+    const finalBalance = entries[entries.length - 1]?.running_balance ?? 0;
+    const totalCharges = entries.filter((e) => e.amount > 0).reduce((s, e) => s + e.amount, 0);
+    const totalCredits = entries.filter((e) => e.amount < 0).reduce((s, e) => s + e.amount, 0);
+
     const tableRows = entries
       .map((e) => {
         const badge = TYPE_BADGE[e.entry_type] ?? { label: e.entry_type };
@@ -183,23 +187,65 @@ export function HouseholdLedger({ refreshKey, initialUnitId }: HouseholdLedgerPr
         const sign = isCredit ? '-' : '+';
         const color = isCredit ? '#16a34a' : '#dc2626';
         return `<tr>
-          <td style="padding:6px 10px;border-bottom:1px solid #eee">${formatDate(e.entry_date)}</td>
-          <td style="padding:6px 10px;border-bottom:1px solid #eee">${badge.label}</td>
-          <td style="padding:6px 10px;border-bottom:1px solid #eee">${e.description}</td>
-          <td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;color:${color}">${sign}$${formatAmount(e.amount)}</td>
-          <td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right">$${(e.running_balance / 100).toFixed(2)}</td>
+          <td>${formatDate(e.entry_date)}</td>
+          <td>${badge.label}</td>
+          <td>${e.description}</td>
+          <td class="num" style="color:${color}">${sign}$${formatAmount(e.amount)}</td>
+          <td class="num">$${(e.running_balance / 100).toFixed(2)}</td>
         </tr>`;
       })
       .join('');
 
     const html = `<!DOCTYPE html><html><head><title>Ledger - ${unitLabel}</title>
-      <style>body{font-family:system-ui,sans-serif;padding:24px;color:#1a1a1a}
-      table{width:100%;border-collapse:collapse}th{text-align:left;padding:8px 10px;border-bottom:2px solid #333;font-size:13px}
-      td{font-size:13px}h2{margin:0 0 4px}p{margin:0 0 16px;color:#666;font-size:13px}
-      @media print{body{padding:0}}</style></head>
-      <body><h2>${community.name}</h2><p>${unitLabel}</p>
-      <table><thead><tr><th>Date</th><th>Type</th><th>Description</th><th style="text-align:right">Amount</th><th style="text-align:right">Balance</th></tr></thead>
-      <tbody>${tableRows}</tbody></table></body></html>`;
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui, -apple-system, sans-serif; padding: 40px; color: #1a1a1a; font-size: 15px; line-height: 1.5; }
+        .header { margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #1D2024; }
+        .header h1 { font-size: 22px; font-weight: 700; margin-bottom: 2px; }
+        .header p { color: #555; font-size: 14px; }
+        .summary { display: flex; gap: 32px; margin-bottom: 20px; }
+        .summary-item { }
+        .summary-item .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888; margin-bottom: 2px; }
+        .summary-item .value { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+        .charges { color: #dc2626; }
+        .credits { color: #16a34a; }
+        table { width: auto; border-collapse: collapse; margin-top: 8px; }
+        th { text-align: left; padding: 8px 16px 8px 0; border-bottom: 2px solid #333; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #555; white-space: nowrap; }
+        td { padding: 7px 16px 7px 0; border-bottom: 1px solid #e5e5e5; font-size: 14px; white-space: nowrap; }
+        .num { text-align: right; font-variant-numeric: tabular-nums; padding-right: 0; padding-left: 24px; }
+        th.num { text-align: right; padding-right: 0; padding-left: 24px; }
+        tr:last-child td { border-bottom: 2px solid #333; }
+        .footer { margin-top: 16px; font-size: 11px; color: #aaa; }
+        @media print {
+          body { padding: 20px; }
+          @page { margin: 0.5in; }
+        }
+      </style></head>
+      <body>
+        <div class="header">
+          <h1>${community.name}</h1>
+          <p>${unitLabel}</p>
+        </div>
+        <div class="summary">
+          <div class="summary-item">
+            <div class="label">Total Charges</div>
+            <div class="value charges">$${(totalCharges / 100).toFixed(2)}</div>
+          </div>
+          <div class="summary-item">
+            <div class="label">Total Payments</div>
+            <div class="value credits">-$${(Math.abs(totalCredits) / 100).toFixed(2)}</div>
+          </div>
+          <div class="summary-item">
+            <div class="label">Current Balance</div>
+            <div class="value">$${(finalBalance / 100).toFixed(2)}</div>
+          </div>
+        </div>
+        <table>
+          <thead><tr><th>Date</th><th>Type</th><th>Description</th><th class="num">Amount</th><th class="num">Balance</th></tr></thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+        <div class="footer">Generated ${new Date().toLocaleDateString()} by DuesIQ</div>
+      </body></html>`;
 
     const w = window.open('', '_blank');
     if (w) {
