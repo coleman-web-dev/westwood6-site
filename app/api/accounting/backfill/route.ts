@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { backfillJournalEntries } from '@/lib/utils/accounting-backfill';
 
+export const maxDuration = 300; // 5 minutes for large communities
+
 export async function POST(req: NextRequest) {
   // Verify the user is a board member
   const supabase = await createClient();
