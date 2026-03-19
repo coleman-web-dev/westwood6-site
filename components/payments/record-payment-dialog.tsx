@@ -12,33 +12,22 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/shared/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/shared/ui/select';
 import { Button } from '@/components/shared/ui/button';
-import { Input } from '@/components/shared/ui/input';
-import { Label } from '@/components/shared/ui/label';
 import { toast } from 'sonner';
 import { logAuditEvent } from '@/lib/audit';
 import {
   postPaymentReceivedAction,
   postOverpaymentWalletCreditAction,
 } from '@/lib/actions/accounting-actions';
+import {
+  PaymentMethodLinesInput,
+  createEmptyLine,
+  linesToPaymentMethods,
+  sumLineCents,
+  formatPaymentMethods,
+  type PaymentMethodLineInput,
+} from '@/components/shared/payment-method-lines-input';
 import type { Invoice } from '@/lib/types/database';
-
-type PaymentMethod = 'check' | 'cash' | 'money_order' | 'ach' | 'other';
-
-const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
-  { value: 'check', label: 'Check' },
-  { value: 'cash', label: 'Cash' },
-  { value: 'money_order', label: 'Money Order' },
-  { value: 'ach', label: 'ACH / Wire Transfer' },
-  { value: 'other', label: 'Other' },
-];
 
 interface RecordPaymentDialogProps {
   invoice: Invoice | null;
@@ -56,22 +45,18 @@ export function RecordPaymentDialog({
   unitOwnerName,
 }: RecordPaymentDialogProps) {
   const { community, member } = useCommunity();
-  const [amount, setAmount] = useState('');
-  const [method, setMethod] = useState<PaymentMethod>('check');
-  const [referenceNumber, setReferenceNumber] = useState('');
+  const [lines, setLines] = useState<PaymentMethodLineInput[]>([createEmptyLine()]);
   const [submitting, setSubmitting] = useState(false);
 
   function resetForm() {
-    setAmount('');
-    setMethod('check');
-    setReferenceNumber('');
+    setLines([createEmptyLine()]);
   }
 
   // When dialog opens with a new invoice, pre-fill the remaining balance
   function handleOpenChange(isOpen: boolean) {
     if (isOpen && invoice) {
       const remaining = invoice.amount - (invoice.amount_paid || 0);
-      setAmount((remaining / 100).toFixed(2));
+      setLines([createEmptyLine((remaining / 100).toFixed(2))]);
     }
     if (!isOpen) {
       resetForm();
@@ -82,23 +67,20 @@ export function RecordPaymentDialog({
   async function handleSubmit() {
     if (!invoice || !member) return;
 
-    const parsedAmount = parseFloat(amount);
-    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+    const amountCents = sumLineCents(lines);
+    if (amountCents <= 0) {
       toast.error('Please enter a valid payment amount.');
       return;
     }
 
-    const amountCents = Math.round(parsedAmount * 100);
     const remaining = invoice.amount - (invoice.amount_paid || 0);
 
     setSubmitting(true);
     const supabase = createClient();
 
-    // Build payment reference description
-    const methodLabel = PAYMENT_METHODS.find((m) => m.value === method)?.label ?? method;
-    const refDesc = referenceNumber.trim()
-      ? `${methodLabel} #${referenceNumber.trim()}`
-      : methodLabel;
+    // Build payment methods JSONB and description
+    const paymentMethods = linesToPaymentMethods(lines);
+    const refDesc = formatPaymentMethods(paymentMethods);
 
     // 1. Create payment record
     const { error: paymentError } = await supabase.from('payments').insert({
@@ -108,6 +90,7 @@ export function RecordPaymentDialog({
       paid_by: member.id,
       stripe_session_id: null,
       stripe_payment_intent: null,
+      payment_methods: paymentMethods,
     });
 
     if (paymentError) {
@@ -212,8 +195,7 @@ export function RecordPaymentDialog({
       metadata: {
         title: invoice.title,
         amount: amountCents,
-        method,
-        reference: referenceNumber.trim() || undefined,
+        payment_methods: paymentMethods,
         overpayment: excess > 0 ? excess : undefined,
       },
     });
@@ -233,9 +215,8 @@ export function RecordPaymentDialog({
   if (!invoice) return null;
 
   const remaining = invoice.amount - (invoice.amount_paid || 0);
-  const parsedAmount = parseFloat(amount) || 0;
-  const amountCents = Math.round(parsedAmount * 100);
-  const excess = amountCents > remaining ? amountCents - remaining : 0;
+  const totalCents = sumLineCents(lines);
+  const excess = totalCents > remaining ? totalCents - remaining : 0;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -286,55 +267,12 @@ export function RecordPaymentDialog({
             </div>
           </div>
 
-          {/* Payment method */}
-          <div className="space-y-1.5">
-            <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-              Payment Method
-            </Label>
-            <Select value={method} onValueChange={(v) => setMethod(v as PaymentMethod)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PAYMENT_METHODS.map((m) => (
-                  <SelectItem key={m.value} value={m.value}>
-                    {m.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Reference number */}
-          <div className="space-y-1.5">
-            <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-              Reference Number
-              <span className="ml-1 text-text-muted-light dark:text-text-muted-dark font-normal">
-                (optional)
-              </span>
-            </Label>
-            <Input
-              value={referenceNumber}
-              onChange={(e) => setReferenceNumber(e.target.value)}
-              placeholder={method === 'check' ? 'Check number' : 'Reference or confirmation number'}
-            />
-          </div>
-
-          {/* Payment amount */}
-          <div className="space-y-1.5">
-            <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-              Amount ($) *
-            </Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0.01"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0.00"
-              className="tabular-nums"
-            />
-          </div>
+          {/* Payment method lines */}
+          <PaymentMethodLinesInput
+            lines={lines}
+            onChange={setLines}
+            totalAmount={remaining}
+          />
 
           {/* Overpayment warning */}
           {excess > 0 && (
@@ -353,7 +291,7 @@ export function RecordPaymentDialog({
           </DialogClose>
           <Button
             onClick={handleSubmit}
-            disabled={submitting || !amount || parsedAmount <= 0}
+            disabled={submitting || totalCents <= 0}
           >
             {submitting ? 'Recording...' : 'Record Payment'}
           </Button>

@@ -16,18 +16,18 @@ import { Button } from '@/components/shared/ui/button';
 import { Input } from '@/components/shared/ui/input';
 import { Textarea } from '@/components/shared/ui/textarea';
 import { Checkbox } from '@/components/shared/ui/checkbox';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/shared/ui/select';
 import { Upload } from 'lucide-react';
 import { UnitPicker } from '@/components/shared/unit-picker';
 import { toast } from 'sonner';
 import { useDialogUnsavedChanges } from '@/lib/hooks/use-dialog-unsaved-changes';
 import { DialogUnsavedChangesAlert } from '@/components/shared/dialog-unsaved-changes-alert';
+import {
+  PaymentMethodLinesInput,
+  createEmptyLine,
+  linesToPaymentMethods,
+  formatPaymentMethods,
+  type PaymentMethodLineInput,
+} from '@/components/shared/payment-method-lines-input';
 import type { Amenity } from '@/lib/types/database';
 
 interface ManualReservationDialogProps {
@@ -154,8 +154,7 @@ export function ManualReservationDialog({
   const [selectedUnitId, setSelectedUnitId] = useState('');
 
   // Payment
-  const [paymentMethod, setPaymentMethod] = useState('check');
-  const [checkNumber, setCheckNumber] = useState('');
+  const [paymentLines, setPaymentLines] = useState<PaymentMethodLineInput[]>([createEmptyLine()]);
   const [feePaid, setFeePaid] = useState(true);
   const [depositPaid, setDepositPaid] = useState(true);
 
@@ -183,8 +182,7 @@ export function ManualReservationDialog({
       setGuestCount('');
       setAdminNotes('');
       setSelectedUnitId('');
-      setPaymentMethod('check');
-      setCheckNumber('');
+      setPaymentLines([createEmptyLine()]);
       setFeePaid(true);
       setDepositPaid(true);
       setAgreementFile(null);
@@ -241,8 +239,11 @@ export function ManualReservationDialog({
         fee_paid_at: fee > 0 && feePaid ? new Date().toISOString() : null,
         deposit_paid: deposit > 0 ? depositPaid : false,
         deposit_paid_at: deposit > 0 && depositPaid ? new Date().toISOString() : null,
-        payment_method: paymentMethod,
-        check_number: paymentMethod === 'check' ? checkNumber.trim() || null : null,
+        // Legacy single-method columns (backward compat from first line)
+        payment_method: paymentLines[0]?.method ?? 'check',
+        check_number: paymentLines[0]?.method === 'check' ? paymentLines[0]?.reference?.trim() || null : null,
+        // New split payment JSONB
+        payment_methods: (feePaid || depositPaid) ? linesToPaymentMethods(paymentLines) : null,
       })
       .select('id')
       .single();
@@ -447,35 +448,18 @@ export function ManualReservationDialog({
                   </div>
                 </div>
 
-                {/* Payment method */}
-                <div className="space-y-1.5">
-                  <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-                    Payment Method
-                  </label>
-                  <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="check">Check</SelectItem>
-                      <SelectItem value="cash">Cash</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Check number */}
-                {paymentMethod === 'check' && (
-                  <div className="space-y-1.5">
-                    <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-                      Check Number
-                    </label>
-                    <Input
-                      value={checkNumber}
-                      onChange={(e) => setCheckNumber(e.target.value)}
-                      placeholder="e.g., 1234"
-                    />
-                  </div>
+                {/* Payment method lines */}
+                {(feePaid || depositPaid) && (
+                  <PaymentMethodLinesInput
+                    lines={paymentLines}
+                    onChange={(newLines) => {
+                      setPaymentLines(newLines);
+                      touch();
+                    }}
+                    totalAmount={
+                      (feePaid ? amenity.fee : 0) + (depositPaid ? amenity.deposit : 0)
+                    }
+                  />
                 )}
 
                 {/* Paid checkboxes */}

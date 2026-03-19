@@ -492,6 +492,24 @@ export interface Invoice {
   created_at: string;
 }
 
+// --- Split payment method types ---
+export type ManualPaymentMethod = 'check' | 'cash' | 'money_order' | 'ach' | 'credit_card' | 'other';
+
+export interface PaymentMethodLine {
+  method: ManualPaymentMethod;
+  amount: number; // cents
+  reference?: string; // check number, confirmation number, etc.
+}
+
+export const PAYMENT_METHOD_OPTIONS: { value: ManualPaymentMethod; label: string }[] = [
+  { value: 'check', label: 'Check' },
+  { value: 'cash', label: 'Cash' },
+  { value: 'money_order', label: 'Money Order' },
+  { value: 'ach', label: 'ACH / Wire Transfer' },
+  { value: 'credit_card', label: 'Credit Card' },
+  { value: 'other', label: 'Other' },
+];
+
 export interface Payment {
   id: string;
   invoice_id: string;
@@ -501,6 +519,7 @@ export interface Payment {
   stripe_payment_intent: string | null;
   paid_by: string;
   created_at: string;
+  payment_methods: PaymentMethodLine[] | null;
 }
 
 export type AgreementFieldType = 'text' | 'number' | 'yes_no' | 'select' | 'date';
@@ -638,6 +657,7 @@ export interface Reservation {
   payment_method: string | null;
   check_number: string | null;
   board_note: string | null;
+  payment_methods: PaymentMethodLine[] | null;
 }
 
 export interface Event {

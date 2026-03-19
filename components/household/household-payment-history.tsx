@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { CreditCard, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
+import { formatPaymentMethods } from '@/components/shared/payment-method-lines-input';
+import type { PaymentMethodLine } from '@/lib/types/database';
 
 interface HouseholdPaymentHistoryProps {
   unitId: string;
@@ -15,6 +17,8 @@ interface PaymentRow {
   id: string;
   amount: number;
   created_at: string;
+  stripe_session_id: string | null;
+  payment_methods: PaymentMethodLine[] | null;
   invoices: { title: string } | null;
 }
 
@@ -29,7 +33,7 @@ export function HouseholdPaymentHistory({ unitId, communityId }: HouseholdPaymen
 
     const { data } = await supabase
       .from('payments')
-      .select('id, amount, created_at, invoices(title)')
+      .select('id, amount, created_at, stripe_session_id, payment_methods, invoices(title)')
       .eq('unit_id', unitId)
       .order('created_at', { ascending: false })
       .limit(10);
@@ -78,6 +82,7 @@ export function HouseholdPaymentHistory({ unitId, communityId }: HouseholdPaymen
               <tr className="border-b border-stroke-light dark:border-stroke-dark">
                 <th className="text-label text-text-secondary-light dark:text-text-secondary-dark pb-2 pr-4">Date</th>
                 <th className="text-label text-text-secondary-light dark:text-text-secondary-dark pb-2 pr-4">Description</th>
+                <th className="text-label text-text-secondary-light dark:text-text-secondary-dark pb-2 pr-4">Method</th>
                 <th className="text-label text-text-secondary-light dark:text-text-secondary-dark pb-2 text-right">Amount</th>
               </tr>
             </thead>
@@ -93,6 +98,9 @@ export function HouseholdPaymentHistory({ unitId, communityId }: HouseholdPaymen
                   </td>
                   <td className="text-body text-text-primary-light dark:text-text-primary-dark py-2 pr-4">
                     {pmt.invoices?.title ?? 'Payment'}
+                  </td>
+                  <td className="text-meta text-text-secondary-light dark:text-text-secondary-dark py-2 pr-4 whitespace-nowrap">
+                    {formatPaymentMethods(pmt.payment_methods) || (pmt.stripe_session_id ? 'Stripe' : '')}
                   </td>
                   <td className="text-body tabular-nums text-green-600 dark:text-green-400 py-2 text-right whitespace-nowrap">
                     ${(pmt.amount / 100).toFixed(2)}

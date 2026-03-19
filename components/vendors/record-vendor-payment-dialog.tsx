@@ -23,6 +23,13 @@ import {
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
 import { postVendorPaymentAction } from '@/lib/actions/accounting-actions';
+import {
+  PaymentMethodLinesInput,
+  createEmptyLine,
+  linesToPaymentMethods,
+  formatPaymentMethods,
+  type PaymentMethodLineInput,
+} from '@/components/shared/payment-method-lines-input';
 import type { Vendor } from '@/lib/types/database';
 import type { Account } from '@/lib/types/accounting';
 
@@ -48,6 +55,7 @@ export function RecordVendorPaymentDialog({
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [description, setDescription] = useState('');
   const [memo, setMemo] = useState('');
+  const [paymentLines, setPaymentLines] = useState<PaymentMethodLineInput[]>([createEmptyLine()]);
   const [saving, setSaving] = useState(false);
   const [expenseAccounts, setExpenseAccounts] = useState<Account[]>([]);
 
@@ -90,6 +98,12 @@ export function RecordVendorPaymentDialog({
     }
 
     setSaving(true);
+
+    // Build payment method description for the memo
+    const paymentMethods = linesToPaymentMethods(paymentLines);
+    const methodDesc = formatPaymentMethods(paymentMethods);
+    const fullMemo = [memo.trim(), methodDesc].filter(Boolean).join(' | ') || undefined;
+
     const result = await postVendorPaymentAction({
       communityId,
       vendorId: vendor.id,
@@ -97,7 +111,7 @@ export function RecordVendorPaymentDialog({
       expenseAccountCode,
       description: description.trim(),
       entryDate: paymentDate,
-      memo: memo.trim() || undefined,
+      memo: fullMemo,
       createdBy: memberId,
     });
     setSaving(false);
@@ -112,6 +126,7 @@ export function RecordVendorPaymentDialog({
     setExpenseAccountCode('');
     setDescription('');
     setMemo('');
+    setPaymentLines([createEmptyLine()]);
     setPaymentDate(new Date().toISOString().split('T')[0]);
     onOpenChange(false);
     onRecorded();
@@ -156,6 +171,13 @@ export function RecordVendorPaymentDialog({
               />
             </div>
           </div>
+
+          {/* Payment method lines */}
+          <PaymentMethodLinesInput
+            lines={paymentLines}
+            onChange={setPaymentLines}
+            hideTotalValidation
+          />
 
           <div className="space-y-1.5">
             <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
