@@ -14,6 +14,16 @@ export interface SyncResult {
   synced_at: string;
   error?: string;
   error_code?: string;
+  debug?: {
+    cursor_was_null: boolean;
+    plaid_raw_added: number;
+    plaid_raw_modified: number;
+    plaid_raw_removed: number;
+    active_bank_accounts: number;
+    plaid_account_ids_seen: string[];
+    mapped_account_ids: string[];
+    pages_fetched: number;
+  };
 }
 
 /**
@@ -54,10 +64,16 @@ export async function syncBankTransactions(
 
   // Cursor-based sync
   let cursor = connection.last_sync_cursor || undefined;
+  const cursorWasNull = !cursor;
   let hasMore = true;
   let added = 0;
   let modified = 0;
   let removed = 0;
+  let plaidRawAdded = 0;
+  let plaidRawModified = 0;
+  let plaidRawRemoved = 0;
+  const plaidAccountIdsSeen = new Set<string>();
+  let pagesFetched = 0;
 
   try {
     while (hasMore) {
@@ -66,7 +82,17 @@ export async function syncBankTransactions(
         cursor,
       });
 
+      pagesFetched++;
       const { added: newTxns, modified: modTxns, removed: removedTxns } = response.data;
+      plaidRawAdded += newTxns.length;
+      plaidRawModified += modTxns.length;
+      plaidRawRemoved += removedTxns.length;
+
+      // Track which Plaid account IDs we see
+      for (const t of newTxns) plaidAccountIdsSeen.add(t.account_id);
+      for (const t of modTxns) plaidAccountIdsSeen.add(t.account_id);
+
+      console.log(`[plaid-sync] page=${pagesFetched} cursor_null=${cursorWasNull} added=${newTxns.length} modified=${modTxns.length} removed=${removedTxns.length} has_more=${response.data.has_more}`);
 
       // Insert new transactions
       if (newTxns.length > 0) {
@@ -200,6 +226,16 @@ export async function syncBankTransactions(
       ai_categorized: 0, // AI runs in background, count not available immediately
       ai_suggested: 0,
       synced_at: new Date().toISOString(),
+      debug: {
+        cursor_was_null: cursorWasNull,
+        plaid_raw_added: plaidRawAdded,
+        plaid_raw_modified: plaidRawModified,
+        plaid_raw_removed: plaidRawRemoved,
+        active_bank_accounts: accountMap.size,
+        plaid_account_ids_seen: Array.from(plaidAccountIdsSeen),
+        mapped_account_ids: Array.from(accountMap.keys()),
+        pages_fetched: pagesFetched,
+      },
     };
   } catch (error: unknown) {
     // Handle Plaid DTM consent error

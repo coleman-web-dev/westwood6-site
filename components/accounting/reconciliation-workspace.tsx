@@ -169,6 +169,18 @@ export function ReconciliationWorkspace({
         toast.error(data.error || 'Sync failed');
       } else {
         toast.success(`Synced: ${data.added} new, ${data.modified} updated`);
+        // Log debug info to help diagnose sync issues
+        if (data.debug) {
+          console.log('[sync-debug]', JSON.stringify(data.debug, null, 2));
+          if (data.added === 0 && data.modified === 0) {
+            const d = data.debug;
+            toast.info(
+              `Plaid returned ${d.plaid_raw_added} raw txns across ${d.pages_fetched} page(s). ` +
+              `${d.active_bank_accounts} active bank account(s). Cursor was ${d.cursor_was_null ? 'reset' : 'existing'}.`,
+              { duration: 10000 },
+            );
+          }
+        }
         await fetchData();
       }
     } catch (err) {
