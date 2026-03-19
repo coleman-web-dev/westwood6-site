@@ -11,12 +11,14 @@ import { StepImportMembers } from './step-import-members';
 import { StepAssessmentConfig } from './step-assessment-config';
 import { StepSendInvites } from './step-send-invites';
 import { StepLandingPage } from './step-landing-page';
+import { LedgerImportWizard } from '@/components/ledger-import/ledger-import-wizard';
 
 const STEPS = [
   { key: 'info', label: 'Community Info' },
   { key: 'units', label: 'Import Units' },
   { key: 'members', label: 'Import Members' },
   { key: 'assessments', label: 'Assessments' },
+  { key: 'ledger', label: 'Import Ledger' },
   { key: 'invites', label: 'Send Invites' },
   { key: 'landing', label: 'Landing Page' },
 ] as const;
@@ -106,8 +108,16 @@ export function OnboardingWizard() {
       case 3:
         return <StepAssessmentConfig onNext={handleNext} onBack={goBack} />;
       case 4:
-        return <StepSendInvites onNext={handleNext} onBack={goBack} />;
+        return (
+          <LedgerImportWizard
+            onComplete={handleNext}
+            onSkip={handleNext}
+            showSkip
+          />
+        );
       case 5:
+        return <StepSendInvites onNext={handleNext} onBack={goBack} />;
+      case 6:
         return <StepLandingPage onBack={goBack} />;
       default:
         return null;

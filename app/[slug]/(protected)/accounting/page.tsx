@@ -28,6 +28,7 @@ import { DelinquencySettings } from '@/components/accounting/delinquency-setting
 import { CheckRegister } from '@/components/accounting/checks/check-register';
 import { CheckSettingsPanel } from '@/components/accounting/checks/check-settings';
 import { TransactionInbox } from '@/components/accounting/transaction-inbox';
+import { LedgerImportWizard } from '@/components/ledger-import/ledger-import-wizard';
 
 const TABS = [
   { id: 'inbox', label: 'Inbox' },
@@ -38,6 +39,7 @@ const TABS = [
   { id: 'checks', label: 'Checks' },
   { id: 'banking', label: 'Banking' },
   { id: 'reconciliation', label: 'Reconciliation' },
+  { id: 'import', label: 'Import Ledger' },
   { id: 'reports', label: 'Reports' },
   { id: 'automation', label: 'Automation' },
 ] as const;
@@ -321,6 +323,15 @@ export default function AccountingPage() {
 
       {activeTab === 'reconciliation' && (
         <ReconciliationList key={`recon-${refreshKey}`} communityId={community.id} />
+      )}
+
+      {activeTab === 'import' && (
+        <LedgerImportWizard
+          onComplete={() => {
+            setRefreshKey((k) => k + 1);
+            setActiveTab('dashboard');
+          }}
+        />
       )}
 
       {activeTab === 'reports' && (

@@ -23,4 +23,5 @@ export const searchLinks: Array<{
   { id: 'arc-requests', name: 'ARC Requests', keywords: 'arc architectural review modifications', section: 'Navigation', href: '/arc-requests' },
   { id: 'budget', name: 'Budget', keywords: 'financial planning reserves income expenses', section: 'Navigation', href: '/budget' },
   { id: 'vendors', name: 'Vendors', keywords: 'contractors service providers', section: 'Navigation', href: '/vendors' },
+  { id: 'import-ledger', name: 'Import Ledger', keywords: 'import ledger csv excel upload historical invoices payments migration', section: 'Navigation', href: '/accounting?tab=import' },
 ];
