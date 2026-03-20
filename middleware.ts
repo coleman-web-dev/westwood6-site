@@ -31,10 +31,12 @@ export async function middleware(request: NextRequest) {
   let needsRewrite = false;
 
   if (customSlug && !pathname.startsWith(`/${customSlug}`)) {
+    // Global routes that should NOT be rewritten even on custom domains
+    // Note: "/" is excluded here because on custom domains it should rewrite to /{slug}
     const isGlobalRoute =
       pathname.startsWith('/api/') ||
       pathname.startsWith('/auth/') ||
-      PUBLIC_ROUTES.has(pathname);
+      (PUBLIC_ROUTES.has(pathname) && pathname !== '/');
 
     if (!isGlobalRoute) {
       effectivePathname = `/${customSlug}${pathname === '/' ? '' : pathname}`;
