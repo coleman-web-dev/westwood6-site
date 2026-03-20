@@ -1,5 +1,5 @@
 import type { Community } from '@/lib/types/database';
-import type { LandingPageConfig, LandingSectionId } from '@/lib/types/landing';
+import type { LandingPageConfig, LandingSectionId, SectionStyleOverride } from '@/lib/types/landing';
 import { resolveLandingColors } from '@/lib/types/landing';
 import { HeroSection } from './sections/hero-section';
 import { AboutSection } from './sections/about-section';
@@ -14,6 +14,7 @@ import { PublicAnnouncementsSection } from './sections/public-announcements-sect
 import { VendorsSection } from './sections/vendors-section';
 import { LoginCtaSection } from './sections/login-cta-section';
 import { LandingNavBar } from './landing-nav-bar';
+import { ResizableSection } from './resizable-section';
 
 interface BoardMember {
   first_name: string;
@@ -58,6 +59,9 @@ interface LandingPageShellProps {
   data: LandingPageData;
   slug: string;
   isMember: boolean;
+  isEditing?: boolean;
+  scale?: number;
+  onSectionResize?: (sectionId: LandingSectionId, changes: Partial<SectionStyleOverride>) => void;
 }
 
 const SECTION_COMPONENTS: Record<
@@ -77,14 +81,25 @@ const SECTION_COMPONENTS: Record<
   vendors: VendorsSection,
 };
 
+// Sections that support height resize
+const HEIGHT_RESIZABLE: Set<LandingSectionId> = new Set(['hero', 'gallery']);
+// Sections that support column count resize
+const COLUMN_RESIZABLE: Set<LandingSectionId> = new Set([
+  'gallery', 'quick_links', 'amenities', 'board_members', 'vendors',
+]);
+
 export function LandingPageShell({
   community,
   config,
   data,
   slug,
   isMember,
+  isEditing = false,
+  scale = 1,
+  onSectionResize,
 }: LandingPageShellProps) {
   const { primary, accent } = resolveLandingColors(config);
+  const template = config.layout_template || 'classic';
 
   const enabledSections = config.sections
     .filter((s) => s.enabled)
@@ -111,14 +126,21 @@ export function LandingPageShell({
           sections={config.sections}
           slug={slug}
           isMember={isMember}
+          layoutTemplate={template}
         />
       )}
 
       {enabledSections.map((section) => {
         const Component = SECTION_COMPONENTS[section.id];
         if (!Component) return null;
-        return (
-          <div key={section.id} id={`section-${section.id}`}>
+
+        const overrides = config.section_overrides?.[section.id];
+
+        const sectionElement = (
+          <div
+            key={section.id}
+            id={`section-${section.id}`}
+          >
             <Component
               community={community}
               config={config}
@@ -127,6 +149,25 @@ export function LandingPageShell({
             />
           </div>
         );
+
+        if (isEditing && onSectionResize) {
+          return (
+            <ResizableSection
+              key={section.id}
+              sectionId={section.id}
+              scale={scale}
+              canResizeHeight={HEIGHT_RESIZABLE.has(section.id)}
+              canResizeColumns={COLUMN_RESIZABLE.has(section.id)}
+              currentHeight={overrides?.height}
+              currentColumns={overrides?.columns}
+              onResize={(changes) => onSectionResize(section.id, changes)}
+            >
+              {sectionElement}
+            </ResizableSection>
+          );
+        }
+
+        return sectionElement;
       })}
 
       <LoginCtaSection slug={slug} isMember={isMember} communityName={community.name} />

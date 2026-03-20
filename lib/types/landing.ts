@@ -13,8 +13,18 @@ export type LandingSectionId =
   | 'contact'
   | 'announcements';
 
-export type HeroLayout = 'image_only' | 'image_above' | 'image_below';
+export type HeroLayout = 'image_only' | 'image_above' | 'image_below' | 'split_left' | 'split_right' | 'text_only';
 export type HeroThickness = 'compact' | 'medium' | 'tall';
+export type LayoutTemplate = 'classic' | 'modern' | 'editorial';
+
+export interface SectionStyleOverride {
+  height?: number;
+  paddingY?: number;
+  columns?: number;
+  imageObjectFit?: 'cover' | 'contain';
+  imageObjectPosition?: string;
+  maxWidth?: 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | 'full';
+}
 
 export interface LandingPageSection {
   id: LandingSectionId;
@@ -64,6 +74,10 @@ export interface CommunityVendorsConfig {
 
 export interface LandingPageConfig {
   sections: LandingPageSection[];
+
+  // Layout template
+  layout_template?: LayoutTemplate;
+  section_overrides?: Partial<Record<LandingSectionId, SectionStyleOverride>>;
 
   // Theme
   theme_preset: string | null;
@@ -169,6 +183,8 @@ export const DEFAULT_VENDORS_CONFIG: CommunityVendorsConfig = {
 
 export const DEFAULT_LANDING_CONFIG: LandingPageConfig = {
   sections: DEFAULT_SECTIONS,
+  layout_template: 'classic',
+  section_overrides: {},
   theme_preset: 'classic',
   custom_primary_color: null,
   custom_accent_color: null,
@@ -191,6 +207,59 @@ export const DEFAULT_LANDING_CONFIG: LandingPageConfig = {
   max_public_announcements: 5,
   footer_text: null,
 };
+
+// ─── Layout Template Definitions ──────────────────
+
+export interface LayoutTemplateDefinition {
+  id: LayoutTemplate;
+  name: string;
+  description: string;
+  defaultHeroLayout: HeroLayout;
+  defaultHeroThickness: HeroThickness;
+  defaultOverrides: Partial<Record<LandingSectionId, SectionStyleOverride>>;
+}
+
+export const LAYOUT_TEMPLATES: LayoutTemplateDefinition[] = [
+  {
+    id: 'classic',
+    name: 'Classic',
+    description: 'Clean, centered layout with full-width hero and card grids',
+    defaultHeroLayout: 'image_only',
+    defaultHeroThickness: 'medium',
+    defaultOverrides: {},
+  },
+  {
+    id: 'modern',
+    name: 'Modern',
+    description: 'Bold, asymmetric layouts with split hero and accent color blocks',
+    defaultHeroLayout: 'split_left',
+    defaultHeroThickness: 'tall',
+    defaultOverrides: {
+      hero: { height: 560 },
+      gallery: { columns: 3 },
+      quick_links: { columns: 4 },
+      board_members: { columns: 1 },
+      amenities: { columns: 2 },
+      vendors: { columns: 3 },
+    },
+  },
+  {
+    id: 'editorial',
+    name: 'Editorial',
+    description: 'Minimal, magazine-inspired with large type and generous spacing',
+    defaultHeroLayout: 'text_only',
+    defaultHeroThickness: 'tall',
+    defaultOverrides: {
+      hero: { height: 480, paddingY: 80 },
+      about: { maxWidth: '2xl', paddingY: 80 },
+      gallery: { columns: 1 },
+      quick_links: { columns: 2 },
+      board_members: { columns: 6 },
+      amenities: { columns: 4 },
+      faq: { paddingY: 64 },
+    },
+  },
+];
 
 /** Resolve the active primary/accent colors from a config */
 export function resolveLandingColors(config: LandingPageConfig): {

@@ -140,24 +140,25 @@ export function LandingPageHeroEditor({
         />
       </div>
 
-      {/* Layout select - shown when image uploaded */}
-      {heroImageUrl && (
-        <div className="space-y-1.5">
-          <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-            Layout
-          </label>
-          <Select value={heroLayout} onValueChange={(v) => onLayoutChange(v as HeroLayout)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="image_only">Image with text overlay</SelectItem>
-              <SelectItem value="image_above">Image above, text below</SelectItem>
-              <SelectItem value="image_below">Text above, image below</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      )}
+      {/* Layout select */}
+      <div className="space-y-1.5">
+        <label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+          Layout
+        </label>
+        <Select value={heroLayout} onValueChange={(v) => onLayoutChange(v as HeroLayout)}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="image_only">Image with text overlay</SelectItem>
+            <SelectItem value="image_above">Image above, text below</SelectItem>
+            <SelectItem value="image_below">Text above, image below</SelectItem>
+            <SelectItem value="split_left">Split: image left, text right</SelectItem>
+            <SelectItem value="split_right">Split: text left, image right</SelectItem>
+            <SelectItem value="text_only">Text only (no image)</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
       {/* Thickness select */}
       <div className="space-y-1.5">

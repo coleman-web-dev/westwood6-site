@@ -29,7 +29,8 @@ import { LandingPageFaqEditor } from './landing-page-faq-editor';
 import { LandingPagePreview } from './landing-page-preview';
 import { AiGenerateButton } from './ai-generate-button';
 import { LandingPageVendorsToggles } from './landing-page-vendors-toggles';
-import { DEFAULT_LANDING_CONFIG } from '@/lib/types/landing';
+import { LandingPageTemplatePicker } from './landing-page-template-picker';
+import { DEFAULT_LANDING_CONFIG, LAYOUT_TEMPLATES } from '@/lib/types/landing';
 import type {
   LandingPageConfig,
   LandingPageSection,
@@ -38,6 +39,9 @@ import type {
   LandingFaqItem,
   HeroLayout,
   HeroThickness,
+  LayoutTemplate,
+  LandingSectionId,
+  SectionStyleOverride,
 } from '@/lib/types/landing';
 import type { LandingPageData } from '@/components/landing-page/landing-page-shell';
 
@@ -58,6 +62,8 @@ export function LandingPageSettings() {
   });
 
   // All config state
+  const [layoutTemplate, setLayoutTemplate] = useState<LayoutTemplate>(DEFAULT_LANDING_CONFIG.layout_template || 'classic');
+  const [sectionOverrides, setSectionOverrides] = useState<Partial<Record<LandingSectionId, SectionStyleOverride>>>({});
   const [sections, setSections] = useState<LandingPageSection[]>(DEFAULT_LANDING_CONFIG.sections);
   const [themePreset, setThemePreset] = useState<string | null>(DEFAULT_LANDING_CONFIG.theme_preset);
   const [customPrimary, setCustomPrimary] = useState<string | null>(null);
@@ -96,6 +102,8 @@ export function LandingPageSettings() {
       .filter((d) => !savedIds.has(d.id))
       .map((d, i) => ({ ...d, enabled: false, order: maxOrder + 1 + i }));
     setSections(saved.length > 0 ? [...saved, ...missing] : DEFAULT_LANDING_CONFIG.sections);
+    setLayoutTemplate(lp.layout_template || 'classic');
+    setSectionOverrides(lp.section_overrides || {});
     setThemePreset(lp.theme_preset ?? DEFAULT_LANDING_CONFIG.theme_preset);
     setCustomPrimary(lp.custom_primary_color);
     setCustomAccent(lp.custom_accent_color);
@@ -170,6 +178,8 @@ export function LandingPageSettings() {
 
   const buildConfig = useCallback((): LandingPageConfig => ({
     sections,
+    layout_template: layoutTemplate,
+    section_overrides: sectionOverrides,
     theme_preset: themePreset,
     custom_primary_color: customPrimary,
     custom_accent_color: customAccent,
@@ -192,7 +202,7 @@ export function LandingPageSettings() {
     max_public_announcements: maxPublicAnnouncements,
     footer_text: footerText,
   }), [
-    sections, themePreset, customPrimary, customAccent,
+    sections, layoutTemplate, sectionOverrides, themePreset, customPrimary, customAccent,
     heroImageUrl, heroHeadline, heroSubheadline, heroLayout, heroThickness,
     aboutTitle, aboutBody, boardMembersTitle, showBoardTitles,
     contactTitle, contactBody, quickLinks, amenitiesTitle,
@@ -235,6 +245,26 @@ export function LandingPageSettings() {
     router.refresh();
   }, [buildConfig, community, router]);
 
+  const handleTemplateChange = useCallback((template: LayoutTemplate) => {
+    setLayoutTemplate(template);
+    const def = LAYOUT_TEMPLATES.find((t) => t.id === template);
+    if (def) {
+      setHeroLayout(def.defaultHeroLayout);
+      setHeroThickness(def.defaultHeroThickness);
+      setSectionOverrides(def.defaultOverrides);
+    }
+  }, []);
+
+  const handleSectionResize = useCallback((sectionId: LandingSectionId, changes: Partial<SectionStyleOverride>) => {
+    setSectionOverrides((prev) => ({
+      ...prev,
+      [sectionId]: {
+        ...(prev[sectionId] || {}),
+        ...changes,
+      },
+    }));
+  }, []);
+
   const unsaved = useUnsavedChanges({ isDirty, onSave: handleSave });
 
   function handleDividerPointerDown(e: React.PointerEvent) {
@@ -269,6 +299,8 @@ export function LandingPageSettings() {
       community={community}
       config={currentConfig}
       data={previewData}
+      isEditing
+      onSectionResize={handleSectionResize}
     />
   );
 
@@ -277,6 +309,14 @@ export function LandingPageSettings() {
       <div className="flex gap-0 xl:gap-0">
         {/* Editor column */}
         <div className="flex-1 min-w-0 space-y-6">
+          {/* Layout Template */}
+          <Section title="Layout Template" description="Choose a layout style for your landing page.">
+            <LandingPageTemplatePicker
+              selected={layoutTemplate}
+              onSelect={handleTemplateChange}
+            />
+          </Section>
+
           {/* Theme & Colors */}
           <Section title="Theme & Colors" description="Choose a color preset or set custom colors.">
             <LandingPageThemePicker

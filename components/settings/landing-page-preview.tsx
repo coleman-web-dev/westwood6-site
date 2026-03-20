@@ -1,8 +1,8 @@
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import type { Community } from '@/lib/types/database';
-import type { LandingPageConfig } from '@/lib/types/landing';
+import type { LandingPageConfig, LandingSectionId, SectionStyleOverride } from '@/lib/types/landing';
 import type { LandingPageData } from '@/components/landing-page/landing-page-shell';
 import { LandingPageShell } from '@/components/landing-page/landing-page-shell';
 import { Monitor } from 'lucide-react';
@@ -11,12 +11,16 @@ interface LandingPagePreviewProps {
   community: Community;
   config: LandingPageConfig;
   data: LandingPageData;
+  isEditing?: boolean;
+  onSectionResize?: (sectionId: LandingSectionId, changes: Partial<SectionStyleOverride>) => void;
 }
 
 export function LandingPagePreview({
   community,
   config,
   data,
+  isEditing = false,
+  onSectionResize,
 }: LandingPagePreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.35);
@@ -73,6 +77,9 @@ export function LandingPagePreview({
             data={data}
             slug={community.slug}
             isMember={false}
+            isEditing={isEditing}
+            scale={scale}
+            onSectionResize={onSectionResize}
           />
         </div>
       </div>
