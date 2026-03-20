@@ -92,6 +92,14 @@ export function HouseholdLedger({ refreshKey, initialUnitId, hideUnitPicker }: H
     }
 
     for (const tx of walletTxs) {
+      // Skip internal reclassification entries (e.g., monthly invoicing conversion)
+      // These are accounting entries that don't affect the unit's balance with the HOA.
+      // The wallet balance is shown separately in the wallet card.
+      const isReclassification =
+        tx.type === 'manual_credit' &&
+        tx.description?.includes('monthly invoicing conversion');
+      if (isReclassification) continue;
+
       ledgerEntries.push({
         entry_date: tx.created_at,
         entry_type: tx.type,
