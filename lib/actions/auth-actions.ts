@@ -51,20 +51,26 @@ export async function checkIsFirstTimeUser(
   const supabase = createAdminClient();
 
   // Look up approved member by email (case-insensitive)
-  const { data: member } = await supabase
+  const { data: member, error: memberError } = await supabase
     .from('members')
-    .select('id, user_id')
+    .select('id, user_id, email, is_approved')
     .ilike('email', normalized)
     .eq('is_approved', true)
     .single();
 
+  console.log('[checkIsFirstTimeUser] lookup:', { normalized, member: member ? { id: member.id, user_id: member.user_id, email: member.email, is_approved: member.is_approved } : null, error: memberError?.message });
+
   if (!member) return { isFirstTime: false };
 
   // If no auth account linked yet, this is definitely first-time
-  if (!member.user_id) return { isFirstTime: true };
+  if (!member.user_id) {
+    console.log('[checkIsFirstTimeUser] No user_id, is first-time');
+    return { isFirstTime: true };
+  }
 
   // Check if the auth user has ever signed in
   const { data: authUser } = await supabase.auth.admin.getUserById(member.user_id);
+  console.log('[checkIsFirstTimeUser] authUser:', { exists: !!authUser?.user, last_sign_in_at: authUser?.user?.last_sign_in_at });
   if (!authUser?.user) return { isFirstTime: false };
 
   // Only first-time if they have never signed in
