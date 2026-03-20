@@ -30,7 +30,7 @@ interface UnitRow {
 export function SearchProviderWrapper({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { query } = useKBar();
-  const { community, isBoard } = useCommunity();
+  const { community, actualIsBoard } = useCommunity();
   const basePath = `/${community.slug}`;
 
   // Explicitly hide KBar modal then navigate.
@@ -135,7 +135,7 @@ export function SearchProviderWrapper({ children }: { children: React.ReactNode 
         section: 'Members',
         subtitle: m.email ?? undefined,
         perform: () => {
-          if (isBoard && m.unit_id) {
+          if (actualIsBoard && m.unit_id) {
             navigate(`${basePath}/household?unit=${m.unit_id}`);
           } else {
             navigate(`${basePath}/directory`);
@@ -164,7 +164,7 @@ export function SearchProviderWrapper({ children }: { children: React.ReactNode 
         keywords,
         section: 'Lots',
         perform: () =>
-          isBoard
+          actualIsBoard
             ? navigate(`${basePath}/household?unit=${u.id}`)
             : navigate(`${basePath}/household`),
       };
@@ -177,7 +177,7 @@ export function SearchProviderWrapper({ children }: { children: React.ReactNode 
       ...announcementActions,
       ...documentActions,
     ];
-  }, [basePath, router, announcements, documents, members, units, isBoard]);
+  }, [basePath, router, announcements, documents, members, units, actualIsBoard]);
 
   useRegisterActions(actions, [actions]);
 
