@@ -93,12 +93,8 @@ function ClassicHero({
       >
         Get Started
       </a>
-      <button
-        type="button"
-        onClick={() => {
-          const el = document.getElementById('section-about') || document.getElementById('section-contact');
-          el?.scrollIntoView({ behavior: 'smooth' });
-        }}
+      <a
+        href="#section-about"
         className={`inline-flex items-center gap-2 rounded-full px-7 py-3 text-sm font-medium transition-all duration-300 ${
           variant === 'light'
             ? 'border border-white/25 text-white hover:bg-white/10'
@@ -107,7 +103,7 @@ function ClassicHero({
       >
         Learn More
         <ArrowRight className="h-4 w-4" />
-      </button>
+      </a>
     </div>
   );
 
