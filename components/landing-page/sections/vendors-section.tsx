@@ -315,53 +315,62 @@ export function VendorsSection({ community, config }: Props) {
     );
   }
 
-  /* ── Editorial ──────────────────────────────────────────── */
+  /* ── Luxury (white bg, accent line, clean list rows) ───── */
   return (
     <section
-      className="py-24 px-6"
+      className="py-28 px-6 bg-white"
       style={py ? { paddingTop: py, paddingBottom: py } : undefined}
     >
       <div className="mx-auto max-w-3xl">
-        <h2
-          className="text-3xl font-bold mb-16 text-center"
-          style={{ color: 'var(--landing-primary)' }}
-        >
-          {title}
-        </h2>
+        {/* Centered title with accent line */}
+        <div className="text-center mb-16">
+          <h2
+            className="text-3xl sm:text-4xl font-light italic mb-4"
+            style={{ color: 'var(--landing-primary)' }}
+          >
+            {title}
+          </h2>
+          <div
+            className="mx-auto w-16 h-px"
+            style={{ backgroundColor: 'var(--landing-accent)' }}
+          />
+        </div>
 
-        <div className="space-y-0">
+        <div>
           {vendors.map((vendor, i) => (
             <button
               key={i}
               type="button"
               onClick={() => setSelected(vendor)}
-              className="w-full text-left py-6 border-b border-gray-100 last:border-b-0 hover:opacity-70 transition-opacity"
+              className="w-full text-left py-7 border-b border-gray-100 last:border-b-0 hover:opacity-70 transition-opacity"
             >
               <div className="flex items-baseline gap-3 mb-1.5">
                 <h3
-                  className="font-bold text-base"
+                  className="font-medium text-base"
                   style={{ color: 'var(--landing-primary)' }}
                 >
                   {vendor.name}
                 </h3>
                 {vendor.category && (
                   <span
-                    className="text-xs font-medium"
+                    className="text-[11px] font-medium uppercase tracking-[0.2em]"
                     style={{ color: 'var(--landing-accent)' }}
                   >
                     {vendor.category}
                   </span>
                 )}
               </div>
-              <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed">
-                {vendor.description}
-              </p>
+              {vendor.description && (
+                <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed">
+                  {vendor.description}
+                </p>
+              )}
             </button>
           ))}
         </div>
 
         {disclaimer && (
-          <p className="mt-16 text-xs text-gray-400 text-center max-w-2xl mx-auto leading-relaxed">
+          <p className="mt-16 text-[11px] text-gray-400 text-center max-w-2xl mx-auto leading-relaxed uppercase tracking-wide">
             {disclaimer}
           </p>
         )}

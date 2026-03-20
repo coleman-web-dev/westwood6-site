@@ -175,42 +175,61 @@ export function AmenitiesSection({ config, data }: Props) {
     );
   }
 
-  /* ── Editorial ──────────────────────────────────────────── */
-  const cols = overrides?.columns ?? 4;
-  const gridStyle = { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` };
-
+  /* ── Luxury ─────────────────────────────────────────────── */
   return (
     <section
-      className="py-24 px-6"
+      className="py-28 sm:py-32 px-6 bg-white"
       style={py ? { paddingTop: py, paddingBottom: py } : undefined}
     >
-      <div className="mx-auto max-w-5xl">
-        <h2
-          className="text-3xl font-bold mb-16 text-center"
-          style={{ color: 'var(--landing-primary)' }}
-        >
-          {title}
-        </h2>
-        <div className="grid gap-10" style={gridStyle}>
-          {data.amenities.map((amenity) => (
-            <div
-              key={amenity.id}
-              className="text-center pb-8 border-b border-gray-100 last:border-b-0"
-            >
-              {amenity.icon && (
-                <span className="text-5xl block mb-4">{amenity.icon}</span>
+      <div className="mx-auto max-w-3xl">
+        {/* Centered elegant header */}
+        <div className="text-center mb-20">
+          <span
+            className="text-[11px] font-medium uppercase tracking-[0.25em] mb-4 block"
+            style={{ color: 'var(--landing-accent)' }}
+          >
+            Amenities
+          </span>
+          <h2
+            className="text-3xl sm:text-4xl font-light italic tracking-wide"
+            style={{ color: 'var(--landing-primary)' }}
+          >
+            {title}
+          </h2>
+          <div
+            className="w-12 h-px mx-auto mt-6"
+            style={{ backgroundColor: 'var(--landing-accent)' }}
+          />
+        </div>
+
+        {/* Numbered amenities list with thin dividers */}
+        <div>
+          {data.amenities.map((amenity, i) => (
+            <div key={amenity.id}>
+              {i > 0 && (
+                <hr className="border-t border-gray-200/60" />
               )}
-              <h3
-                className="text-sm font-medium tracking-wide mb-2"
-                style={{ color: 'var(--landing-primary)' }}
-              >
-                {amenity.name}
-              </h3>
-              {amenity.description && (
-                <p className="text-xs text-gray-400 leading-relaxed line-clamp-2 max-w-[200px] mx-auto">
-                  {amenity.description}
-                </p>
-              )}
+              <div className="py-8 flex items-start gap-8">
+                <span
+                  className="text-4xl font-light shrink-0 leading-none tabular-nums w-14 text-right"
+                  style={{ color: 'var(--landing-accent)' }}
+                >
+                  {String(i + 1).padStart(2, '0')}
+                </span>
+                <div className="pt-1">
+                  <h3
+                    className="text-sm font-semibold uppercase tracking-wide mb-1.5"
+                    style={{ color: 'var(--landing-primary)' }}
+                  >
+                    {amenity.name}
+                  </h3>
+                  {amenity.description && (
+                    <p className="text-sm text-gray-500 leading-relaxed max-w-md">
+                      {amenity.description}
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
           ))}
         </div>

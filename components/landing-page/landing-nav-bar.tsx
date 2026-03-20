@@ -51,20 +51,20 @@ export function LandingNavBar({
     setMenuOpen(false);
   }
 
-  /* ── Editorial nav ───────────────────────────────────────── */
-  if (layoutTemplate === 'editorial') {
+  /* ── Luxury nav ─────────────────────────────────────────── */
+  if (layoutTemplate === 'luxury') {
     return (
       <nav
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-          scrolled ? 'bg-white/80 backdrop-blur-md' : 'bg-transparent'
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
+          scrolled ? 'bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)]' : 'bg-transparent'
         }`}
       >
-        <div className="mx-auto max-w-6xl flex items-center justify-between px-4 sm:px-6 h-14">
+        <div className="mx-auto max-w-6xl flex items-center justify-between px-6 sm:px-8 h-16">
           {/* Left: logo + uppercase community name */}
           <button
             type="button"
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            className="flex items-center gap-2.5 shrink-0"
+            className="flex items-center gap-3 shrink-0"
           >
             {logoUrl && (
               <img
@@ -74,7 +74,7 @@ export function LandingNavBar({
               />
             )}
             <span
-              className={`text-xs font-semibold tracking-widest uppercase transition-colors duration-300 ${
+              className={`text-[10px] font-medium tracking-[0.2em] uppercase transition-colors duration-500 ${
                 scrolled ? 'text-gray-900' : 'text-white'
               }`}
             >
@@ -82,17 +82,17 @@ export function LandingNavBar({
             </span>
           </button>
 
-          {/* Center-right: section links */}
-          <div className="hidden md:flex items-center gap-0.5">
+          {/* Center-right: elegant spaced uppercase links */}
+          <div className="hidden md:flex items-center gap-6">
             {navSections.map((s) => (
               <button
                 key={s.id}
                 type="button"
                 onClick={() => scrollTo(s.id)}
-                className={`px-3 py-1.5 rounded-lg text-[11px] font-medium tracking-widest uppercase transition-colors duration-300 ${
+                className={`text-[10px] font-medium tracking-widest uppercase transition-colors duration-500 ${
                   scrolled
-                    ? 'text-gray-500 hover:text-gray-900 hover:bg-gray-100/80'
-                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                    ? 'text-gray-400 hover:text-gray-900'
+                    : 'text-white/60 hover:text-white'
                 }`}
               >
                 {SECTION_LABELS[s.id]}
@@ -100,13 +100,13 @@ export function LandingNavBar({
             ))}
           </div>
 
-          {/* Right: login button + hamburger */}
-          <div className="flex items-center gap-2">
+          {/* Right: bordered CTA + hamburger */}
+          <div className="flex items-center gap-3">
             <Link
               href={dashboardHref}
-              className={`hidden sm:inline-flex items-center rounded-lg px-4 py-1.5 text-[11px] font-medium tracking-wide uppercase border transition-colors duration-300 ${
+              className={`hidden sm:inline-flex items-center rounded px-5 py-1.5 text-[10px] font-medium tracking-widest uppercase border transition-all duration-500 ${
                 scrolled
-                  ? 'border-gray-300 text-gray-900 hover:bg-gray-100'
+                  ? 'border-gray-300 text-gray-900 hover:bg-gray-50'
                   : 'border-white/30 text-white hover:bg-white/10'
               }`}
             >
@@ -116,9 +116,9 @@ export function LandingNavBar({
             <button
               type="button"
               onClick={() => setMenuOpen(!menuOpen)}
-              className={`md:hidden p-1.5 rounded-lg transition-colors duration-300 ${
+              className={`md:hidden p-1.5 rounded transition-colors duration-500 ${
                 scrolled
-                  ? 'text-gray-700 hover:bg-gray-100'
+                  ? 'text-gray-700 hover:bg-gray-50'
                   : 'text-white hover:bg-white/10'
               }`}
             >
@@ -131,28 +131,28 @@ export function LandingNavBar({
           </div>
         </div>
 
-        {/* Mobile dropdown */}
+        {/* Mobile dropdown: clean white, elegant spacing */}
         <div
           className={`md:hidden overflow-hidden transition-all duration-300 ${
             menuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
           }`}
         >
-          <div className="bg-white/95 backdrop-blur-md border-t border-gray-200/60">
-            <div className="px-4 py-3 space-y-0.5">
+          <div className="bg-white border-t border-gray-100">
+            <div className="px-6 py-5 space-y-1">
               {navSections.map((s) => (
                 <button
                   key={s.id}
                   type="button"
                   onClick={() => scrollTo(s.id)}
-                  className="block w-full text-left px-3 py-2.5 rounded-lg text-[11px] font-medium tracking-widest uppercase text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors duration-200"
+                  className="block w-full text-left px-3 py-3 text-[10px] font-medium tracking-widest uppercase text-gray-400 hover:text-gray-900 transition-colors duration-200"
                 >
                   {SECTION_LABELS[s.id]}
                 </button>
               ))}
-              <div className="pt-1 border-t border-gray-200/60 mt-1">
+              <div className="pt-3 border-t border-gray-100 mt-3">
                 <Link
                   href={dashboardHref}
-                  className="block w-full text-left px-3 py-2.5 rounded-lg text-[11px] font-semibold tracking-widest uppercase text-gray-900 hover:bg-gray-100/80 transition-colors duration-200"
+                  className="block w-full text-center px-3 py-2.5 rounded text-[10px] font-medium tracking-widest uppercase border border-gray-300 text-gray-900 hover:bg-gray-50 transition-colors duration-200"
                 >
                   {ctaLabel}
                 </Link>

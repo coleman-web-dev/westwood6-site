@@ -183,30 +183,38 @@ export function PublicDocumentsSection({ config, data }: Props) {
     );
   }
 
-  /* ── Editorial ──────────────────────────────────────────── */
+  /* ── Luxury (clean white, accent line, numbered rows) ──── */
   return (
     <section
-      className="py-24 px-6"
+      className="py-28 px-6 bg-white"
       style={py ? { paddingTop: py, paddingBottom: py } : undefined}
     >
       <div className="mx-auto max-w-3xl">
-        <h2
-          className="text-3xl font-bold mb-16 text-center"
-          style={{ color: 'var(--landing-primary)' }}
-        >
-          Community Documents
-        </h2>
-        <div className="space-y-0">
+        {/* Centered title with accent line */}
+        <div className="text-center mb-16">
+          <h2
+            className="text-3xl sm:text-4xl font-light italic mb-4"
+            style={{ color: 'var(--landing-primary)' }}
+          >
+            Community Documents
+          </h2>
+          <div
+            className="mx-auto w-16 h-px"
+            style={{ backgroundColor: 'var(--landing-accent)' }}
+          />
+        </div>
+
+        <div>
           {data.publicDocs.map((doc, i) => (
             <a
               key={doc.id}
               href={doc.signed_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-start gap-6 group hover:opacity-70 transition-opacity py-6 border-b border-gray-100 last:border-b-0"
+              className="flex items-center gap-6 group hover:opacity-70 transition-opacity py-6 border-b border-gray-100 last:border-b-0"
             >
               <span
-                className="text-2xl font-bold shrink-0 w-10 text-right tabular-nums leading-tight"
+                className="text-lg font-light shrink-0 w-8 text-right tabular-nums"
                 style={{ color: 'var(--landing-accent)' }}
               >
                 {String(i + 1).padStart(2, '0')}
@@ -218,21 +226,18 @@ export function PublicDocumentsSection({ config, data }: Props) {
                 >
                   {doc.title}
                 </p>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-xs text-gray-400 uppercase tracking-wider">
+                {doc.category && (
+                  <span className="text-[11px] font-medium uppercase tracking-[0.2em] text-gray-400 mt-1 block">
                     {doc.category}
                   </span>
-                  {doc.file_size != null && doc.file_size > 0 && (
-                    <>
-                      <span className="text-gray-200">·</span>
-                      <span className="text-xs text-gray-400">
-                        {formatFileSize(doc.file_size)}
-                      </span>
-                    </>
-                  )}
-                </div>
+                )}
               </div>
-              <Download className="h-4 w-4 text-gray-300 group-hover:text-gray-500 shrink-0 mt-1 transition-colors" />
+              {doc.file_size != null && doc.file_size > 0 && (
+                <span className="text-xs text-gray-300 shrink-0 tabular-nums">
+                  {formatFileSize(doc.file_size)}
+                </span>
+              )}
+              <Download className="h-4 w-4 text-gray-300 group-hover:text-gray-500 shrink-0 transition-colors" />
             </a>
           ))}
         </div>

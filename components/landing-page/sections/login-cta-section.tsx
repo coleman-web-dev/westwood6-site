@@ -79,31 +79,52 @@ export function LoginCtaSection({ slug, isMember, communityName, config }: Props
     );
   }
 
-  /* ── Editorial CTA: minimal, elegant, white background ────────── */
-  if (template === 'editorial') {
+  /* ── Luxury CTA: dark bg, gold accents, elegant typography ───── */
+  if (template === 'luxury') {
     return (
-      <section className="py-28 px-6">
-        <div className="mx-auto max-w-lg text-center">
-          {/* Thin decorative line */}
-          <div className="mx-auto w-16 h-px bg-gray-300 mb-12" />
-          <h2
-            className="text-3xl sm:text-4xl font-light tracking-tight mb-4"
-            style={{ color: 'var(--landing-primary)' }}
-          >
+      <section
+        className="relative overflow-hidden py-28 px-6"
+        style={{ backgroundColor: 'var(--landing-primary)' }}
+      >
+        {/* Subtle decorative accent corners */}
+        <div
+          className="absolute top-0 left-0 w-24 h-px"
+          style={{ backgroundColor: 'var(--landing-accent)', opacity: 0.4 }}
+        />
+        <div
+          className="absolute top-0 left-0 w-px h-24"
+          style={{ backgroundColor: 'var(--landing-accent)', opacity: 0.4 }}
+        />
+        <div
+          className="absolute bottom-0 right-0 w-24 h-px"
+          style={{ backgroundColor: 'var(--landing-accent)', opacity: 0.4 }}
+        />
+        <div
+          className="absolute bottom-0 right-0 w-px h-24"
+          style={{ backgroundColor: 'var(--landing-accent)', opacity: 0.4 }}
+        />
+
+        <div className="relative mx-auto max-w-lg text-center">
+          <span className="text-[11px] font-medium uppercase tracking-[0.2em] text-white/40 mb-6 block">
+            Member Portal
+          </span>
+          <h2 className="text-3xl sm:text-4xl font-light italic text-white mb-5">
             {heading}
           </h2>
-          <p className="text-gray-400 mb-12 text-sm leading-relaxed max-w-sm mx-auto">
+          {/* Accent line separator */}
+          <div
+            className="mx-auto w-16 h-px mb-8"
+            style={{ backgroundColor: 'var(--landing-accent)' }}
+          />
+          <p className="text-sm text-white/50 mb-12 leading-relaxed max-w-sm mx-auto">
             {subtext}
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             {isMember ? (
               <Link
                 href={`/${slug}/dashboard`}
-                className="inline-flex items-center justify-center rounded-lg px-8 py-3 text-xs font-medium tracking-widest uppercase transition-all hover:opacity-80"
-                style={{
-                  backgroundColor: 'var(--landing-primary)',
-                  color: 'white',
-                }}
+                className="inline-flex items-center justify-center rounded px-10 py-3.5 text-xs font-medium uppercase tracking-[0.15em] text-white transition-all hover:opacity-90"
+                style={{ backgroundColor: 'var(--landing-accent)' }}
               >
                 Go to Dashboard
               </Link>
@@ -111,20 +132,17 @@ export function LoginCtaSection({ slug, isMember, communityName, config }: Props
               <>
                 <Link
                   href={`/login?redirect=/${slug}/dashboard`}
-                  className="inline-flex items-center justify-center rounded-lg px-8 py-3 text-xs font-medium tracking-widest uppercase transition-all hover:opacity-80"
-                  style={{
-                    backgroundColor: 'var(--landing-primary)',
-                    color: 'white',
-                  }}
+                  className="inline-flex items-center justify-center rounded px-10 py-3.5 text-xs font-medium uppercase tracking-[0.15em] text-white transition-all hover:opacity-90"
+                  style={{ backgroundColor: 'var(--landing-accent)' }}
                 >
                   Member Login
                 </Link>
                 <Link
                   href={`/signup?community=${slug}`}
-                  className="inline-flex items-center justify-center rounded-lg border px-8 py-3 text-xs font-medium tracking-widest uppercase transition-all hover:bg-gray-50"
+                  className="inline-flex items-center justify-center rounded border px-10 py-3.5 text-xs font-medium uppercase tracking-[0.15em] transition-all hover:bg-white/5"
                   style={{
-                    borderColor: 'var(--landing-primary)',
-                    color: 'var(--landing-primary)',
+                    borderColor: 'var(--landing-accent)',
+                    color: 'var(--landing-accent)',
                   }}
                 >
                   Request Access

@@ -220,50 +220,58 @@ export function BoardMembersSection({ config, data }: Props) {
     );
   }
 
-  /* ── Editorial ───────────────────────────────────────── */
+  /* ── Luxury ──────────────────────────────────────────── */
   return (
     <section
-      className="py-24 sm:py-28 px-6"
-      style={py ? { paddingTop: py, paddingBottom: py } : undefined}
+      className="py-24 sm:py-32 px-6"
+      style={{
+        backgroundColor: 'var(--landing-primary)',
+        ...(py ? { paddingTop: py, paddingBottom: py } : {}),
+      }}
     >
-      <div className="mx-auto max-w-3xl">
-        <h2
-          className="text-3xl sm:text-4xl font-bold mb-4 text-center tracking-tight"
-          style={{ color: 'var(--landing-primary)' }}
-        >
-          {title}
-        </h2>
+      <div className="mx-auto max-w-6xl">
+        {/* Header */}
+        <div className="text-center mb-16">
+          <p
+            className="text-[11px] font-medium uppercase tracking-[0.2em] mb-4"
+            style={{ color: 'rgba(255,255,255,0.5)' }}
+          >
+            Our Leadership
+          </p>
+          <h2 className="text-3xl sm:text-4xl font-light italic text-white leading-[1.2] mb-6">
+            {title}
+          </h2>
+          {/* Thin accent line */}
+          <div
+            className="mx-auto h-px w-16"
+            style={{ backgroundColor: 'var(--landing-accent)' }}
+          />
+        </div>
 
-        {/* Thin horizontal divider */}
-        <div className="mt-8 mb-12 h-px w-full bg-gray-200" />
-
-        {/* Clean minimal grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-16 gap-y-0">
+        {/* Member grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {data.boardMembers.map((member, i) => (
             <div
               key={i}
-              className="flex items-center gap-4 py-6 border-b border-gray-100"
+              className="border border-white/10 px-7 py-6 transition-colors duration-300 hover:border-white/20"
             >
-              {/* Small avatar */}
-              <div
-                className="h-14 w-14 rounded-full flex items-center justify-center shrink-0"
-                style={{ backgroundColor: 'color-mix(in srgb, var(--landing-accent) 8%, #f5f5f4)' }}
-              >
-                <User
-                  className="h-6 w-6"
-                  style={{ color: 'var(--landing-accent)', opacity: 0.7 }}
-                />
-              </div>
-              <div>
-                <p
-                  className="text-sm font-medium"
-                  style={{ color: 'var(--landing-primary)' }}
-                >
-                  {member.first_name} {member.last_name}
-                </p>
-                {config.show_board_titles && member.board_title && (
-                  <p className="text-xs text-gray-400 mt-0.5">{member.board_title}</p>
-                )}
+              <div className="flex items-center gap-4">
+                <div className="h-11 w-11 rounded-full border border-white/15 flex items-center justify-center shrink-0">
+                  <User className="h-5 w-5 text-white/40" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-white">
+                    {member.first_name} {member.last_name}
+                  </p>
+                  {config.show_board_titles && member.board_title && (
+                    <p
+                      className="text-xs mt-0.5"
+                      style={{ color: 'var(--landing-accent)' }}
+                    >
+                      {member.board_title}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           ))}

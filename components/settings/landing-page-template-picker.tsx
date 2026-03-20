@@ -68,28 +68,27 @@ function ModernWireframe() {
   );
 }
 
-function EditorialWireframe() {
+function LuxuryWireframe() {
   return (
     <svg viewBox="0 0 160 120" className="w-full h-full" fill="none">
-      {/* Hero - large text only */}
-      <rect x="4" y="4" width="152" height="36" rx="2" fill="currentColor" opacity="0.04" />
-      <rect x="28" y="12" width="104" height="8" rx="1" fill="currentColor" opacity="0.3" />
-      <rect x="50" y="26" width="60" height="3" rx="1" fill="currentColor" opacity="0.15" />
-      {/* Narrow prose */}
-      <rect x="36" y="46" width="88" height="3" rx="1" fill="currentColor" opacity="0.15" />
-      <rect x="36" y="52" width="84" height="3" rx="1" fill="currentColor" opacity="0.12" />
-      <rect x="36" y="58" width="78" height="3" rx="1" fill="currentColor" opacity="0.1" />
-      {/* Divider */}
-      <line x1="36" y1="68" x2="124" y2="68" stroke="currentColor" strokeOpacity="0.15" strokeWidth="0.5" />
-      {/* Numbered items */}
-      <circle cx="42" cy="78" r="5" fill="currentColor" opacity="0.08" />
-      <rect x="52" y="76" width="72" height="3" rx="1" fill="currentColor" opacity="0.15" />
-      <line x1="36" y1="86" x2="124" y2="86" stroke="currentColor" strokeOpacity="0.1" strokeWidth="0.5" />
-      <circle cx="42" cy="94" r="5" fill="currentColor" opacity="0.08" />
-      <rect x="52" y="92" width="68" height="3" rx="1" fill="currentColor" opacity="0.12" />
-      <line x1="36" y1="102" x2="124" y2="102" stroke="currentColor" strokeOpacity="0.1" strokeWidth="0.5" />
-      {/* Minimal footer */}
-      <rect x="55" y="110" width="50" height="3" rx="1" fill="currentColor" opacity="0.1" />
+      {/* Hero - full-bleed dark with centered elegant text */}
+      <rect x="4" y="4" width="152" height="42" rx="2" fill="currentColor" opacity="0.25" />
+      <rect x="45" y="14" width="70" height="6" rx="1" fill="currentColor" opacity="0.15" />
+      <rect x="55" y="24" width="50" height="2" rx="1" fill="currentColor" opacity="0.1" />
+      <line x1="65" y1="32" x2="95" y2="32" stroke="currentColor" strokeOpacity="0.2" strokeWidth="0.5" />
+      {/* Split section: dark bg + image */}
+      <rect x="4" y="50" width="74" height="30" rx="2" fill="currentColor" opacity="0.2" />
+      <rect x="12" y="56" width="40" height="3" rx="1" fill="currentColor" opacity="0.12" />
+      <rect x="12" y="62" width="50" height="2" rx="1" fill="currentColor" opacity="0.08" />
+      <rect x="82" y="50" width="74" height="30" rx="2" fill="currentColor" opacity="0.08" />
+      {/* Numbered features */}
+      <rect x="20" y="86" width="10" height="8" rx="1" fill="currentColor" opacity="0.06" />
+      <rect x="34" y="88" width="30" height="2" rx="1" fill="currentColor" opacity="0.12" />
+      <rect x="80" y="86" width="10" height="8" rx="1" fill="currentColor" opacity="0.06" />
+      <rect x="94" y="88" width="30" height="2" rx="1" fill="currentColor" opacity="0.12" />
+      {/* Footer bar */}
+      <rect x="4" y="100" width="152" height="16" rx="2" fill="currentColor" opacity="0.2" />
+      <rect x="55" y="106" width="50" height="2" rx="1" fill="currentColor" opacity="0.08" />
     </svg>
   );
 }
@@ -97,7 +96,7 @@ function EditorialWireframe() {
 const WIREFRAMES: Record<LayoutTemplate, React.ComponentType> = {
   classic: ClassicWireframe,
   modern: ModernWireframe,
-  editorial: EditorialWireframe,
+  luxury: LuxuryWireframe,
 };
 
 export function LandingPageTemplatePicker({ selected, onSelect }: Props) {

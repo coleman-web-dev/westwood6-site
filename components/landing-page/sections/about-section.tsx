@@ -157,38 +157,65 @@ export function AboutSection({ config, data }: Props) {
     );
   }
 
-  /* ── Editorial ───────────────────────────────────────── */
-  const maxW = overrides?.maxWidth ? MAX_WIDTH_MAP[overrides.maxWidth] : 'max-w-2xl';
+  /* ── Luxury ──────────────────────────────────────────── */
+  const statCount = data.boardMembers.length || data.amenities.length || 0;
+  const statLabel = data.boardMembers.length > 0 ? 'Board Members' : data.amenities.length > 0 ? 'Amenities' : '';
 
   return (
     <section
       className="py-24 sm:py-32 px-6"
       style={py ? { paddingTop: py, paddingBottom: py } : undefined}
     >
-      <div className={`mx-auto ${maxW}`}>
-        {/* Thin hairline divider above */}
-        <div className="mb-10 h-px w-full bg-gray-200" />
-
-        <h2
-          className="text-3xl sm:text-4xl font-bold mb-10 text-center tracking-tight"
-          style={{ color: 'var(--landing-primary)' }}
-        >
-          {title}
-        </h2>
-
-        {/* Thin hairline divider below title */}
-        <div className="mb-10 h-px w-full bg-gray-200" />
-
-        {/* Body text with drop cap */}
-        <div className="text-gray-600 leading-[1.85] whitespace-pre-line text-base">
-          {/* Drop cap first letter */}
-          <span
-            className="float-left text-6xl font-bold leading-none mr-3 mt-1"
-            style={{ color: 'var(--landing-primary)' }}
+      <div className="mx-auto max-w-6xl">
+        <div className="flex flex-col lg:flex-row overflow-hidden">
+          {/* Left dark panel */}
+          <div
+            className="lg:w-[45%] shrink-0 px-10 py-16 sm:px-14 sm:py-20 flex flex-col justify-center"
+            style={{ backgroundColor: 'var(--landing-primary)' }}
           >
-            {config.about_body.charAt(0)}
-          </span>
-          {config.about_body.slice(1)}
+            <p
+              className="text-[11px] font-medium uppercase tracking-[0.2em] mb-6"
+              style={{ color: 'var(--landing-accent)' }}
+            >
+              About Us
+            </p>
+
+            {/* Gold accent line above title */}
+            <div
+              className="h-px w-12 mb-8"
+              style={{ backgroundColor: 'var(--landing-accent)' }}
+            />
+
+            <h2 className="text-3xl sm:text-4xl font-light italic text-white leading-[1.2] mb-8">
+              {title}
+            </h2>
+
+            {/* Gold accent line below title */}
+            <div
+              className="h-px w-12 mb-10"
+              style={{ backgroundColor: 'var(--landing-accent)' }}
+            />
+
+            {/* Stat display on dark panel */}
+            {statCount > 0 && (
+              <div className="mt-auto pt-6 border-t border-white/10">
+                <p className="text-4xl font-light text-white">{statCount}</p>
+                <p
+                  className="text-[11px] uppercase tracking-[0.2em] mt-1"
+                  style={{ color: 'var(--landing-accent)' }}
+                >
+                  {statLabel}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Right light panel */}
+          <div className="lg:w-[55%] bg-[#FAF8F5] px-10 py-16 sm:px-14 sm:py-20 flex items-center">
+            <p className="text-gray-600 leading-[1.9] whitespace-pre-line text-base">
+              {config.about_body}
+            </p>
+          </div>
         </div>
       </div>
     </section>

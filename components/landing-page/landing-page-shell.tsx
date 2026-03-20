@@ -177,18 +177,23 @@ export function LandingPageShell({
           className={
             template === 'modern'
               ? 'py-10 px-6 text-center'
-              : template === 'editorial'
+              : template === 'luxury'
               ? 'py-16 px-6 text-center'
               : 'py-12 px-6 text-center bg-stone-50'
           }
           style={
             template === 'modern'
               ? { backgroundColor: 'var(--landing-primary)' }
+              : template === 'luxury'
+              ? { backgroundColor: 'var(--landing-primary)' }
               : undefined
           }
         >
-          {template === 'editorial' && (
-            <div className="mx-auto w-16 h-px bg-gray-300 mb-8" />
+          {template === 'luxury' && (
+            <div
+              className="mx-auto w-12 h-px mb-8"
+              style={{ backgroundColor: 'var(--landing-accent)' }}
+            />
           )}
           {template === 'classic' && (
             <div
@@ -200,6 +205,8 @@ export function LandingPageShell({
             className={
               template === 'modern'
                 ? 'text-sm text-white/60'
+                : template === 'luxury'
+                ? 'text-xs text-white/40 uppercase tracking-[0.15em]'
                 : template === 'classic'
                 ? 'text-xs text-gray-400'
                 : 'text-sm text-gray-500'

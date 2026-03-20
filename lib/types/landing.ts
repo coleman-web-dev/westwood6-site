@@ -15,7 +15,7 @@ export type LandingSectionId =
 
 export type HeroLayout = 'image_only' | 'image_above' | 'image_below' | 'split_left' | 'split_right' | 'text_only';
 export type HeroThickness = 'compact' | 'medium' | 'tall';
-export type LayoutTemplate = 'classic' | 'modern' | 'editorial';
+export type LayoutTemplate = 'classic' | 'modern' | 'luxury';
 
 export interface SectionStyleOverride {
   height?: number;
@@ -244,18 +244,18 @@ export const LAYOUT_TEMPLATES: LayoutTemplateDefinition[] = [
     },
   },
   {
-    id: 'editorial',
-    name: 'Editorial',
-    description: 'Minimal, magazine-inspired with large type and generous spacing',
-    defaultHeroLayout: 'text_only',
+    id: 'luxury',
+    name: 'Luxury',
+    description: 'Elegant resort-inspired design with rich colors and refined typography',
+    defaultHeroLayout: 'image_only',
     defaultHeroThickness: 'tall',
     defaultOverrides: {
-      hero: { height: 480, paddingY: 80 },
-      about: { maxWidth: '2xl', paddingY: 80 },
-      gallery: { columns: 1 },
+      hero: { height: 640, paddingY: 80 },
+      about: { maxWidth: '3xl', paddingY: 80 },
+      gallery: { columns: 2 },
       quick_links: { columns: 2 },
-      board_members: { columns: 6 },
-      amenities: { columns: 4 },
+      board_members: { columns: 3 },
+      amenities: { columns: 2 },
       faq: { paddingY: 64 },
     },
   },

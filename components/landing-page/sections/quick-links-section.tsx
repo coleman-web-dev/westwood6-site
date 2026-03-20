@@ -132,39 +132,56 @@ export function QuickLinksSection({ config }: Props) {
     );
   }
 
-  /* ── Editorial (simple text links, minimal) ──────────────── */
-  const cols = overrides?.columns ?? 2;
-  const gridStyle =
-    cols === 1
-      ? { gridTemplateColumns: '1fr' }
-      : { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` };
-
+  /* ── Luxury (elegant link list with dividers) ────────────── */
   return (
     <section
-      className="py-24 px-6"
+      className="py-28 sm:py-32 px-6 bg-white"
       style={py ? { paddingTop: py, paddingBottom: py } : undefined}
     >
-      <div className="mx-auto max-w-3xl">
-        <h2
-          className="text-3xl font-light mb-6 text-center tracking-wide"
-          style={{ color: 'var(--landing-primary)' }}
-        >
-          Quick Links
-        </h2>
-        <hr className="border-t border-gray-200 mb-10 mx-auto max-w-xs" />
-        <div className="grid gap-x-8 gap-y-4" style={gridStyle}>
+      <div className="mx-auto max-w-2xl">
+        {/* Centered elegant header */}
+        <div className="text-center mb-16">
+          <span
+            className="text-[11px] font-medium uppercase tracking-[0.25em] mb-4 block"
+            style={{ color: 'var(--landing-accent)' }}
+          >
+            Resources
+          </span>
+          <h2
+            className="text-3xl sm:text-4xl font-light italic tracking-wide"
+            style={{ color: 'var(--landing-primary)' }}
+          >
+            Quick Links
+          </h2>
+          <div
+            className="w-12 h-px mx-auto mt-6"
+            style={{ backgroundColor: 'var(--landing-accent)' }}
+          />
+        </div>
+
+        {/* Link list with thin dividers */}
+        <div>
           {config.quick_links.map((link, i) => (
-            <a
-              key={i}
-              href={link.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 py-2 text-sm font-medium transition-all duration-200 hover:underline underline-offset-4"
-              style={{ color: 'var(--landing-accent)' }}
-            >
-              <ArrowUpRight className="h-4 w-4 shrink-0" />
-              {link.label}
-            </a>
+            <div key={i}>
+              {i > 0 && <hr className="border-t border-gray-200/60" />}
+              <a
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-4 py-5 group transition-opacity duration-200 hover:opacity-80"
+              >
+                <ArrowRight
+                  className="h-4 w-4 shrink-0 transition-transform duration-200 group-hover:translate-x-0.5"
+                  style={{ color: 'var(--landing-accent)' }}
+                />
+                <span
+                  className="text-xs font-medium uppercase tracking-[0.2em]"
+                  style={{ color: 'var(--landing-accent)' }}
+                >
+                  {link.label}
+                </span>
+              </a>
+            </div>
           ))}
         </div>
       </div>

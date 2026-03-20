@@ -664,8 +664,8 @@ function ModernHero({
   );
 }
 
-/* ── Editorial layout ───────────────────────────────────── */
-function EditorialHero({
+/* ── Luxury layout ──────────────────────────────────────── */
+function LuxuryHero({
   community,
   config,
   headline,
@@ -682,29 +682,14 @@ function EditorialHero({
 }) {
   const py = overrides?.paddingY ?? 128;
 
-  /* text_only: oversized typography, magazine feel */
-  if (layout === 'text_only') {
+  /* text_only or no image: dark rich background, centered elegant text */
+  if (layout === 'text_only' || !config.hero_image_url) {
     return (
       <section className="relative overflow-hidden">
-        {/* Blurred ambient background image if available */}
-        {config.hero_image_url && (
-          <>
-            <Image
-              src={config.hero_image_url}
-              alt=""
-              fill
-              className="object-cover blur-xl scale-110"
-              priority
-            />
-            <div className="absolute inset-0 bg-black/70" />
-          </>
-        )}
-        {!config.hero_image_url && (
-          <div
-            className="absolute inset-0"
-            style={{ backgroundColor: 'var(--landing-primary)' }}
-          />
-        )}
+        <div
+          className="absolute inset-0"
+          style={{ backgroundColor: 'var(--landing-primary)' }}
+        />
         <div
           className="relative flex flex-col items-center justify-center px-6 text-center"
           style={{ paddingTop: `${py}px`, paddingBottom: `${py}px` }}
@@ -713,27 +698,30 @@ function EditorialHero({
             <img
               src={community.logo_url}
               alt={`${community.name} logo`}
-              className="mb-10 h-14 w-14 rounded-xl object-cover opacity-90"
+              className="mb-10 h-14 w-14 rounded-xl object-cover opacity-80"
             />
           )}
-          {/* Thin decorative line above headline */}
-          <div className="mb-8 h-px w-16 bg-white/20" />
-          <h1 className="text-6xl sm:text-8xl font-bold tracking-tight text-white max-w-5xl leading-[0.9]">
-            {headline}
-          </h1>
+          {/* Gold decorative line above */}
+          <div className="mb-6 h-px w-24" style={{ backgroundColor: 'var(--landing-accent)' }} />
+
           {subheadline && (
-            <p className="mt-8 text-sm sm:text-base text-white/50 max-w-xl tracking-[0.2em] uppercase font-light">
+            <p className="mb-8 text-xs sm:text-sm text-white/50 max-w-xl tracking-[0.3em] uppercase font-light">
               {subheadline}
             </p>
           )}
-          {/* Thin decorative line below */}
-          <div className="mt-10 h-px w-16 bg-white/20" />
+
+          <h1 className="text-5xl sm:text-7xl lg:text-8xl font-light italic tracking-tight text-white max-w-5xl leading-[0.9]">
+            {headline}
+          </h1>
+
+          {/* Gold decorative line below */}
+          <div className="mt-10 h-px w-24" style={{ backgroundColor: 'var(--landing-accent)' }} />
         </div>
       </section>
     );
   }
 
-  /* image_only with image: editorial full-bleed, minimal text, refined overlay */
+  /* image_only / image_above / image_below with image: full-bleed, dark gradient from bottom */
   if ((layout === 'image_only' || layout === 'image_above' || layout === 'image_below') && config.hero_image_url) {
     return (
       <section className="relative overflow-hidden">
@@ -745,35 +733,46 @@ function EditorialHero({
             className="object-cover"
             priority
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/20" />
+          {/* Dark gradient overlay from bottom */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10" />
+
           <div
             className="absolute inset-0 flex flex-col items-center justify-end px-6 text-center"
             style={{ paddingBottom: `${py * 0.75}px` }}
           >
-            {/* Thin line above text cluster */}
-            <div className="mb-6 h-px w-12 bg-white/30" />
-            <h1 className="text-5xl sm:text-7xl font-bold tracking-tight text-white max-w-4xl leading-[0.9]">
+            {/* Thin gold accent line */}
+            <div className="mb-6 h-px w-16" style={{ backgroundColor: 'var(--landing-accent)' }} />
+
+            <p className="mb-4 text-[10px] sm:text-xs text-white/40 tracking-[0.3em] uppercase font-light">
+              {community.name}
+            </p>
+
+            <h1 className="text-5xl sm:text-7xl font-light italic tracking-tight text-white max-w-4xl leading-[0.9]">
               {headline}
             </h1>
+
             {subheadline && (
-              <p className="mt-6 text-sm text-white/50 max-w-lg tracking-[0.15em] uppercase font-light">
+              <p className="mt-6 text-xs sm:text-sm text-white/40 max-w-lg tracking-[0.2em] uppercase font-light">
                 {subheadline}
               </p>
             )}
+
+            {/* Thin gold accent line */}
+            <div className="mt-8 h-px w-16" style={{ backgroundColor: 'var(--landing-accent)' }} />
           </div>
         </div>
       </section>
     );
   }
 
-  /* Split layouts: editorial interpretation with massive type */
+  /* Split layouts: one side dark with elegant text, other side image */
   if (layout === 'split_left' || layout === 'split_right') {
     const isRight = layout === 'split_right';
     const minH = overrides?.height ?? 560;
 
     const textPanel = (
       <div
-        className="flex flex-col items-center lg:items-start justify-center px-10 sm:px-16 w-full lg:w-1/2"
+        className="flex flex-col items-center justify-center px-10 sm:px-16 w-full lg:w-1/2"
         style={{
           backgroundColor: 'var(--landing-primary)',
           paddingTop: `${py * 0.6}px`,
@@ -784,18 +783,25 @@ function EditorialHero({
           <img
             src={community.logo_url}
             alt={`${community.name} logo`}
-            className="mb-8 h-12 w-12 rounded-xl object-cover opacity-80"
+            className="mb-8 h-12 w-12 rounded-xl object-cover opacity-70"
           />
         )}
-        <div className="mb-6 h-px w-10 bg-white/20" />
-        <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight text-white leading-[0.9] text-center lg:text-left">
-          {headline}
-        </h1>
+
+        {/* Gold accent line above */}
+        <div className="mb-6 h-px w-16" style={{ backgroundColor: 'var(--landing-accent)' }} />
+
         {subheadline && (
-          <p className="mt-6 text-sm text-white/45 tracking-[0.15em] uppercase font-light text-center lg:text-left">
+          <p className="mb-6 text-[10px] sm:text-xs text-white/40 tracking-[0.3em] uppercase font-light text-center">
             {subheadline}
           </p>
         )}
+
+        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-light italic tracking-tight text-white leading-[0.9] text-center">
+          {headline}
+        </h1>
+
+        {/* Gold accent line below */}
+        <div className="mt-8 h-px w-16" style={{ backgroundColor: 'var(--landing-accent)' }} />
       </div>
     );
 
@@ -835,7 +841,7 @@ function EditorialHero({
     );
   }
 
-  /* Fallback: no image, any layout */
+  /* Fallback: dark background, centered elegant text */
   return (
     <section className="relative overflow-hidden">
       <div
@@ -850,19 +856,24 @@ function EditorialHero({
           <img
             src={community.logo_url}
             alt={`${community.name} logo`}
-            className="mb-10 h-14 w-14 rounded-xl object-cover opacity-90"
+            className="mb-10 h-14 w-14 rounded-xl object-cover opacity-80"
           />
         )}
-        <div className="mb-8 h-px w-16 bg-white/20" />
-        <h1 className="text-6xl sm:text-8xl font-bold tracking-tight text-white max-w-5xl leading-[0.9]">
-          {headline}
-        </h1>
+        {/* Gold decorative line above */}
+        <div className="mb-6 h-px w-24" style={{ backgroundColor: 'var(--landing-accent)' }} />
+
         {subheadline && (
-          <p className="mt-8 text-sm sm:text-base text-white/50 max-w-xl tracking-[0.2em] uppercase font-light">
+          <p className="mb-8 text-xs sm:text-sm text-white/50 max-w-xl tracking-[0.3em] uppercase font-light">
             {subheadline}
           </p>
         )}
-        <div className="mt-10 h-px w-16 bg-white/20" />
+
+        <h1 className="text-5xl sm:text-7xl lg:text-8xl font-light italic tracking-tight text-white max-w-5xl leading-[0.9]">
+          {headline}
+        </h1>
+
+        {/* Gold decorative line below */}
+        <div className="mt-10 h-px w-24" style={{ backgroundColor: 'var(--landing-accent)' }} />
       </div>
     </section>
   );
@@ -890,9 +901,9 @@ export function HeroSection({ community, config, data, slug }: Props) {
     );
   }
 
-  if (template === 'editorial') {
+  if (template === 'luxury') {
     return (
-      <EditorialHero
+      <LuxuryHero
         community={community}
         config={config}
         headline={headline}

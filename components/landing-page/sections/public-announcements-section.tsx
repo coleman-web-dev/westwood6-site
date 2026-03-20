@@ -244,58 +244,71 @@ export function PublicAnnouncementsSection({ config, data }: Props) {
     );
   }
 
-  /* ── Editorial ──────────────────────────────────────────── */
+  /* ── Luxury (cream bg, accent line, elegant featured card) ── */
   const [featured, ...rest] = data.announcements;
   return (
     <section
-      className="py-24 px-6"
-      style={py ? { paddingTop: py, paddingBottom: py } : undefined}
+      className="py-28 px-6"
+      style={{
+        backgroundColor: '#FDFAF6',
+        ...(py ? { paddingTop: py, paddingBottom: py } : {}),
+      }}
     >
       <div className="mx-auto max-w-4xl">
-        <h2
-          className="text-3xl font-bold mb-16 text-center"
-          style={{ color: 'var(--landing-primary)' }}
-        >
-          {title}
-        </h2>
-
-        {/* Featured announcement: large display */}
-        <div className="mb-12 pb-12 border-b border-gray-200">
-          <div className="flex items-center gap-3 flex-wrap mb-4">
-            <span className="text-xs text-gray-400 uppercase tracking-widest font-medium">
-              {formatDate(featured.created_at)}
-            </span>
-            <PriorityBadge priority={featured.priority} />
-          </div>
-          <h3
-            className="text-2xl font-bold mb-5 leading-tight"
+        {/* Centered title with accent line */}
+        <div className="text-center mb-16">
+          <h2
+            className="text-3xl sm:text-4xl font-light italic mb-4"
             style={{ color: 'var(--landing-primary)' }}
           >
-            {featured.title}
-          </h3>
-          <p className="text-sm text-gray-600 whitespace-pre-line leading-relaxed max-w-2xl">
+            {title}
+          </h2>
+          <div
+            className="mx-auto w-16 h-px"
+            style={{ backgroundColor: 'var(--landing-accent)' }}
+          />
+        </div>
+
+        {/* Featured announcement: full-width dark card */}
+        <div
+          className="px-10 py-12 mb-12"
+          style={{ backgroundColor: 'var(--landing-primary)' }}
+        >
+          <span className="text-[11px] font-medium uppercase tracking-[0.2em] text-white/40 block mb-4">
+            {formatDate(featured.created_at)}
+          </span>
+          <div className="flex items-center gap-3 flex-wrap mb-4">
+            <h3 className="text-2xl sm:text-3xl font-light italic text-white leading-tight">
+              {featured.title}
+            </h3>
+            <PriorityBadge priority={featured.priority} />
+          </div>
+          <p className="text-sm text-white/70 whitespace-pre-line leading-relaxed max-w-2xl">
             {featured.body}
           </p>
         </div>
 
-        {/* Remaining: 2-column grid with minimal styling */}
+        {/* Remaining: clean divider rows */}
         {rest.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-10">
+          <div>
             {rest.map((ann) => (
-              <div key={ann.id}>
-                <div className="flex items-center gap-2 flex-wrap mb-2">
-                  <span className="text-xs text-gray-400 uppercase tracking-wider font-medium">
+              <div
+                key={ann.id}
+                className="py-8 border-b border-gray-200 last:border-b-0"
+              >
+                <div className="flex items-center gap-3 flex-wrap mb-2">
+                  <span className="text-[11px] font-medium uppercase tracking-[0.2em] text-gray-400">
                     {formatDateShort(ann.created_at)}
                   </span>
                   <PriorityBadge priority={ann.priority} />
                 </div>
                 <h3
-                  className="text-base font-bold mb-2"
+                  className="text-lg font-medium mb-2 leading-snug"
                   style={{ color: 'var(--landing-primary)' }}
                 >
                   {ann.title}
                 </h3>
-                <p className="text-sm text-gray-500 whitespace-pre-line line-clamp-4 leading-relaxed">
+                <p className="text-sm text-gray-500 whitespace-pre-line line-clamp-3 leading-relaxed">
                   {ann.body}
                 </p>
               </div>

@@ -170,39 +170,53 @@ export function GallerySection({ config }: Props) {
     );
   }
 
-  /* ── Editorial (full-width cinematic, hairline dividers) ── */
+  /* ── Luxury (cinematic gallery, sharp edges, hover overlays) ── */
   return (
     <section
-      className="py-24 px-6"
+      className="py-24 sm:py-32 px-6"
       style={py ? { paddingTop: py, paddingBottom: py } : undefined}
     >
-      <div className="mx-auto max-w-5xl">
-        <h2
-          className="text-3xl font-light mb-16 text-center tracking-wide"
-          style={{ color: 'var(--landing-primary)' }}
-        >
-          Photo Gallery
-        </h2>
-        <div>
+      <div className="mx-auto max-w-6xl">
+        {/* Minimal centered header with accent lines */}
+        <div className="flex items-center justify-center gap-6 mb-16">
+          <div
+            className="h-px w-16 hidden sm:block"
+            style={{ backgroundColor: 'var(--landing-accent)' }}
+          />
+          <p
+            className="text-[11px] font-medium uppercase tracking-[0.2em]"
+            style={{ color: 'var(--landing-primary)' }}
+          >
+            Gallery
+          </p>
+          <div
+            className="h-px w-16 hidden sm:block"
+            style={{ backgroundColor: 'var(--landing-accent)' }}
+          />
+        </div>
+
+        {/* 2-column grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           {config.gallery_images.map((img, i) => (
-            <div key={i}>
-              {i > 0 && (
-                <hr className="border-t border-gray-200 my-12 mx-auto max-w-xs" />
-              )}
-              <div className="relative aspect-[21/9] overflow-hidden">
-                <Image
-                  src={img.url}
-                  alt={img.caption || `Community photo ${i + 1}`}
-                  fill
-                  className="object-cover"
-                  sizes="100vw"
-                />
+            <div
+              key={i}
+              className="relative overflow-hidden group aspect-[4/3]"
+            >
+              <Image
+                src={img.url}
+                alt={img.caption || `Community photo ${i + 1}`}
+                fill
+                className="object-cover transition-transform duration-700 group-hover:scale-105"
+                sizes="(max-width: 640px) 100vw, 50vw"
+              />
+              {/* Hover overlay with caption */}
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-500 flex items-end justify-center">
+                {img.caption && (
+                  <p className="text-sm text-white font-light tracking-wide px-6 pb-6 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-500">
+                    {img.caption}
+                  </p>
+                )}
               </div>
-              {img.caption && (
-                <p className="text-sm text-gray-500 mt-4 text-center italic">
-                  {img.caption}
-                </p>
-              )}
             </div>
           ))}
         </div>

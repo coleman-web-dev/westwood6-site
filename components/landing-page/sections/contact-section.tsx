@@ -202,85 +202,79 @@ export function ContactSection({ community, config }: Props) {
     );
   }
 
-  /* ── Editorial (centered, oversized icons, hairline dividers) */
-  const infoBlocks: React.ReactNode[] = [];
+  /* ── Luxury (dark bg, gold accents, elegant typography) ──── */
+  const infoItems: { icon: React.ReactNode; content: React.ReactNode }[] = [];
 
   if (community.address) {
-    infoBlocks.push(
-      <div key="address" className="text-center py-8">
-        <MapPin
-          className="h-10 w-10 mx-auto mb-4"
-          style={{ color: 'var(--landing-accent)' }}
-        />
-        <p className="text-sm text-gray-700 leading-relaxed">
-          {community.address}
-        </p>
-      </div>
-    );
+    infoItems.push({
+      icon: <MapPin className="h-5 w-5" style={{ color: 'var(--landing-accent)' }} />,
+      content: <span className="text-sm text-white/80">{community.address}</span>,
+    });
   }
 
   if (community.phone) {
-    infoBlocks.push(
-      <div key="phone" className="text-center py-8">
-        <Phone
-          className="h-10 w-10 mx-auto mb-4"
-          style={{ color: 'var(--landing-accent)' }}
-        />
+    infoItems.push({
+      icon: <Phone className="h-5 w-5" style={{ color: 'var(--landing-accent)' }} />,
+      content: (
         <a
           href={`tel:${community.phone}`}
-          className="text-sm hover:underline underline-offset-4"
-          style={{ color: 'var(--landing-accent)' }}
+          className="text-sm text-white/80 hover:text-white transition-colors"
         >
           {community.phone}
         </a>
-      </div>
-    );
+      ),
+    });
   }
 
   if (community.email) {
-    infoBlocks.push(
-      <div key="email" className="text-center py-8">
-        <Mail
-          className="h-10 w-10 mx-auto mb-4"
-          style={{ color: 'var(--landing-accent)' }}
-        />
+    infoItems.push({
+      icon: <Mail className="h-5 w-5" style={{ color: 'var(--landing-accent)' }} />,
+      content: (
         <a
           href={`mailto:${community.email}`}
-          className="text-sm hover:underline underline-offset-4"
-          style={{ color: 'var(--landing-accent)' }}
+          className="text-sm text-white/80 hover:text-white transition-colors"
         >
           {community.email}
         </a>
-      </div>
-    );
+      ),
+    });
   }
 
   return (
     <section
-      className="py-24 px-6"
-      style={py ? { paddingTop: py, paddingBottom: py } : undefined}
+      className="py-28 px-6"
+      style={{
+        backgroundColor: 'var(--landing-primary)',
+        ...(py ? { paddingTop: py, paddingBottom: py } : {}),
+      }}
     >
-      <div className="mx-auto max-w-2xl">
-        <h2
-          className="text-3xl font-light mb-6 text-center tracking-wide"
-          style={{ color: 'var(--landing-primary)' }}
-        >
+      <div className="mx-auto max-w-2xl text-center">
+        <span className="text-[11px] font-medium uppercase tracking-[0.2em] text-white/50 mb-6 block">
+          Get in Touch
+        </span>
+        <h2 className="text-3xl sm:text-4xl font-light italic text-white mb-6">
           {title}
         </h2>
 
         {config.contact_body && (
-          <p className="text-sm text-gray-500 text-center mb-12 whitespace-pre-line leading-relaxed max-w-lg mx-auto">
+          <p className="text-sm text-white/60 mb-14 whitespace-pre-line leading-relaxed max-w-lg mx-auto">
             {config.contact_body}
           </p>
         )}
 
-        <div>
-          {infoBlocks.map((block, i) => (
-            <div key={i}>
+        <div className="flex flex-col items-center gap-0">
+          {infoItems.map((item, i) => (
+            <div key={i} className="flex flex-col items-center">
               {i > 0 && (
-                <hr className="border-t border-gray-200 mx-auto max-w-[60px]" />
+                <div
+                  className="w-px h-8 my-1"
+                  style={{ backgroundColor: 'var(--landing-accent)', opacity: 0.3 }}
+                />
               )}
-              {block}
+              <div className="flex items-center gap-3 py-3">
+                {item.icon}
+                {item.content}
+              </div>
             </div>
           ))}
         </div>

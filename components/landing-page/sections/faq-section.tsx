@@ -136,36 +136,51 @@ export function FaqSection({ config }: Props) {
     );
   }
 
-  /* ── Editorial (numbered, all visible, hairline dividers) ── */
+  /* ── Luxury (numbered, dark bg, elegant dividers) ────────── */
   return (
     <section
-      className="py-24 px-6"
-      style={py ? { paddingTop: py, paddingBottom: py } : undefined}
+      className="py-28 sm:py-32 px-6"
+      style={{
+        backgroundColor: 'var(--landing-primary)',
+        ...(py ? { paddingTop: py, paddingBottom: py } : {}),
+      }}
     >
       <div className="mx-auto max-w-3xl">
-        <h2
-          className="text-3xl font-light mb-16 text-center tracking-wide"
-          style={{ color: 'var(--landing-primary)' }}
-        >
-          Frequently Asked Questions
-        </h2>
+        {/* Centered elegant header */}
+        <div className="text-center mb-20">
+          <span
+            className="text-[11px] font-medium uppercase tracking-[0.25em] mb-4 block"
+            style={{ color: 'var(--landing-accent)' }}
+          >
+            FAQ
+          </span>
+          <h2 className="text-3xl sm:text-4xl font-light italic tracking-wide text-white">
+            Frequently Asked Questions
+          </h2>
+          <div
+            className="w-12 h-px mx-auto mt-6"
+            style={{ backgroundColor: 'var(--landing-accent)' }}
+          />
+        </div>
+
+        {/* Numbered FAQ items */}
         <div>
           {config.faq_items.map((item, i) => (
             <div key={i}>
-              {i > 0 && <hr className="border-t border-gray-200" />}
-              <div className="py-10 first:pt-0 last:pb-0">
+              {i > 0 && <hr className="border-t border-white/10" />}
+              <div className="py-10">
                 <div className="flex gap-6">
                   <span
-                    className="text-4xl font-light shrink-0 leading-none tabular-nums"
+                    className="text-3xl font-light shrink-0 leading-none tabular-nums w-12 text-right"
                     style={{ color: 'var(--landing-accent)' }}
                   >
                     {String(i + 1).padStart(2, '0')}
                   </span>
                   <div>
-                    <h3 className="text-base font-semibold text-gray-900 mb-3">
+                    <h3 className="text-base font-semibold text-white mb-3">
                       {item.question}
                     </h3>
-                    <p className="text-sm text-gray-500 leading-relaxed whitespace-pre-line">
+                    <p className="text-sm text-white/60 leading-relaxed whitespace-pre-line">
                       {item.answer}
                     </p>
                   </div>
