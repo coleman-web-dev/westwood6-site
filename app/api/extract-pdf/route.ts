@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { extractText } from 'unpdf';
+import mammoth from 'mammoth';
 
 /**
  * POST /api/extract-pdf
- * Extracts text from an uploaded PDF file server-side.
- * Uses unpdf (serverless-friendly, no worker/DOM dependencies).
+ * Extracts text from an uploaded PDF or Word document.
+ * Uses unpdf for PDFs, mammoth for .docx files.
  * Accepts multipart form data with a "file" field.
- * Returns { text, pageCount } on success.
+ * Returns { text, pageCount? } on success.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
 
     if (!file || !(file instanceof File)) {
       return NextResponse.json(
-        { error: 'No PDF file provided' },
+        { error: 'No file provided' },
         { status: 400 },
       );
     }
@@ -28,8 +29,22 @@ export async function POST(req: NextRequest) {
     }
 
     const arrayBuffer = await file.arrayBuffer();
-    const data = new Uint8Array(arrayBuffer);
+    const fileName = file.name.toLowerCase();
+    const isDocx =
+      fileName.endsWith('.docx') ||
+      fileName.endsWith('.doc') ||
+      file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      file.type === 'application/msword';
 
+    if (isDocx) {
+      const result = await mammoth.extractRawText({ buffer: Buffer.from(arrayBuffer) });
+      const trimmed = result.value?.trim() ?? '';
+
+      return NextResponse.json({ text: trimmed });
+    }
+
+    // Default: treat as PDF
+    const data = new Uint8Array(arrayBuffer);
     const result = await extractText(data);
     const trimmed = result.text?.join('\n\n').trim() ?? '';
 
@@ -38,7 +53,7 @@ export async function POST(req: NextRequest) {
       pageCount: result.totalPages,
     });
   } catch (err) {
-    console.error('PDF extraction error:', err);
+    console.error('File extraction error:', err);
     const message = err instanceof Error ? err.message : 'Unknown error';
 
     if (message.includes('password')) {
@@ -49,7 +64,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: 'Failed to extract text from PDF.' },
+      { error: 'Failed to extract text from file.' },
       { status: 500 },
     );
   }

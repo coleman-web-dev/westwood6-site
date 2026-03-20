@@ -358,11 +358,11 @@ export function EstoppelWizardDialog({
                   <div className="border-2 border-dashed border-stroke-light dark:border-stroke-dark rounded-panel p-8 text-center">
                     <Upload className="h-8 w-8 mx-auto mb-3 text-text-muted-light dark:text-text-muted-dark" />
                     <p className="text-body text-text-secondary-light dark:text-text-secondary-dark mb-3">
-                      Upload your estoppel certificate PDF
+                      Upload your estoppel certificate (PDF or Word)
                     </p>
                     <input
                       type="file"
-                      accept=".pdf"
+                      accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                       className="hidden"
                       id="estoppel-pdf-upload"
                       onChange={(e) => {
@@ -381,7 +381,7 @@ export function EstoppelWizardDialog({
                           Extracting text...
                         </>
                       ) : (
-                        'Choose PDF'
+                        'Choose File'
                       )}
                     </Button>
                   </div>
