@@ -305,22 +305,22 @@ export function LandingNavBar({
           : 'bg-transparent'
       }`}
     >
-      <div className="mx-auto max-w-6xl flex items-center justify-between px-4 sm:px-6 h-16">
+      <div className="mx-auto max-w-7xl flex items-center px-4 sm:px-6 h-14">
         {/* Left: logo + community name */}
         <button
           type="button"
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          className="flex items-center gap-2.5 shrink-0"
+          className="flex items-center gap-2 shrink-0 mr-6"
         >
           {logoUrl && (
             <img
               src={logoUrl}
               alt={`${communityName} logo`}
-              className="h-8 w-8 rounded-full object-cover"
+              className="h-7 w-7 rounded-full object-cover"
             />
           )}
           <span
-            className={`text-sm font-semibold transition-colors duration-300 ${
+            className={`text-sm font-semibold transition-colors duration-300 whitespace-nowrap ${
               scrolled ? 'text-gray-900' : 'text-white'
             }`}
           >
@@ -328,23 +328,17 @@ export function LandingNavBar({
           </span>
         </button>
 
-        {/* Center: pill-shaped nav group (desktop) */}
-        <div
-          className={`hidden md:flex items-center gap-0.5 absolute left-1/2 -translate-x-1/2 rounded-full px-1.5 py-1.5 transition-all duration-300 ${
-            scrolled
-              ? 'border border-gray-200/60 bg-gray-100/50'
-              : 'border border-white/15 bg-white/5 backdrop-blur-md'
-          }`}
-        >
+        {/* Center: flat horizontal links, auto-spacing */}
+        <div className="hidden lg:flex items-center gap-1 flex-1 min-w-0 justify-center">
           {navSections.map((s) => (
             <button
               key={s.id}
               type="button"
               onClick={() => scrollTo(s.id)}
-              className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors duration-300 ${
+              className={`px-2.5 xl:px-3 py-1.5 text-[11px] font-medium transition-colors duration-300 whitespace-nowrap ${
                 scrolled
-                  ? 'text-gray-600 hover:text-gray-900 hover:bg-white'
-                  : 'text-white/80 hover:text-white hover:bg-white/10'
+                  ? 'text-gray-500 hover:text-gray-900'
+                  : 'text-white/70 hover:text-white'
               }`}
             >
               {SECTION_LABELS[s.id]}
@@ -352,28 +346,21 @@ export function LandingNavBar({
           ))}
         </div>
 
-        {/* Right: text label + accent circle CTA + hamburger */}
-        <div className="flex items-center gap-3">
+        {/* Right: CTA + hamburger */}
+        <div className="flex items-center gap-2.5 ml-auto shrink-0">
           <Link
             href={dashboardHref}
-            className={`hidden sm:inline-flex items-center gap-2 text-xs font-medium transition-colors duration-300 ${
-              scrolled ? 'text-gray-700' : 'text-white/80'
-            }`}
-          >
-            {ctaLabel}
-          </Link>
-          <Link
-            href={dashboardHref}
-            className="hidden sm:flex h-9 w-9 items-center justify-center rounded-full text-white transition-all duration-300 hover:opacity-90 hover:shadow-lg"
+            className="hidden sm:inline-flex items-center gap-1.5 rounded-full px-5 py-1.5 text-xs font-semibold text-white transition-all duration-300 hover:opacity-90 hover:shadow-md"
             style={{ backgroundColor: 'var(--landing-accent)' }}
           >
-            <ArrowUpRight className="h-4 w-4" />
+            {ctaLabel}
+            <ArrowUpRight className="h-3.5 w-3.5" />
           </Link>
 
           <button
             type="button"
             onClick={() => setMenuOpen(!menuOpen)}
-            className={`md:hidden p-1.5 rounded-full transition-colors duration-300 ${
+            className={`lg:hidden p-1.5 rounded-full transition-colors duration-300 ${
               scrolled
                 ? 'text-gray-700 hover:bg-gray-100'
                 : 'text-white hover:bg-white/10'
@@ -388,10 +375,10 @@ export function LandingNavBar({
         </div>
       </div>
 
-      {/* Mobile dropdown with glass-morphism */}
+      {/* Mobile/tablet dropdown */}
       <div
-        className={`md:hidden overflow-hidden transition-all duration-300 ${
-          menuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+        className={`lg:hidden overflow-hidden transition-all duration-300 ${
+          menuOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
         }`}
       >
         <div className="bg-white/95 backdrop-blur-xl mx-4 mt-2 rounded-2xl shadow-2xl border border-gray-100">
