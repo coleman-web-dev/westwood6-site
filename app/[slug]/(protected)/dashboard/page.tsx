@@ -81,6 +81,8 @@ export default function DashboardPage() {
   const { width, containerRef, mounted } = useContainerWidth();
   const [currentBreakpoint, setCurrentBreakpoint] = useState('lg');
 
+  const visibleSet = useMemo(() => new Set<string>(visibleCards), [visibleCards]);
+
   const layouts = useMemo(() => {
     if (loaded && prefs.dashboard_layout && Object.keys(prefs.dashboard_layout).length > 0) {
       const saved = prefs.dashboard_layout as ResponsiveLayouts<GridBreakpoint>;
@@ -89,6 +91,9 @@ export default function DashboardPage() {
       const patched = { ...saved };
       for (const bp of Object.keys(patched) as GridBreakpoint[]) {
         let items = patched[bp] ?? [];
+
+        // Filter out cards that aren't currently visible (e.g. board-only cards in personal view)
+        items = items.filter((l) => visibleSet.has(l.i));
 
         // Enforce minW/minH on every saved entry (fixes corrupted saves)
         items = items.map((l) => {
@@ -134,13 +139,25 @@ export default function DashboardPage() {
       return patched;
     }
     return generateDefaultLayouts(visibleCards);
-  }, [loaded, prefs.dashboard_layout, visibleCards]);
+  }, [loaded, prefs.dashboard_layout, visibleCards, visibleSet]);
 
   const handleLayoutChange = useCallback(
     (_currentLayout: Layout, allLayouts: ResponsiveLayouts<GridBreakpoint>) => {
-      setDashboardLayout(allLayouts);
+      // Merge with saved layouts so hidden cards (e.g. board-only cards in personal view)
+      // don't lose their positions when the visible subset triggers a save.
+      const saved = (prefs.dashboard_layout ?? {}) as ResponsiveLayouts<GridBreakpoint>;
+      const merged = { ...allLayouts };
+      for (const bp of Object.keys(saved) as GridBreakpoint[]) {
+        const incoming = merged[bp] ?? [];
+        const incomingIds = new Set(incoming.map((l) => l.i));
+        const hidden = (saved[bp] ?? []).filter((l) => !incomingIds.has(l.i));
+        if (hidden.length > 0) {
+          merged[bp] = [...incoming, ...hidden];
+        }
+      }
+      setDashboardLayout(merged);
     },
-    [setDashboardLayout],
+    [setDashboardLayout, prefs.dashboard_layout],
   );
 
   const handleBreakpointChange = useCallback((newBreakpoint: string) => {
