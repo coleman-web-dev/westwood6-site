@@ -78,6 +78,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Look up the Stripe customer ID for this member (from Membershine migration sync)
+    // This lets Stripe Checkout show saved payment methods (cards, ACH)
+    const { data: payingMember } = await supabase
+      .from('members')
+      .select('stripe_customer_id')
+      .eq('user_id', user.id)
+      .eq('community_id', communityId)
+      .single();
+    const stripeCustomerId = payingMember?.stripe_customer_id || null;
+
     if (invoice.status === 'paid') {
       return NextResponse.json(
         { error: 'Invoice is already paid' },
@@ -202,6 +212,7 @@ export async function POST(req: NextRequest) {
       line_items: lineItems,
       success_url: successUrl,
       cancel_url: cancelUrl,
+      ...(stripeCustomerId ? { customer: stripeCustomerId } : {}),
       metadata: {
         invoice_id: invoiceId,
         community_id: communityId,
