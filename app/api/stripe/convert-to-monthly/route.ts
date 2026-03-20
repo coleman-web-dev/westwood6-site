@@ -133,14 +133,17 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      // Fetch PAID invoices for this unit in the current fiscal year
-      // Match by date range (not assessment_id) because old invoices may have been
+      // Fetch PAID dues invoices for this unit in the current fiscal year
+      // Filter to invoices with an assessment_id to exclude non-dues invoices
+      // (e.g., amenity rentals, clubhouse deposits, etc.)
+      // Don't match specific assessment_id because old invoices may have been
       // created under a different assessment or imported from legacy system
       const { data: paidInvoices } = await supabase
         .from('invoices')
-        .select('id, amount, amount_paid, status')
+        .select('id, amount, amount_paid, status, assessment_id')
         .eq('unit_id', unit.id)
         .eq('status', 'paid')
+        .not('assessment_id', 'is', null)
         .gte('due_date', assessment.fiscal_year_start)
         .lte('due_date', assessment.fiscal_year_end);
 
