@@ -171,31 +171,13 @@ export function EstoppelWizardDialog({
     setAnalyzing(true);
     try {
       const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
 
-      if (!session?.access_token) {
-        toast.error('You must be logged in to use AI analysis.');
-        setAnalyzing(false);
-        return;
-      }
+      const { data, error: fnError } = await supabase.functions.invoke('analyze-estoppel', {
+        body: { estoppel_text: rawText.trim() },
+      });
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/analyze-estoppel`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
-          },
-          body: JSON.stringify({ estoppel_text: rawText.trim() }),
-        },
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || `Edge function returned ${response.status}`);
+      if (fnError) {
+        throw new Error(fnError.message || 'AI analysis failed');
       }
 
       if (!data.template) {
@@ -231,37 +213,19 @@ export function EstoppelWizardDialog({
 
     try {
       const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
 
-      if (!session?.access_token) {
-        toast.error('You must be logged in.');
-        setRefining(false);
-        return;
-      }
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/analyze-estoppel`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
+      const { data, error: fnError } = await supabase.functions.invoke('analyze-estoppel', {
+        body: {
+          refinement: {
+            current_template: template,
+            current_fields: fields,
+            instruction,
           },
-          body: JSON.stringify({
-            refinement: {
-              current_template: template,
-              current_fields: fields,
-              instruction,
-            },
-          }),
         },
-      );
+      });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Refinement failed');
+      if (fnError) {
+        throw new Error(fnError.message || 'Refinement failed');
       }
 
       if (data.template) setTemplate(data.template);
