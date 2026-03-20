@@ -220,9 +220,8 @@ export default function PaymentsPage() {
 
   const filteredPayments = useMemo(() => {
     if (!urlUnitId || !isBoard) return payments;
-    const unitInvoiceIds = new Set(filteredInvoices.map((inv) => inv.id));
-    return payments.filter((pmt) => unitInvoiceIds.has(pmt.invoice_id));
-  }, [payments, urlUnitId, isBoard, filteredInvoices]);
+    return payments.filter((pmt) => pmt.unit_id === urlUnitId);
+  }, [payments, urlUnitId, isBoard]);
 
   // Calculate outstanding balance from filtered invoices (respects unit filter)
   const outstandingInvoices = filteredInvoices.filter(
