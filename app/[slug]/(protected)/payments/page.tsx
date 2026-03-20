@@ -82,30 +82,10 @@ export default function PaymentsPage() {
 
     const { data: invoiceData } = await invoiceQuery;
 
-    // Fetch payments
-    let paymentQuery = supabase
-      .from('payments')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (!isBoard && unit) {
-      paymentQuery = paymentQuery.eq('unit_id', unit.id);
-    } else if (isBoard) {
-      const communityInvoiceIds = (invoiceData as Invoice[] | null)?.map((inv) => inv.id) ?? [];
-      if (communityInvoiceIds.length > 0) {
-        paymentQuery = paymentQuery.in('invoice_id', communityInvoiceIds);
-      } else {
-        setInvoices([]);
-        setPayments([]);
-        setLoading(false);
-        return;
-      }
-    }
-
-    const { data: paymentData } = await paymentQuery;
-
     // Fetch unit members for display (board only) - prefer owners, fall back to any member
     const ownerMap: Record<string, string> = {};
+    let fetchedUnits: Unit[] = [];
+    let fetchedMembers: { unit_id: string | null; user_id: string | null }[] = [];
     if (isBoard) {
       const { data: memberRows } = await supabase
         .from('members')
@@ -118,12 +98,7 @@ export default function PaymentsPage() {
           ownerMap[m.unit_id] = `${m.first_name} ${m.last_name}`;
         }
       }
-    }
 
-    // Fetch units + members for filtering (board only)
-    let fetchedUnits: Unit[] = [];
-    let fetchedMembers: { unit_id: string | null; user_id: string | null }[] = [];
-    if (isBoard) {
       const { data: unitData } = await supabase
         .from('units')
         .select('*')
@@ -140,6 +115,21 @@ export default function PaymentsPage() {
 
       fetchedMembers = (memberData ?? []) as { unit_id: string | null; user_id: string | null }[];
     }
+
+    // Fetch payments — board: by community unit IDs, resident: by own unit
+    let paymentQuery = supabase
+      .from('payments')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!isBoard && unit) {
+      paymentQuery = paymentQuery.eq('unit_id', unit.id);
+    } else if (isBoard && fetchedUnits.length > 0) {
+      const communityUnitIds = fetchedUnits.map((u) => u.id);
+      paymentQuery = paymentQuery.in('unit_id', communityUnitIds);
+    }
+
+    const { data: paymentData } = await paymentQuery;
 
     // Fetch assessments (board only)
     let fetchedAssessments: Assessment[] = [];
