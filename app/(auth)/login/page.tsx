@@ -74,21 +74,20 @@ function LoginForm() {
 
     if (authError) {
       logLoginAttempt(email, false);
+      console.log('[login] auth error:', authError.message, authError.status);
 
-      if (authError.message === 'Invalid login credentials') {
-        // Check if this is a first-time pre-provisioned member
-        const { isFirstTime } = await checkIsFirstTimeUser(email);
-        if (isFirstTime) {
-          // Show inline password creation form
-          setIsFirstTimeSetup(true);
-          setLoading(false);
-          return;
-        }
-        // Not first-time: show generic error
-        setError('The email or password you entered is incorrect.');
-      } else {
-        setError(authError.message);
+      // Check if this is a first-time pre-provisioned member
+      // (covers "Invalid login credentials", "Email not confirmed", etc.)
+      const { isFirstTime } = await checkIsFirstTimeUser(email);
+      if (isFirstTime) {
+        // Show inline password creation form
+        setIsFirstTimeSetup(true);
+        setLoading(false);
+        return;
       }
+
+      // Not first-time: show appropriate error
+      setError('The email or password you entered is incorrect.');
       setLoading(false);
       return;
     }
