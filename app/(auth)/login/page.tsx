@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import {
-  sendPasswordSetupLink,
+  checkIsFirstTimeUser,
+  setupFirstTimePassword,
   logLoginAttempt,
 } from '@/lib/actions/auth-actions';
 
@@ -28,9 +29,12 @@ function LoginForm() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [needsPasswordSetup, setNeedsPasswordSetup] = useState(false);
-  const [setupLinkSent, setSetupLinkSent] = useState(false);
-  const [sendingSetupLink, setSendingSetupLink] = useState(false);
+
+  // First-time password setup state
+  const [isFirstTimeSetup, setIsFirstTimeSetup] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [settingUpPassword, setSettingUpPassword] = useState(false);
 
   // MFA state
   const [mfaRequired, setMfaRequired] = useState(false);
@@ -59,8 +63,7 @@ function LoginForm() {
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setNeedsPasswordSetup(false);
-    setSetupLinkSent(false);
+    setIsFirstTimeSetup(false);
     setLoading(true);
 
     const supabase = createClient();
@@ -71,12 +74,18 @@ function LoginForm() {
 
     if (authError) {
       logLoginAttempt(email, false);
-      // Show both the error and a "first time?" option so users who need
-      // to set their password can do so, without revealing whether the
-      // email exists in the system (prevents email enumeration).
+
       if (authError.message === 'Invalid login credentials') {
-        setError(authError.message);
-        setNeedsPasswordSetup(true);
+        // Check if this is a first-time pre-provisioned member
+        const { isFirstTime } = await checkIsFirstTimeUser(email);
+        if (isFirstTime) {
+          // Show inline password creation form
+          setIsFirstTimeSetup(true);
+          setLoading(false);
+          return;
+        }
+        // Not first-time: show generic error
+        setError('The email or password you entered is incorrect.');
       } else {
         setError(authError.message);
       }
@@ -206,16 +215,44 @@ function LoginForm() {
     setLoading(false);
   }
 
-  async function handleSendSetupLink() {
-    setSendingSetupLink(true);
+  async function handleFirstTimeSetup(e: React.FormEvent) {
+    e.preventDefault();
     setError(null);
-    const result = await sendPasswordSetupLink(email);
-    setSendingSetupLink(false);
-    if (result.success) {
-      setSetupLinkSent(true);
-    } else {
-      setError(result.error || 'Failed to send setup link');
+
+    if (newPassword.length < 8) {
+      setError('Password must be at least 8 characters.');
+      return;
     }
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
+    setSettingUpPassword(true);
+
+    const result = await setupFirstTimePassword(email, newPassword);
+    if (!result.success) {
+      setError(result.error || 'Failed to set up password. Please try again.');
+      setSettingUpPassword(false);
+      return;
+    }
+
+    // Password set successfully. Now sign in with it.
+    const supabase = createClient();
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password: newPassword,
+    });
+
+    if (signInError) {
+      setError('Password was set but sign-in failed. Please try signing in again.');
+      setIsFirstTimeSetup(false);
+      setSettingUpPassword(false);
+      return;
+    }
+
+    logLoginAttempt(email, true);
+    await completeLogin();
   }
 
   // State: Community picker (multi-community user)
@@ -345,79 +382,99 @@ function LoginForm() {
     );
   }
 
-  // State: setup link sent successfully
-  if (setupLinkSent) {
+  // State: first-time member inline password creation
+  if (isFirstTimeSetup) {
     return (
       <div className="rounded-panel p-card-padding bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark surface-elevation">
         <div className="text-center mb-6">
           <h1 className="text-page-title text-text-primary-light dark:text-text-primary-dark">
-            Check your email
+            Welcome to DuesIQ
           </h1>
           <p className="text-body text-text-muted-light dark:text-text-muted-dark mt-2">
-            We sent a link to <strong>{email}</strong> to set your password.
-            Click the link in your email, then come back and sign in.
+            We&apos;ve made some upgrades! Please create a password for your
+            account.
           </p>
-        </div>
-        <div className="flex justify-center">
-          <button
-            type="button"
-            onClick={() => {
-              setSetupLinkSent(false);
-              setNeedsPasswordSetup(false);
-              setError(null);
-            }}
-            className="h-10 px-8 rounded-pill border border-stroke-light dark:border-stroke-dark text-label text-secondary-500 dark:text-secondary-400 hover:bg-secondary-50 dark:hover:bg-surface-dark-2 transition-colors inline-flex items-center justify-center"
-          >
-            Back to login
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // State: needs password setup (login failed, offer first-time setup)
-  if (needsPasswordSetup) {
-    return (
-      <div className="rounded-panel p-card-padding bg-surface-light dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark surface-elevation">
-        <div className="text-center mb-6">
-          <h1 className="text-page-title text-text-primary-light dark:text-text-primary-dark">
-            Unable to sign in
-          </h1>
-          <p className="text-body text-text-muted-light dark:text-text-muted-dark mt-2">
-            The email or password you entered is incorrect. If this is your
-            first time signing in, you may need to set up your password.
+          <p className="text-meta text-text-muted-light dark:text-text-muted-dark mt-3">
+            Setting up password for{' '}
+            <strong className="text-text-primary-light dark:text-text-primary-dark">
+              {email}
+            </strong>
           </p>
         </div>
 
-        <div className="space-y-4">
+        <form onSubmit={handleFirstTimeSetup} className="space-y-4">
           {error && (
             <div className="rounded-inner-card bg-surface-light-2 dark:bg-surface-dark-2 border border-warning-dot/20 p-3 text-body text-warning-dot">
               {error}
             </div>
           )}
 
+          <div>
+            <label
+              htmlFor="new-password"
+              className="text-label text-text-secondary-light dark:text-text-secondary-dark block mb-1.5"
+            >
+              New Password
+            </label>
+            <input
+              id="new-password"
+              type="password"
+              placeholder="At least 8 characters"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              required
+              minLength={8}
+              autoComplete="new-password"
+              autoFocus
+              className="w-full h-10 px-3 rounded-pill bg-surface-light-2 dark:bg-surface-dark-2 border border-stroke-light dark:border-stroke-dark text-body text-text-primary-light dark:text-text-primary-dark placeholder:text-text-muted-light dark:placeholder:text-text-muted-dark focus:outline-none focus:ring-2 focus:ring-secondary-400/30 transition-all"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="confirm-password"
+              className="text-label text-text-secondary-light dark:text-text-secondary-dark block mb-1.5"
+            >
+              Confirm Password
+            </label>
+            <input
+              id="confirm-password"
+              type="password"
+              placeholder="Re-enter your password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              minLength={8}
+              autoComplete="new-password"
+              className="w-full h-10 px-3 rounded-pill bg-surface-light-2 dark:bg-surface-dark-2 border border-stroke-light dark:border-stroke-dark text-body text-text-primary-light dark:text-text-primary-dark placeholder:text-text-muted-light dark:placeholder:text-text-muted-dark focus:outline-none focus:ring-2 focus:ring-secondary-400/30 transition-all"
+            />
+          </div>
+
           <button
-            type="button"
-            onClick={handleSendSetupLink}
-            disabled={sendingSetupLink}
+            type="submit"
+            disabled={settingUpPassword}
             className="w-full h-10 rounded-pill bg-secondary-400 text-label font-semibold text-primary-900 hover:bg-secondary-300 active:bg-secondary-500 focus:outline-none focus:ring-2 focus:ring-secondary-300/40 transition-all shadow-lg shadow-secondary-400/20 disabled:opacity-50 disabled:pointer-events-none"
           >
-            {sendingSetupLink ? 'Sending...' : 'Send password setup link'}
+            {settingUpPassword
+              ? 'Creating password...'
+              : 'Create password & sign in'}
           </button>
 
           <div className="text-center">
             <button
               type="button"
               onClick={() => {
-                setNeedsPasswordSetup(false);
+                setIsFirstTimeSetup(false);
+                setNewPassword('');
+                setConfirmPassword('');
                 setError(null);
               }}
               className="text-meta text-secondary-500 dark:text-secondary-400 hover:text-secondary-600 dark:hover:text-secondary-300 transition-colors"
             >
-              Try again
+              Back to login
             </button>
           </div>
-        </div>
+        </form>
       </div>
     );
   }
