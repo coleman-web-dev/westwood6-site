@@ -26,9 +26,6 @@ export async function sendPasswordSetupLink(
   const { data, error } = await supabase.auth.admin.generateLink({
     type: 'recovery',
     email,
-    options: {
-      redirectTo: `${appUrl}/auth/callback?type=recovery`,
-    },
   });
 
   if (error) {
@@ -48,16 +45,12 @@ export async function sendPasswordSetupLink(
     communityName = (member.communities as { name: string }).name;
   }
 
-  // The action_link from Supabase embeds the Site URL (which may be localhost
-  // in development). Replace any localhost references with the real app URL
-  // so the link works in production.
-  let resetUrl = data.properties.action_link;
-  if (appUrl !== 'http://localhost:3000') {
-    resetUrl = resetUrl.replace(
-      /redirect_to=http%3A%2F%2Flocalhost%3A3000/g,
-      `redirect_to=${encodeURIComponent(appUrl)}`,
-    );
-  }
+  // Build a URL to our own verification endpoint instead of using Supabase's
+  // action_link (which redirects via Supabase's Site URL setting and may
+  // point to localhost). Our endpoint verifies the token server-side and
+  // redirects to /reset-password.
+  const tokenHash = data.properties.hashed_token;
+  const resetUrl = `${appUrl}/auth/verify-recovery?token=${encodeURIComponent(tokenHash)}&email=${encodeURIComponent(email)}`;
 
   // Render and send via Resend (branded DuesIQ email)
   try {
