@@ -103,12 +103,13 @@ export async function POST(req: NextRequest) {
     const details: { unit: string; paid: number; consumed: number; prepaid: number; voided: number }[] = [];
 
     for (const unit of units) {
-      // Fetch PAID invoices for this unit and assessment in the current fiscal year
+      // Fetch PAID invoices for this unit in the current fiscal year
+      // Match by date range (not assessment_id) because old invoices may have been
+      // created under a different assessment or imported from legacy system
       const { data: paidInvoices } = await supabase
         .from('invoices')
         .select('id, amount, amount_paid, status')
         .eq('unit_id', unit.id)
-        .eq('assessment_id', assessment.id)
         .eq('status', 'paid')
         .gte('due_date', assessment.fiscal_year_start)
         .lte('due_date', assessment.fiscal_year_end);
@@ -121,14 +122,14 @@ export async function POST(req: NextRequest) {
       // Calculate prepaid balance
       const prepaid = Math.max(0, totalPaid - consumedAmount);
 
-      // Void any PENDING non-monthly invoices for this assessment
+      // Void any PENDING non-monthly invoices for this fiscal year
       const { data: pendingInvoices } = await supabase
         .from('invoices')
         .select('id')
         .eq('unit_id', unit.id)
-        .eq('assessment_id', assessment.id)
         .in('status', ['pending', 'overdue'])
-        .gte('due_date', now.toISOString().split('T')[0]);
+        .gte('due_date', now.toISOString().split('T')[0])
+        .lte('due_date', assessment.fiscal_year_end);
 
       let voidedCount = 0;
       if (pendingInvoices && pendingInvoices.length > 0) {
