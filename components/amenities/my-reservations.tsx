@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { format, isFuture } from 'date-fns';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
@@ -19,7 +18,7 @@ import {
   DialogFooter,
 } from '@/components/shared/ui/dialog';
 import { Textarea } from '@/components/shared/ui/textarea';
-import { FileSignature, ClipboardCheck, CheckCircle2, XCircle, AlertTriangle, ExternalLink, Loader2, CreditCard, CalendarClock } from 'lucide-react';
+import { FileSignature, ClipboardCheck, CheckCircle2, XCircle, AlertTriangle, ExternalLink, Loader2, CreditCard } from 'lucide-react';
 import { toast } from 'sonner';
 import { logAuditEvent } from '@/lib/audit';
 import type { AgreementField, SignedAgreement, Reservation, ReservationStatus } from '@/lib/types/database';
@@ -44,7 +43,6 @@ const STATUS_BADGE: Record<ReservationStatus, { variant: 'default' | 'secondary'
 };
 
 export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
-  const router = useRouter();
   const { community, member, unit, isBoard } = useCommunity();
   const [reservations, setReservations] = useState<ReservationWithAmenity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -165,32 +163,6 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
         r.id === reservationId ? { ...r, status: 'cancelled' as ReservationStatus } : r
       )
     );
-  }
-
-  async function handleReschedule(reservation: ReservationWithAmenity) {
-    const supabase = createClient();
-    const { error } = await supabase
-      .from('reservations')
-      .update({ status: 'cancelled' as ReservationStatus })
-      .eq('id', reservation.id);
-
-    if (error) {
-      toast.error('Failed to cancel reservation for rescheduling.');
-      return;
-    }
-
-    logAuditEvent({
-      communityId: community.id,
-      actorId: member?.user_id,
-      actorEmail: member?.email,
-      action: 'reservation_rescheduled',
-      targetType: 'reservation',
-      targetId: reservation.id,
-      metadata: { amenity: reservation.amenities.name },
-    });
-
-    toast.success('Reservation cancelled. Please book a new time.');
-    router.push(`/${community.slug}/amenities`);
   }
 
   async function handleDepositPaid(reservationId: string) {
@@ -613,24 +585,14 @@ export function MyReservations({ amenityId, refreshKey }: MyReservationsProps) {
                 </>
               )}
 
-              {canCancel && !isBoard && (
-                <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleReschedule(r)}
-                  >
-                    <CalendarClock className="h-3.5 w-3.5 mr-1" />
-                    Reschedule
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleCancel(r.id)}
-                  >
-                    Cancel
-                  </Button>
-                </>
+              {isBoard && canCancel && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleCancel(r.id)}
+                >
+                  Cancel
+                </Button>
               )}
 
               {/* Member: Pay deposit online */}
