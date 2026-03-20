@@ -26,38 +26,26 @@ type GridBreakpoint = keyof typeof GRID_BREAKPOINTS;
  * without overlapping other items. Sorts by y then x, then greedily
  * places each item at the lowest available y.
  */
-function compactVertically(items: readonly LayoutItem[], cols: number): LayoutItem[] {
+function compactVertically(items: readonly LayoutItem[]): LayoutItem[] {
   const sorted = [...items].sort((a, b) => a.y - b.y || a.x - b.x);
   const placed: LayoutItem[] = [];
 
   for (const item of sorted) {
-    let bestY = 0;
-    // Try each y from 0 upward, find the lowest y where this item fits
-    for (let tryY = 0; tryY <= item.y; tryY++) {
-      const collides = placed.some(
+    // Start at y=0, jump past any colliders until we find a free slot
+    let y = 0;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const collider = placed.find(
         (p) =>
           p.x < item.x + item.w &&
           p.x + p.w > item.x &&
-          p.y < tryY + item.h &&
-          p.y + p.h > tryY,
+          p.y < y + item.h &&
+          p.y + p.h > y,
       );
-      if (!collides) {
-        bestY = tryY;
-        break;
-      }
-      // If collision, try next y = bottom of the colliding item
-      const collidingBottom = placed
-        .filter(
-          (p) =>
-            p.x < item.x + item.w &&
-            p.x + p.w > item.x &&
-            p.y < tryY + item.h &&
-            p.y + p.h > tryY,
-        )
-        .reduce((max, p) => Math.max(max, p.y + p.h), 0);
-      bestY = collidingBottom;
+      if (!collider) break;
+      y = collider.y + collider.h; // jump past this collider
     }
-    placed.push({ ...item, y: bestY });
+    placed.push({ ...item, y });
   }
 
   return placed;
@@ -136,12 +124,8 @@ export default function DashboardPage() {
 
         // Filter out cards that aren't currently visible (e.g. board-only cards in personal view)
         // then compact vertically so remaining cards fill any gaps left behind.
-        const beforeCount = items.length;
         items = items.filter((l) => visibleSet.has(l.i));
-        if (items.length < beforeCount) {
-          const bpCols = GRID_COLS[bp] ?? 12;
-          items = compactVertically(items, bpCols);
-        }
+        items = compactVertically(items);
 
         // Enforce minW/minH on every saved entry (fixes corrupted saves)
         items = items.map((l) => {
