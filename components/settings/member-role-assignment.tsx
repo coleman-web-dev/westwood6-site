@@ -14,6 +14,7 @@ import {
 import { toast } from 'sonner';
 import { logAuditEvent } from '@/lib/audit';
 import { Users } from 'lucide-react';
+import { TemplatePermissionTooltip } from '@/components/shared/template-permission-tooltip';
 import type { RoleTemplate } from '@/lib/types/permissions';
 
 interface BoardMember {
@@ -176,9 +177,13 @@ export function MemberRoleAssignment({ templates, onAssigned }: MemberRoleAssign
                       <SelectContent>
                         <SelectItem value="__none__">No template (read-only)</SelectItem>
                         {templates.map((t) => (
-                          <SelectItem key={t.id} value={t.id}>
-                            {t.name}
-                          </SelectItem>
+                          <TemplatePermissionTooltip key={t.id} template={t} side="left">
+                            <div>
+                              <SelectItem value={t.id}>
+                                {t.name}
+                              </SelectItem>
+                            </div>
+                          </TemplatePermissionTooltip>
                         ))}
                       </SelectContent>
                     </Select>

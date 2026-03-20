@@ -188,6 +188,103 @@ export async function setupFirstTimePassword(
   }
 }
 
+// Promote or demote a member's board status.
+// Caller must be board/manager/super_admin in the same community.
+// Cannot change super_admin's system_role or demote yourself.
+export async function promoteToBoard(
+  memberId: string,
+  newSystemRole: 'board' | 'resident',
+  boardTitle?: string | null,
+  roleTemplateId?: string | null,
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = createAdminClient();
+
+  // We need the caller's identity. Use the server client with cookies.
+  const { createClient } = await import('@/lib/supabase/server');
+  const userClient = await createClient();
+  const { data: { user }, error: authError } = await userClient.auth.getUser();
+
+  if (authError || !user) {
+    return { success: false, error: 'Authentication required.' };
+  }
+
+  // Look up the target member
+  const { data: target } = await supabase
+    .from('members')
+    .select('id, community_id, system_role, first_name, last_name, email, user_id')
+    .eq('id', memberId)
+    .single();
+
+  if (!target) {
+    return { success: false, error: 'Member not found.' };
+  }
+
+  // Verify caller is board+ in the same community
+  const { data: caller } = await supabase
+    .from('members')
+    .select('id, system_role')
+    .eq('user_id', user.id)
+    .eq('community_id', target.community_id)
+    .single();
+
+  if (!caller || !['board', 'manager', 'super_admin'].includes(caller.system_role)) {
+    return { success: false, error: 'You do not have permission to manage board roles.' };
+  }
+
+  // Cannot change super_admin
+  if (target.system_role === 'super_admin') {
+    return { success: false, error: 'Cannot change the role of a super admin.' };
+  }
+
+  // Cannot demote yourself
+  if (newSystemRole === 'resident' && target.user_id === user.id) {
+    return { success: false, error: 'You cannot demote yourself.' };
+  }
+
+  // Build update
+  const updates: Record<string, unknown> = {
+    system_role: newSystemRole,
+  };
+
+  if (newSystemRole === 'board') {
+    updates.board_title = boardTitle?.trim() || null;
+    updates.role_template_id = roleTemplateId || null;
+  } else {
+    // Demoting to resident: clear board fields
+    updates.board_title = null;
+    updates.role_template_id = null;
+  }
+
+  const { error: updateError } = await supabase
+    .from('members')
+    .update(updates)
+    .eq('id', memberId);
+
+  if (updateError) {
+    console.error('Failed to update board role:', updateError);
+    return { success: false, error: 'Failed to update role.' };
+  }
+
+  // Audit log
+  await logAuditEvent({
+    communityId: target.community_id,
+    actorId: user.id,
+    actorEmail: user.email,
+    action: newSystemRole === 'board' ? 'member_promoted_to_board' : 'member_demoted_from_board',
+    targetType: 'member',
+    targetId: memberId,
+    metadata: {
+      member_name: `${target.first_name} ${target.last_name}`,
+      member_email: target.email,
+      new_system_role: newSystemRole,
+      board_title: boardTitle || null,
+      role_template_id: roleTemplateId || null,
+    },
+  });
+
+  return { success: true };
+}
+
 // Log a login attempt for audit purposes
 export async function logLoginAttempt(
   email: string,

@@ -4,7 +4,7 @@ import { useCommunity } from '@/lib/providers/community-provider';
 import { Shield, User } from 'lucide-react';
 
 export function ViewModeToggle() {
-  const { actualIsBoard, viewMode, setViewMode } = useCommunity();
+  const { actualIsBoard, viewMode, setViewMode, member } = useCommunity();
 
   if (!actualIsBoard) return null;
 
@@ -25,7 +25,7 @@ export function ViewModeToggle() {
         `}
       >
         <Shield className="h-3 w-3" />
-        <span className="hidden sm:inline">Admin</span>
+        <span className="hidden sm:inline">{member?.board_title || 'Admin'}</span>
       </button>
       <button
         type="button"
