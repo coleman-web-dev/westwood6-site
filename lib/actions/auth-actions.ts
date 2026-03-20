@@ -50,11 +50,11 @@ export async function checkIsFirstTimeUser(
 
   const supabase = createAdminClient();
 
-  // Look up approved member by email
+  // Look up approved member by email (case-insensitive)
   const { data: member } = await supabase
     .from('members')
     .select('id, user_id')
-    .eq('email', normalized)
+    .ilike('email', normalized)
     .eq('is_approved', true)
     .single();
 
@@ -96,7 +96,7 @@ export async function setupFirstTimePassword(
   const { data: member } = await supabase
     .from('members')
     .select('id, user_id, community_id')
-    .eq('email', normalized)
+    .ilike('email', normalized)
     .eq('is_approved', true)
     .single();
 
