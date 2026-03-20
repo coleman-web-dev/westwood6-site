@@ -70,10 +70,18 @@ export function ResizableSection({
     [currentColumns, onResize]
   );
 
+  // Apply height override directly so dragging has a visible effect
+  const wrapperStyle: React.CSSProperties = {};
+  if (canResizeHeight && currentHeight) {
+    wrapperStyle.height = currentHeight;
+    wrapperStyle.overflow = 'hidden';
+  }
+
   return (
     <div
       ref={containerRef}
       className="relative group"
+      style={wrapperStyle}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => !isDragging && setIsHovered(false)}
     >

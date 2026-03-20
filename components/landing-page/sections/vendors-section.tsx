@@ -116,7 +116,6 @@ export function VendorsSection({ community, config }: Props) {
   /* ── Classic ─────────────────────────────────────────────── */
   if (template === 'classic') {
     const cols = overrides?.columns;
-    const [featured, ...rest] = vendors;
 
     return (
       <section
@@ -150,7 +149,7 @@ export function VendorsSection({ community, config }: Props) {
             </div>
           </div>
 
-          {/* Bento grid */}
+          {/* Uniform grid */}
           <div
             className={
               cols
@@ -163,59 +162,7 @@ export function VendorsSection({ community, config }: Props) {
                 : undefined
             }
           >
-            {/* Featured vendor: spans 2 cols */}
-            <button
-              type="button"
-              onClick={() => setSelected(featured)}
-              className="text-left rounded-2xl bg-stone-50 overflow-hidden transition-all duration-300 hover:bg-white hover:shadow-lg group sm:col-span-2"
-            >
-              {featured.image_url ? (
-                <div className="aspect-[16/9] overflow-hidden relative">
-                  <img
-                    src={featured.image_url}
-                    alt={featured.name}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-              ) : (
-                <div
-                  className="aspect-[16/9] flex items-center justify-center"
-                  style={{ backgroundColor: 'var(--landing-primary)' }}
-                >
-                  <span className="text-5xl font-bold text-white/60">
-                    {featured.name.charAt(0).toUpperCase()}
-                  </span>
-                </div>
-              )}
-              <div className="p-6">
-                <h3
-                  className="text-sm font-bold"
-                  style={{ color: 'var(--landing-primary)' }}
-                >
-                  {featured.name}
-                </h3>
-                {featured.category && (
-                  <span
-                    className="inline-flex rounded-full px-3 py-1 text-xs font-medium mt-2"
-                    style={{
-                      backgroundColor: 'color-mix(in srgb, var(--landing-accent) 10%, white)',
-                      color: 'var(--landing-accent)',
-                    }}
-                  >
-                    {featured.category}
-                  </span>
-                )}
-                {featured.description && (
-                  <p className="text-xs text-gray-500 mt-2 line-clamp-2">
-                    {featured.description}
-                  </p>
-                )}
-              </div>
-            </button>
-
-            {/* Remaining vendors */}
-            {rest.map((vendor, i) => (
+            {vendors.map((vendor, i) => (
               <button
                 key={i}
                 type="button"
@@ -283,8 +230,6 @@ export function VendorsSection({ community, config }: Props) {
 
   /* ── Modern ─────────────────────────────────────────────── */
   if (template === 'modern') {
-    const [featured, ...rest] = vendors;
-
     return (
       <section
         className="py-20 px-6"
@@ -305,58 +250,7 @@ export function VendorsSection({ community, config }: Props) {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Featured: spans 2 cols with larger presentation */}
-            <button
-              type="button"
-              onClick={() => setSelected(featured)}
-              className="text-left rounded-xl bg-white overflow-hidden transition-all duration-300 hover:shadow-xl hover:scale-[1.02] sm:col-span-2"
-              style={{ borderBottomWidth: 4, borderBottomColor: 'var(--landing-accent)' }}
-            >
-              {featured.image_url ? (
-                <div className="aspect-[21/9] overflow-hidden relative">
-                  <img
-                    src={featured.image_url}
-                    alt={featured.name}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-                </div>
-              ) : (
-                <div
-                  className="aspect-[21/9] flex items-center justify-center relative"
-                  style={{ backgroundColor: 'var(--landing-primary)' }}
-                >
-                  <span className="text-5xl font-bold text-white/60">
-                    {featured.name.charAt(0).toUpperCase()}
-                  </span>
-                </div>
-              )}
-              <div className="p-5">
-                <div className="flex items-start justify-between gap-2 mb-1">
-                  <h3
-                    className="font-bold text-base"
-                    style={{ color: 'var(--landing-primary)' }}
-                  >
-                    {featured.name}
-                  </h3>
-                  {featured.category && (
-                    <span
-                      className="shrink-0 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium text-white"
-                      style={{ backgroundColor: 'var(--landing-accent)' }}
-                    >
-                      <Tag className="h-3 w-3" />
-                      {featured.category}
-                    </span>
-                  )}
-                </div>
-                <p className="text-sm text-gray-500 line-clamp-3">
-                  {featured.description}
-                </p>
-              </div>
-            </button>
-
-            {/* Rest of vendors */}
-            {rest.map((vendor, i) => (
+            {vendors.map((vendor, i) => (
               <button
                 key={i}
                 type="button"
