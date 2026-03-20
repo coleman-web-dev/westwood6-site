@@ -115,7 +115,24 @@ export async function POST(req: NextRequest) {
       voided: number;
     }[] = [];
 
+    // Fetch units that were already processed (have a conversion wallet transaction)
+    const { data: alreadyProcessed } = await supabase
+      .from('wallet_transactions')
+      .select('unit_id')
+      .eq('community_id', communityId)
+      .eq('type', 'manual_credit')
+      .like('description', '%monthly invoicing conversion%');
+
+    const processedUnitIds = new Set((alreadyProcessed || []).map((t) => t.unit_id));
+    let skipped = 0;
+
     for (const unit of units) {
+      // Skip units that were already converted
+      if (processedUnitIds.has(unit.id)) {
+        skipped++;
+        continue;
+      }
+
       // Fetch PAID invoices for this unit in the current fiscal year
       // Match by date range (not assessment_id) because old invoices may have been
       // created under a different assessment or imported from legacy system
@@ -246,6 +263,7 @@ export async function POST(req: NextRequest) {
       monthsElapsed,
       consumedAmount,
       totalUnitsScanned: units.length,
+      skipped,
       details,
     });
   } catch (err) {
