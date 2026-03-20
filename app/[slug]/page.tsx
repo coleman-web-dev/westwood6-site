@@ -42,17 +42,39 @@ export default async function CommunityLandingPage({ params }: Props) {
 
   const rawLandingConfig: LandingPageConfig | undefined = c.theme?.landing_page;
 
-  // If no landing page config exists, render the legacy minimal page
-  if (!rawLandingConfig) {
-    return <LegacyLandingPage community={c} slug={slug} isMember={isMember} />;
-  }
-
-  // Normalize config: protect against partially saved config where sections may be undefined
-  const landingConfig: LandingPageConfig = {
-    ...DEFAULT_LANDING_CONFIG,
-    ...rawLandingConfig,
-    sections: rawLandingConfig.sections ?? DEFAULT_LANDING_CONFIG.sections,
-  };
+  // If no landing page config exists, auto-generate one from community data
+  // so communities get a beautiful landing page out of the box
+  const landingConfig: LandingPageConfig = rawLandingConfig
+    ? {
+        ...DEFAULT_LANDING_CONFIG,
+        ...rawLandingConfig,
+        sections: rawLandingConfig.sections ?? DEFAULT_LANDING_CONFIG.sections,
+      }
+    : {
+        ...DEFAULT_LANDING_CONFIG,
+        hero_headline: `Welcome to ${c.name}`,
+        hero_subheadline: c.address || null,
+        hero_layout: 'text_only',
+        hero_thickness: 'tall',
+        about_title: `About ${c.name}`,
+        about_body: null,
+        contact_title: 'Contact Us',
+        contact_body: null,
+        footer_text: `\u00A9 ${new Date().getFullYear()} ${c.name}. All rights reserved.`,
+        sections: [
+          { id: 'hero', enabled: true, order: 0 },
+          { id: 'about', enabled: false, order: 1 },
+          { id: 'announcements', enabled: true, order: 2 },
+          { id: 'board_members', enabled: true, order: 3 },
+          { id: 'amenities', enabled: true, order: 4 },
+          { id: 'documents', enabled: true, order: 5 },
+          { id: 'vendors', enabled: false, order: 6 },
+          { id: 'quick_links', enabled: false, order: 7 },
+          { id: 'gallery', enabled: false, order: 8 },
+          { id: 'faq', enabled: false, order: 9 },
+          { id: 'contact', enabled: true, order: 10 },
+        ],
+      };
 
   // Fetch all public data in parallel using admin client (bypasses RLS for unauthenticated visitors)
   let landingData: LandingPageData = {
