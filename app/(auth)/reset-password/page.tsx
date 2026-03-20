@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { sendPasswordSetupLink } from '@/lib/actions/auth-actions';
@@ -9,12 +9,45 @@ import { sendPasswordSetupLink } from '@/lib/actions/auth-actions';
 type PageMode = 'loading' | 'request-reset' | 'set-password';
 
 export default function ResetPasswordPage() {
+  return (
+    <Suspense>
+      <ResetPasswordInner />
+    </Suspense>
+  );
+}
+
+function ResetPasswordInner() {
   const [mode, setMode] = useState<PageMode>('loading');
+  const [verifyError, setVerifyError] = useState<string | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     async function detectSession() {
       const supabase = createClient();
+
+      // If we have a recovery token from our verify-recovery redirect,
+      // verify it client-side to establish the session in the browser
+      const token = searchParams.get('token');
+      if (token) {
+        const { error } = await supabase.auth.verifyOtp({
+          token_hash: token,
+          type: 'recovery',
+        });
+
+        if (error) {
+          console.error('Recovery verification failed:', error);
+          setVerifyError('This reset link has expired. Please request a new one.');
+          setMode('request-reset');
+          return;
+        }
+
+        // Session established, show set-password form
+        setMode('set-password');
+        return;
+      }
+
+      // No token: check if user already has a session (e.g. from Supabase callback)
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -26,7 +59,7 @@ export default function ResetPasswordPage() {
       }
     }
     detectSession();
-  }, []);
+  }, [searchParams]);
 
   if (mode === 'loading') {
     return (
@@ -44,7 +77,7 @@ export default function ResetPasswordPage() {
     return <SetPasswordForm />;
   }
 
-  return <RequestResetForm />;
+  return <RequestResetForm initialError={verifyError} />;
 }
 
 function SetPasswordForm() {
@@ -217,9 +250,9 @@ function SetPasswordForm() {
   );
 }
 
-function RequestResetForm() {
+function RequestResetForm({ initialError }: { initialError?: string | null }) {
   const [email, setEmail] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError || null);
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
