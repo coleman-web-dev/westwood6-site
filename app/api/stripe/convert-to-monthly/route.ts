@@ -5,14 +5,16 @@ import { createJournalEntry } from '@/lib/utils/accounting-entries';
 
 /**
  * POST /api/stripe/convert-to-monthly
- * One-time conversion endpoint for existing non-monthly invoices.
- * Converts annual/semi-annual/quarterly invoices to the monthly invoicing model.
+ * One-time conversion endpoint for migrating to the monthly invoicing model.
  *
- * For each non-monthly unit:
- * 1. Finds PAID invoices for the current fiscal year
- * 2. Calculates prepaid balance (total paid minus months consumed)
+ * Processes ALL active units (not just non-monthly) because some units may be
+ * marked as 'monthly' in the DB but made lump-sum payments under the old system.
+ *
+ * For each unit with prepaid balance:
+ * 1. Sums all PAID invoices for the current fiscal year
+ * 2. Calculates prepaid balance (total paid minus months consumed at monthly rate)
  * 3. Credits prepaid amount to wallet with GL reclassification entry
- * 4. Voids any PENDING non-monthly invoices
+ * 4. Voids any PENDING invoices larger than monthly amount (old bulk invoices)
  *
  * Requires board member authentication.
  */
@@ -26,7 +28,10 @@ export async function POST(req: NextRequest) {
 
     // Verify the user is authenticated and is a board member
     const userClient = await createClient();
-    const { data: { user }, error: authError } = await userClient.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await userClient.auth.getUser();
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
@@ -77,30 +82,38 @@ export async function POST(req: NextRequest) {
     const currentYear = now.getUTCFullYear();
 
     // Months elapsed since fiscal year start (including the current month)
-    const monthsElapsed = (currentYear - fiscalStartYear) * 12 + (currentMonth - fiscalStartMonth) + 1;
+    const monthsElapsed =
+      (currentYear - fiscalStartYear) * 12 + (currentMonth - fiscalStartMonth) + 1;
     const consumedAmount = monthsElapsed * monthlyAmount;
 
-    // Fetch non-monthly units
+    // Fetch ALL active units (not just non-monthly, because some units may be
+    // mismarked as monthly but have lump-sum payments from the old system)
     const { data: units } = await supabase
       .from('units')
       .select('id, unit_number, payment_frequency')
       .eq('community_id', communityId)
-      .eq('status', 'active')
-      .neq('payment_frequency', 'monthly');
+      .eq('status', 'active');
 
     if (!units || units.length === 0) {
       return NextResponse.json({
         converted: 0,
         walletCredits: 0,
         voided: 0,
-        message: 'No non-monthly units found',
+        message: 'No active units found',
       });
     }
 
     let converted = 0;
     let totalWalletCredits = 0;
     let totalVoided = 0;
-    const details: { unit: string; paid: number; consumed: number; prepaid: number; voided: number }[] = [];
+    const details: {
+      unit: string;
+      frequency: string;
+      paid: number;
+      consumed: number;
+      prepaid: number;
+      voided: number;
+    }[] = [];
 
     for (const unit of units) {
       // Fetch PAID invoices for this unit in the current fiscal year
@@ -122,12 +135,15 @@ export async function POST(req: NextRequest) {
       // Calculate prepaid balance
       const prepaid = Math.max(0, totalPaid - consumedAmount);
 
-      // Void any PENDING non-monthly invoices for this fiscal year
+      // Void any PENDING invoices that are larger than monthly amount
+      // (these are old bulk invoices from the legacy system that should be
+      // replaced by monthly invoices going forward)
       const { data: pendingInvoices } = await supabase
         .from('invoices')
-        .select('id')
+        .select('id, amount')
         .eq('unit_id', unit.id)
         .in('status', ['pending', 'overdue'])
+        .gt('amount', monthlyAmount)
         .gte('due_date', now.toISOString().split('T')[0])
         .lte('due_date', assessment.fiscal_year_end);
 
@@ -148,21 +164,21 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Credit prepaid amount to wallet
-      if (prepaid > 0) {
-        // Upsert wallet balance
-        const { data: wallet } = await supabase
-          .from('unit_wallets')
-          .select('balance')
-          .eq('unit_id', unit.id)
-          .single();
+      // Only count units that had prepaid balance or voided invoices
+      if (prepaid > 0 || voidedCount > 0) {
+        // Credit prepaid amount to wallet
+        if (prepaid > 0) {
+          // Upsert wallet balance
+          const { data: wallet } = await supabase
+            .from('unit_wallets')
+            .select('balance')
+            .eq('unit_id', unit.id)
+            .single();
 
-        const currentBalance = wallet?.balance ?? 0;
-        const newBalance = currentBalance + prepaid;
+          const currentBalance = wallet?.balance ?? 0;
+          const newBalance = currentBalance + prepaid;
 
-        await supabase
-          .from('unit_wallets')
-          .upsert(
+          await supabase.from('unit_wallets').upsert(
             {
               unit_id: unit.id,
               community_id: communityId,
@@ -172,48 +188,64 @@ export async function POST(req: NextRequest) {
             { onConflict: 'unit_id' }
           );
 
-        // Log wallet transaction
-        await supabase.from('wallet_transactions').insert({
-          unit_id: unit.id,
-          community_id: communityId,
-          amount: prepaid,
-          type: 'manual_credit',
-          description: 'Prepaid dues converted to wallet credit (monthly invoicing conversion)',
-        });
+          // Log wallet transaction
+          await supabase.from('wallet_transactions').insert({
+            unit_id: unit.id,
+            community_id: communityId,
+            amount: prepaid,
+            type: 'manual_credit',
+            description: 'Prepaid dues converted to wallet credit (monthly invoicing conversion)',
+          });
 
-        // GL entry: reclassify recognized revenue as deferred (wallet liability)
-        // DR Assessment Revenue (4000) - reverse the premature revenue recognition
-        // CR Wallet Credits (2110) - record as liability (prepaid dues)
-        await createJournalEntry({
-          communityId,
-          description: `Prepaid dues reclassification: Unit ${unit.unit_number}`,
-          source: 'wallet_credit',
-          referenceType: 'unit',
-          referenceId: unit.id,
-          unitId: unit.id,
-          lines: [
-            { accountCode: '4000', debit: prepaid, credit: 0, description: 'Assessment Revenue (reclassified)' },
-            { accountCode: '2110', debit: 0, credit: prepaid, description: 'Wallet Credits (prepaid dues)' },
-          ],
-        });
+          // GL entry: reclassify recognized revenue as deferred (wallet liability)
+          // DR Assessment Revenue (4000) - reverse the premature revenue recognition
+          // CR Wallet Credits (2110) - record as liability (prepaid dues)
+          await createJournalEntry({
+            communityId,
+            description: `Prepaid dues reclassification: Unit ${unit.unit_number}`,
+            source: 'wallet_credit',
+            referenceType: 'unit',
+            referenceId: unit.id,
+            unitId: unit.id,
+            lines: [
+              {
+                accountCode: '4000',
+                debit: prepaid,
+                credit: 0,
+                description: 'Assessment Revenue (reclassified)',
+              },
+              {
+                accountCode: '2110',
+                debit: 0,
+                credit: prepaid,
+                description: 'Wallet Credits (prepaid dues)',
+              },
+            ],
+          });
 
-        totalWalletCredits += prepaid;
+          totalWalletCredits += prepaid;
+        }
+
+        converted++;
+        details.push({
+          unit: unit.unit_number,
+          frequency: unit.payment_frequency,
+          paid: totalPaid,
+          consumed: consumedAmount,
+          prepaid,
+          voided: voidedCount,
+        });
       }
-
-      converted++;
-      details.push({
-        unit: unit.unit_number,
-        paid: totalPaid,
-        consumed: consumedAmount,
-        prepaid,
-        voided: voidedCount,
-      });
     }
 
     return NextResponse.json({
       converted,
       walletCredits: totalWalletCredits,
       voided: totalVoided,
+      monthlyAmount,
+      monthsElapsed,
+      consumedAmount,
+      totalUnitsScanned: units.length,
       details,
     });
   } catch (err) {
