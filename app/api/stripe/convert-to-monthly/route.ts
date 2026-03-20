@@ -133,27 +133,32 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      // Fetch PAID dues invoices for this unit in the current fiscal year
-      // Filter to invoices with an assessment_id to exclude non-dues invoices
-      // (e.g., amenity rentals, clubhouse deposits, etc.)
-      // Don't match specific assessment_id because old invoices may have been
-      // created under a different assessment or imported from legacy system
+      // Fetch PAID lump-sum dues invoices (amount > monthly) for this unit
+      // in the current fiscal year. Only lump-sum invoices create prepaid balance.
+      // Monthly invoices are 1:1 with consumption and don't contribute to prepaid.
+      // Filter by assessment_id to exclude non-dues invoices (rentals, deposits, etc.)
       const { data: paidInvoices } = await supabase
         .from('invoices')
         .select('id, amount, amount_paid, status, assessment_id')
         .eq('unit_id', unit.id)
         .eq('status', 'paid')
         .not('assessment_id', 'is', null)
+        .gt('amount', monthlyAmount)
         .gte('due_date', assessment.fiscal_year_start)
         .lte('due_date', assessment.fiscal_year_end);
 
-      const totalPaid = (paidInvoices || []).reduce(
+      // For lump-sum payments, prepaid = total paid - months covered at monthly rate
+      // e.g., $504 annual covers 12 months, 3 elapsed = $504 - (3 × $42) = $378
+      // e.g., $252 semi-annual covers 6 months, 3 elapsed = $252 - (3 × $42) = $126
+      const totalLumpSum = (paidInvoices || []).reduce(
         (sum, inv) => sum + (inv.amount_paid ?? inv.amount),
         0
       );
 
-      // Calculate prepaid balance
-      const prepaid = Math.max(0, totalPaid - consumedAmount);
+      // Calculate how many months these lump-sum payments cover
+      const monthsCovered = Math.round(totalLumpSum / monthlyAmount);
+      const monthsConsumed = Math.min(monthsElapsed, monthsCovered);
+      const prepaid = Math.max(0, totalLumpSum - monthsConsumed * monthlyAmount);
 
       // Void any PENDING invoices that are larger than monthly amount
       // (these are old bulk invoices from the legacy system that should be
@@ -250,7 +255,7 @@ export async function POST(req: NextRequest) {
         details.push({
           unit: unit.unit_number,
           frequency: unit.payment_frequency,
-          paid: totalPaid,
+          paid: totalLumpSum,
           consumed: consumedAmount,
           prepaid,
           voided: voidedCount,
