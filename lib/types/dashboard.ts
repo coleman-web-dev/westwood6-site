@@ -35,9 +35,15 @@ export const ADMIN_ONLY_CARDS: Set<DashboardCardId> = new Set([
   'violations',
 ]);
 
+/**
+ * Default card visibility and ORDER for each member role.
+ * The order determines the default grid layout (paired two per row, left to right).
+ * Most important cards should come first for a good first-login experience.
+ * Board members in admin view prepend admin-only cards; in personal view those are filtered out.
+ */
 export const DEFAULT_CARD_VISIBILITY: Record<MemberRole, DashboardCardId[]> = {
-  owner: ['board-tasks', 'balance', 'announcements', 'maintenance', 'payments', 'events', 'amenity-calendar', 'household', 'documents', 'voting', 'bulletin-board', 'vendors', 'arc-requests'],
-  member: ['board-tasks', 'balance', 'announcements', 'maintenance', 'payments', 'events', 'amenity-calendar', 'documents', 'voting', 'bulletin-board', 'vendors', 'arc-requests'],
+  owner: ['balance', 'announcements', 'payments', 'maintenance', 'events', 'amenity-calendar', 'household', 'voting', 'bulletin-board', 'documents', 'board-tasks', 'vendors', 'arc-requests'],
+  member: ['balance', 'announcements', 'payments', 'maintenance', 'events', 'amenity-calendar', 'voting', 'bulletin-board', 'documents', 'board-tasks', 'vendors', 'arc-requests'],
   tenant: ['announcements', 'maintenance', 'events', 'amenity-calendar', 'bulletin-board', 'vendors'],
   minor: ['announcements', 'events', 'bulletin-board'],
 };

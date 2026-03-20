@@ -51,38 +51,71 @@ function compactVertically(items: readonly LayoutItem[]): LayoutItem[] {
   return placed;
 }
 
+/**
+ * Curated default layout for the personal/member dashboard.
+ * Cards not in this map fall back to auto-placement at the bottom.
+ * x/y/w/h are in grid units (12 cols, rowHeight=30, margin=18).
+ */
+const CURATED_LAYOUT: Record<string, { x: number; y: number; w: number; h: number }> = {
+  // Row 1: Announcements (left, wide) + Balance (right, shorter)
+  announcements:      { x: 0, y: 0,  w: 6, h: 7 },
+  balance:            { x: 6, y: 0,  w: 6, h: 5 },
+  // Row 2: Amenity Calendar (left, tall) + Payments (right top) + Events (right bottom)
+  'amenity-calendar': { x: 0, y: 7,  w: 6, h: 10 },
+  payments:           { x: 6, y: 7,  w: 6, h: 5 },
+  events:             { x: 6, y: 12, w: 6, h: 5 },
+  // Row 3: Household + Voting + Maintenance (3 across)
+  household:          { x: 0, y: 17, w: 4, h: 5 },
+  voting:             { x: 4, y: 17, w: 4, h: 5 },
+  maintenance:        { x: 8, y: 17, w: 4, h: 5 },
+  // Row 4: Bulletin Board + Documents
+  'bulletin-board':   { x: 0, y: 22, w: 6, h: 7 },
+  documents:          { x: 6, y: 22, w: 6, h: 7 },
+};
+
 function generateDefaultLayouts(cards: DashboardCardId[]): ResponsiveLayouts<GridBreakpoint> {
-  // Build lg layout: 2-column grid, track cumulative row heights
+  // Build lg layout using curated positions where available
   const lg: LayoutItem[] = [];
-  let lgY = 0;
-  for (let i = 0; i < cards.length; i += 2) {
-    const left = CARD_REGISTRY[cards[i]];
-    const right = i + 1 < cards.length ? CARD_REGISTRY[cards[i + 1]] : null;
-    const rowH = right ? Math.max(left.defaultH, right.defaultH) : left.defaultH;
+  const placed = new Set<string>();
 
-    lg.push({
-      i: cards[i],
-      x: 0,
-      y: lgY,
-      w: left.defaultW,
-      h: left.defaultH,
-      minW: left.minW,
-      minH: left.minH,
-    });
-
-    if (right) {
+  for (const cardId of cards) {
+    const config = CARD_REGISTRY[cardId];
+    const pos = CURATED_LAYOUT[cardId];
+    if (pos) {
       lg.push({
-        i: cards[i + 1],
-        x: 6,
-        y: lgY,
-        w: right.defaultW,
-        h: right.defaultH,
-        minW: right.minW,
-        minH: right.minH,
+        i: cardId,
+        x: pos.x,
+        y: pos.y,
+        w: pos.w,
+        h: pos.h,
+        minW: config.minW,
+        minH: config.minH,
       });
+      placed.add(cardId);
     }
+  }
 
-    lgY += rowH;
+  // Auto-place any cards not in the curated layout at the bottom
+  const maxY = lg.reduce((max, l) => Math.max(max, l.y + l.h), 0);
+  let nextY = maxY;
+  let nextX = 0;
+  for (const cardId of cards) {
+    if (placed.has(cardId)) continue;
+    const config = CARD_REGISTRY[cardId];
+    lg.push({
+      i: cardId,
+      x: nextX,
+      y: nextY,
+      w: config.defaultW,
+      h: config.defaultH,
+      minW: config.minW,
+      minH: config.minH,
+    });
+    nextX += config.defaultW;
+    if (nextX >= 12) {
+      nextX = 0;
+      nextY += config.defaultH;
+    }
   }
 
   // Build sm layout: single column, stack vertically
