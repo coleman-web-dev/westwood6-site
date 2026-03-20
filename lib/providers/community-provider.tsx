@@ -60,15 +60,15 @@ export function CommunityProvider({
   children: React.ReactNode;
 }) {
   const { community, member, unit, householdMembers, userCommunities } = initialData;
-  const [viewMode, setViewModeState] = useState<ViewMode>('admin');
-
-  // Initialize from localStorage on mount
-  useEffect(() => {
-    const stored = localStorage.getItem(VIEW_MODE_KEY);
-    if (stored === 'personal') {
-      setViewModeState('personal');
+  // Read localStorage synchronously to avoid a flash/race where cards
+  // fire admin queries before the useEffect switches to 'personal'.
+  const [viewMode, setViewModeState] = useState<ViewMode>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(VIEW_MODE_KEY);
+      if (stored === 'personal') return 'personal';
     }
-  }, []);
+    return 'admin';
+  });
 
   function setViewMode(mode: ViewMode) {
     setViewModeState(mode);

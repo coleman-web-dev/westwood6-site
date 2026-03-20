@@ -30,6 +30,7 @@ export function PaymentsCard() {
   useEffect(() => {
     if (!isAdminView && !unit) { setLoading(false); return; }
 
+    let active = true;
     const supabase = createClient();
 
     async function fetchPayments() {
@@ -39,6 +40,7 @@ export function PaymentsCard() {
           .from('units')
           .select('id')
           .eq('community_id', community.id);
+        if (!active) return;
         const ids = unitIds?.map((u: { id: string }) => u.id) ?? [];
         if (ids.length > 0) {
           const { data } = await supabase
@@ -47,6 +49,7 @@ export function PaymentsCard() {
             .in('unit_id', ids)
             .order('created_at', { ascending: false })
             .limit(5);
+          if (!active) return;
           setPayments((data as PaymentRow[]) ?? []);
         }
       } else {
@@ -56,12 +59,14 @@ export function PaymentsCard() {
           .eq('unit_id', unit!.id)
           .order('created_at', { ascending: false })
           .limit(5);
+        if (!active) return;
         setPayments((data as PaymentRow[]) ?? []);
       }
       setLoading(false);
     }
 
     fetchPayments();
+    return () => { active = false; };
   }, [unit, isAdminView, community.id]);
 
   return (

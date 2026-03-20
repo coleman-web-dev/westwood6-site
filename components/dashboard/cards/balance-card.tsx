@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
+import { Button } from '@/components/shared/ui/button';
 import { DashboardCardShell } from './dashboard-card-shell';
 
 export function BalanceCard() {
@@ -22,6 +23,7 @@ export function BalanceCard() {
       return;
     }
 
+    let active = true;
     const supabase = createClient();
 
     async function fetchBalance() {
@@ -33,6 +35,7 @@ export function BalanceCard() {
           .eq('community_id', community.id)
           .in('status', ['pending', 'overdue', 'partial']);
 
+        if (!active) return;
         const total = invoices?.reduce((sum: number, inv: { amount: number; amount_paid: number | null }) =>
           sum + (inv.amount - (inv.amount_paid ?? 0)), 0) ?? 0;
         setBalance(total);
@@ -46,6 +49,7 @@ export function BalanceCard() {
           .eq('unit_id', unit!.id)
           .in('status', ['pending', 'overdue', 'partial']);
 
+        if (!active) return;
         const total = invoices?.reduce((sum: number, inv: { amount: number; amount_paid: number | null }) =>
           sum + (inv.amount - (inv.amount_paid ?? 0)), 0) ?? 0;
         setBalance(total);
@@ -56,12 +60,14 @@ export function BalanceCard() {
           .eq('unit_id', unit!.id)
           .single();
 
+        if (!active) return;
         setWalletCredit(walletData?.balance ?? 0);
       }
       setLoading(false);
     }
 
     fetchBalance();
+    return () => { active = false; };
   }, [unit, isAdminView, community.id]);
 
   return (
@@ -86,12 +92,11 @@ export function BalanceCard() {
             )}
           </div>
           {!isAdminView && (balance ?? 0) > 0 && (
-            <Link
-              href={`/${community.slug}/payments`}
-              className="inline-block text-label text-secondary-500 dark:text-secondary-400 hover:text-secondary-600 dark:hover:text-secondary-300 transition-colors font-semibold"
-            >
-              Pay now &rarr;
-            </Link>
+            <Button asChild size="sm" className="w-full">
+              <Link href={`/${community.slug}/payments`}>
+                Pay now
+              </Link>
+            </Button>
           )}
           <Link
             href={`/${community.slug}/payments`}
