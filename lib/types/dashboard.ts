@@ -27,6 +27,14 @@ export interface DashboardCardConfig {
   defaultH: number;
 }
 
+/** Cards that only appear in admin view (hidden when board members switch to personal) */
+export const ADMIN_ONLY_CARDS: Set<DashboardCardId> = new Set([
+  'board-tasks',
+  'vendors',
+  'arc-requests',
+  'violations',
+]);
+
 export const DEFAULT_CARD_VISIBILITY: Record<MemberRole, DashboardCardId[]> = {
   owner: ['board-tasks', 'balance', 'announcements', 'maintenance', 'payments', 'events', 'amenity-calendar', 'household', 'documents', 'voting', 'bulletin-board', 'vendors', 'arc-requests'],
   member: ['board-tasks', 'balance', 'announcements', 'maintenance', 'payments', 'events', 'amenity-calendar', 'documents', 'voting', 'bulletin-board', 'vendors', 'arc-requests'],

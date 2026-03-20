@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { Community, Member, Unit } from '@/lib/types/database';
-import { DEFAULT_CARD_VISIBILITY, type DashboardCardId } from '@/lib/types/dashboard';
+import { DEFAULT_CARD_VISIBILITY, ADMIN_ONLY_CARDS, type DashboardCardId } from '@/lib/types/dashboard';
 import type { PermissionKey, PermissionMap } from '@/lib/types/permissions';
 import { noPermissions } from '@/lib/types/permissions';
 import {
@@ -94,7 +94,11 @@ export function CommunityProvider({
     const activePermissions = viewMode === 'admin' ? resolvedPermissions : personalPermissions;
 
     const configCards = community.theme?.dashboard_cards?.[role];
-    const visibleCards = (configCards ?? DEFAULT_CARD_VISIBILITY[role]) as DashboardCardId[];
+    const allCards = (configCards ?? DEFAULT_CARD_VISIBILITY[role]) as DashboardCardId[];
+    // In personal view, hide admin-only cards so board members see a resident experience
+    const visibleCards = (actualIsBoard && viewMode === 'personal')
+      ? allCards.filter((id) => !ADMIN_ONLY_CARDS.has(id))
+      : allCards;
 
     return {
       community,
