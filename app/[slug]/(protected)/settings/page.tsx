@@ -1,8 +1,21 @@
 'use client';
 
+import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/shared/ui/tabs';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from '@/components/shared/ui/alert-dialog';
+import { Button } from '@/components/shared/ui/button';
+import { registerSettingsTabGuard } from '@/lib/hooks/use-unsaved-changes';
 import { ProfileSettings } from '@/components/settings/profile-settings';
 import { EmailPreferences } from '@/components/settings/email-preferences';
 import { CommunitySettings } from '@/components/settings/community-settings';
@@ -22,13 +35,51 @@ export default function SettingsPage() {
   const defaultTab =
     tabParam && validTabs.includes(tabParam) ? tabParam : 'profile';
 
+  const [activeTab, setActiveTab] = useState(defaultTab);
+  const [isDirty, setIsDirty] = useState(false);
+  const [showWarning, setShowWarning] = useState(false);
+  const [pendingTab, setPendingTab] = useState<string | null>(null);
+
+  // Register this page's dirty state handler so useUnsavedChanges can notify us
+  const handleDirtyChange = useCallback((dirty: boolean) => {
+    setIsDirty(dirty);
+  }, []);
+
+  useEffect(() => {
+    const unregister = registerSettingsTabGuard(handleDirtyChange);
+    return unregister;
+  }, [handleDirtyChange]);
+
+  function handleTabChange(newTab: string) {
+    if (isDirty) {
+      setPendingTab(newTab);
+      setShowWarning(true);
+    } else {
+      setActiveTab(newTab);
+    }
+  }
+
+  function handleDiscard() {
+    setShowWarning(false);
+    setIsDirty(false);
+    if (pendingTab) {
+      setActiveTab(pendingTab);
+      setPendingTab(null);
+    }
+  }
+
+  function handleCancel() {
+    setShowWarning(false);
+    setPendingTab(null);
+  }
+
   return (
     <div className="space-y-6">
       <h1 className="text-page-title text-text-primary-light dark:text-text-primary-dark">
         Settings
       </h1>
 
-      <Tabs defaultValue={defaultTab}>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
@@ -87,6 +138,25 @@ export default function SettingsPage() {
           </TabsContent>
         )}
       </Tabs>
+
+      <AlertDialog open={showWarning} onOpenChange={(open) => { if (!open) handleCancel(); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes. If you leave this tab, your changes will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancel}>Stay</AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button variant="destructive" onClick={handleDiscard}>
+                Discard Changes
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

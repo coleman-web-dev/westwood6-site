@@ -2,6 +2,15 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 
+// Global registry for tab guard - settings page registers itself here
+type DirtyCallback = (isDirty: boolean) => void;
+let _globalDirtyCallback: DirtyCallback | null = null;
+
+export function registerSettingsTabGuard(cb: DirtyCallback) {
+  _globalDirtyCallback = cb;
+  return () => { _globalDirtyCallback = null; };
+}
+
 interface UseUnsavedChangesOptions {
   isDirty: boolean;
   onSave: () => Promise<void>;
@@ -75,9 +84,19 @@ export function useUnsavedChanges({
     };
   }, []);
 
+  // ── Notify tab guard of dirty state changes ──
+  useEffect(() => {
+    if (_globalDirtyCallback) {
+      _globalDirtyCallback(isDirty);
+    }
+    return () => {
+      if (_globalDirtyCallback) {
+        _globalDirtyCallback(false);
+      }
+    };
+  }, [isDirty]);
+
   const navigateAway = useCallback(() => {
-    // Temporarily restore original pushState so our redirect goes through
-    // We need to do a real navigation, so just set location
     if (pendingUrl.current) {
       window.location.href = pendingUrl.current;
     }
@@ -101,7 +120,6 @@ export function useUnsavedChanges({
       setShowWarning(false);
       navigateAway();
     } catch {
-      // Save failed, keep dialog open so user can retry or cancel
       setSaving(false);
     }
   }, [onSave, navigateAway]);
