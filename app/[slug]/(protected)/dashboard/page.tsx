@@ -21,6 +21,48 @@ import type { DashboardCardId } from '@/lib/types/dashboard';
 
 type GridBreakpoint = keyof typeof GRID_BREAKPOINTS;
 
+/**
+ * Simple vertical compaction: move each item up as far as possible
+ * without overlapping other items. Sorts by y then x, then greedily
+ * places each item at the lowest available y.
+ */
+function compactVertically(items: readonly LayoutItem[], cols: number): LayoutItem[] {
+  const sorted = [...items].sort((a, b) => a.y - b.y || a.x - b.x);
+  const placed: LayoutItem[] = [];
+
+  for (const item of sorted) {
+    let bestY = 0;
+    // Try each y from 0 upward, find the lowest y where this item fits
+    for (let tryY = 0; tryY <= item.y; tryY++) {
+      const collides = placed.some(
+        (p) =>
+          p.x < item.x + item.w &&
+          p.x + p.w > item.x &&
+          p.y < tryY + item.h &&
+          p.y + p.h > tryY,
+      );
+      if (!collides) {
+        bestY = tryY;
+        break;
+      }
+      // If collision, try next y = bottom of the colliding item
+      const collidingBottom = placed
+        .filter(
+          (p) =>
+            p.x < item.x + item.w &&
+            p.x + p.w > item.x &&
+            p.y < tryY + item.h &&
+            p.y + p.h > tryY,
+        )
+        .reduce((max, p) => Math.max(max, p.y + p.h), 0);
+      bestY = collidingBottom;
+    }
+    placed.push({ ...item, y: bestY });
+  }
+
+  return placed;
+}
+
 function generateDefaultLayouts(cards: DashboardCardId[]): ResponsiveLayouts<GridBreakpoint> {
   // Build lg layout: 2-column grid, track cumulative row heights
   const lg: LayoutItem[] = [];
@@ -93,7 +135,13 @@ export default function DashboardPage() {
         let items = patched[bp] ?? [];
 
         // Filter out cards that aren't currently visible (e.g. board-only cards in personal view)
+        // then compact vertically so remaining cards fill any gaps left behind.
+        const beforeCount = items.length;
         items = items.filter((l) => visibleSet.has(l.i));
+        if (items.length < beforeCount) {
+          const bpCols = GRID_COLS[bp] ?? 12;
+          items = compactVertically(items, bpCols);
+        }
 
         // Enforce minW/minH on every saved entry (fixes corrupted saves)
         items = items.map((l) => {
