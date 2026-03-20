@@ -20,40 +20,70 @@ export function GallerySection({ config }: Props) {
   /* ── Classic ─────────────────────────────────────────────── */
   if (template === 'classic') {
     const cols = overrides?.columns;
-    const gridClass = cols
-      ? 'grid gap-5'
-      : 'grid grid-cols-2 sm:grid-cols-3 gap-5';
     const gridStyle = cols
       ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }
       : undefined;
 
     return (
       <section
-        className="py-16 px-6"
+        className="py-24 sm:py-28 px-6"
         style={py ? { paddingTop: py, paddingBottom: py } : undefined}
       >
-        <div className="mx-auto max-w-5xl">
-          <h2
-            className="text-2xl font-semibold mb-8 text-center"
-            style={{ color: 'var(--landing-primary)' }}
+        <div className="mx-auto max-w-6xl">
+          {/* Two-column section header */}
+          <div className="flex flex-col lg:flex-row lg:items-end gap-6 lg:gap-16 mb-14">
+            <div className="lg:w-2/5">
+              <div className="inline-flex items-center gap-2 mb-4">
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ backgroundColor: 'var(--landing-accent)' }}
+                />
+                <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">
+                  Gallery
+                </span>
+              </div>
+              <p className="text-sm text-gray-500 leading-relaxed max-w-sm">
+                Explore our community through photos
+              </p>
+            </div>
+            <div className="lg:w-3/5">
+              <h2
+                className="text-4xl sm:text-5xl font-bold tracking-tight leading-[1.1]"
+                style={{ color: 'var(--landing-primary)' }}
+              >
+                Photo Gallery
+              </h2>
+            </div>
+          </div>
+
+          {/* Bento grid */}
+          <div
+            className="grid grid-cols-2 sm:grid-cols-3 gap-4 auto-rows-[200px] sm:auto-rows-[240px]"
+            style={gridStyle}
           >
-            Photo Gallery
-          </h2>
-          <div className={gridClass} style={gridStyle}>
             {config.gallery_images.map((img, i) => (
               <div
                 key={i}
-                className="relative aspect-[4/3] rounded-xl overflow-hidden shadow-sm group transition-shadow duration-300 hover:shadow-md"
+                className={`rounded-2xl overflow-hidden relative group ${i === 0 ? 'col-span-2 row-span-2' : ''}`}
               >
-                <Image
-                  src={img.url}
-                  alt={img.caption || `Community photo ${i + 1}`}
-                  fill
-                  className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                  sizes="(max-width: 640px) 50vw, 33vw"
-                />
+                {i === 0 ? (
+                  <Image
+                    src={img.url}
+                    alt={img.caption || `Community photo ${i + 1}`}
+                    fill
+                    className="object-cover w-full h-full"
+                    sizes="(max-width: 640px) 100vw, 66vw"
+                  />
+                ) : (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={img.url}
+                    alt={img.caption || `Community photo ${i + 1}`}
+                    className="object-cover w-full h-full"
+                  />
+                )}
                 {img.caption && (
-                  <div className="absolute inset-x-0 bottom-0 translate-y-full group-hover:translate-y-0 transition-transform duration-300 bg-gradient-to-t from-black/70 via-black/40 to-transparent px-4 py-3">
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
                     <p className="text-xs text-white font-medium">
                       {img.caption}
                     </p>

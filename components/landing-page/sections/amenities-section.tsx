@@ -19,48 +19,77 @@ export function AmenitiesSection({ config, data }: Props) {
 
   /* ── Classic ─────────────────────────────────────────────── */
   if (template === 'classic') {
-    const cols = overrides?.columns;
-    const gridClass = cols
-      ? 'grid gap-6'
-      : 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6';
-    const gridStyle = cols
-      ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }
-      : undefined;
+    const [featured, ...rest] = data.amenities;
 
     return (
       <section
-        className="py-20 px-6 bg-gray-50"
+        className="py-24 sm:py-28 px-6"
         style={py ? { paddingTop: py, paddingBottom: py } : undefined}
       >
-        <div className="mx-auto max-w-5xl">
-          <div className="text-center mb-12">
-            <h2
-              className="text-3xl font-bold mb-3"
-              style={{ color: 'var(--landing-primary)' }}
-            >
-              {title}
-            </h2>
-            <p className="text-sm text-gray-500 max-w-lg mx-auto">
-              Explore the shared spaces and amenities available to our community members.
-            </p>
+        <div className="mx-auto max-w-6xl">
+          {/* Two-column section header */}
+          <div className="flex flex-col lg:flex-row lg:items-end gap-6 lg:gap-16 mb-14">
+            <div className="lg:w-2/5">
+              <div className="inline-flex items-center gap-2 mb-4">
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ backgroundColor: 'var(--landing-accent)' }}
+                />
+                <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">
+                  Amenities
+                </span>
+              </div>
+              <p className="text-sm text-gray-500 leading-relaxed max-w-sm">
+                Everything you need, right at your doorstep
+              </p>
+            </div>
+            <div className="lg:w-3/5">
+              <h2
+                className="text-4xl sm:text-5xl font-bold tracking-tight leading-[1.1]"
+                style={{ color: 'var(--landing-primary)' }}
+              >
+                {title}
+              </h2>
+            </div>
           </div>
-          <div className={gridClass} style={gridStyle}>
-            {data.amenities.map((amenity) => (
+
+          {/* Bento grid */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+            {/* Featured card */}
+            <div
+              className="lg:col-span-2 rounded-2xl p-8 min-h-[200px] text-white relative overflow-hidden"
+              style={{ backgroundColor: 'var(--landing-accent)' }}
+            >
+              {featured.icon && (
+                <span className="text-4xl mb-4 block">{featured.icon}</span>
+              )}
+              <h3 className="text-lg font-bold">{featured.name}</h3>
+              {featured.description && (
+                <p className="text-sm text-white/70 mt-1">
+                  {featured.description}
+                </p>
+              )}
+              {/* Decorative circle */}
+              <div className="absolute -bottom-8 -right-8 h-32 w-32 rounded-full bg-white opacity-[0.15]" />
+            </div>
+
+            {/* Remaining amenity cards */}
+            {rest.map((amenity) => (
               <div
                 key={amenity.id}
-                className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 text-center"
+                className="rounded-2xl bg-stone-50 p-6 transition-all duration-300 hover:bg-white hover:shadow-lg"
               >
                 {amenity.icon && (
                   <span className="text-3xl mb-3 block">{amenity.icon}</span>
                 )}
                 <h3
-                  className="text-sm font-bold mb-1"
+                  className="text-sm font-bold"
                   style={{ color: 'var(--landing-primary)' }}
                 >
                   {amenity.name}
                 </h3>
                 {amenity.description && (
-                  <p className="text-xs text-gray-500 leading-relaxed line-clamp-3">
+                  <p className="text-xs text-gray-500 line-clamp-2 mt-1">
                     {amenity.description}
                   </p>
                 )}

@@ -116,75 +116,154 @@ export function VendorsSection({ community, config }: Props) {
   /* ── Classic ─────────────────────────────────────────────── */
   if (template === 'classic') {
     const cols = overrides?.columns;
-    const gridClass = cols
-      ? 'grid gap-6'
-      : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6';
-    const gridStyle = cols
-      ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }
-      : undefined;
+    const [featured, ...rest] = vendors;
 
     return (
       <section
-        className="py-20 px-6"
+        className="py-24 sm:py-28 px-6"
         style={py ? { paddingTop: py, paddingBottom: py } : undefined}
       >
-        <div className="mx-auto max-w-5xl">
-          <div className="text-center mb-12">
-            <h2
-              className="text-3xl font-bold mb-3"
-              style={{ color: 'var(--landing-primary)' }}
-            >
-              {title}
-            </h2>
-            <p className="text-sm text-gray-500 max-w-lg mx-auto">
-              Trusted local businesses recommended by our community.
-            </p>
+        <div className="mx-auto max-w-6xl">
+          {/* Two-column section header */}
+          <div className="flex flex-col lg:flex-row lg:items-end gap-6 lg:gap-16 mb-14">
+            <div className="lg:w-2/5">
+              <div className="inline-flex items-center gap-2 mb-4">
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ backgroundColor: 'var(--landing-accent)' }}
+                />
+                <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">
+                  Directory
+                </span>
+              </div>
+              <p className="text-sm text-gray-500 leading-relaxed max-w-sm">
+                Trusted vendors and service providers
+              </p>
+            </div>
+            <div className="lg:w-3/5">
+              <h2
+                className="text-4xl sm:text-5xl font-bold tracking-tight leading-[1.1]"
+                style={{ color: 'var(--landing-primary)' }}
+              >
+                {title}
+              </h2>
+            </div>
           </div>
 
-          <div className={gridClass} style={gridStyle}>
-            {vendors.map((vendor, i) => (
+          {/* Bento grid */}
+          <div
+            className={
+              cols
+                ? 'grid gap-5'
+                : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5'
+            }
+            style={
+              cols
+                ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }
+                : undefined
+            }
+          >
+            {/* Featured vendor: spans 2 cols */}
+            <button
+              type="button"
+              onClick={() => setSelected(featured)}
+              className="text-left rounded-2xl bg-stone-50 overflow-hidden transition-all duration-300 hover:bg-white hover:shadow-lg group sm:col-span-2"
+            >
+              {featured.image_url ? (
+                <div className="aspect-[16/9] overflow-hidden relative">
+                  <img
+                    src={featured.image_url}
+                    alt={featured.name}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+              ) : (
+                <div
+                  className="aspect-[16/9] flex items-center justify-center"
+                  style={{ backgroundColor: 'var(--landing-primary)' }}
+                >
+                  <span className="text-5xl font-bold text-white/60">
+                    {featured.name.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+              )}
+              <div className="p-6">
+                <h3
+                  className="text-sm font-bold"
+                  style={{ color: 'var(--landing-primary)' }}
+                >
+                  {featured.name}
+                </h3>
+                {featured.category && (
+                  <span
+                    className="inline-flex rounded-full px-3 py-1 text-xs font-medium mt-2"
+                    style={{
+                      backgroundColor: 'color-mix(in srgb, var(--landing-accent) 10%, white)',
+                      color: 'var(--landing-accent)',
+                    }}
+                  >
+                    {featured.category}
+                  </span>
+                )}
+                {featured.description && (
+                  <p className="text-xs text-gray-500 mt-2 line-clamp-2">
+                    {featured.description}
+                  </p>
+                )}
+              </div>
+            </button>
+
+            {/* Remaining vendors */}
+            {rest.map((vendor, i) => (
               <button
                 key={i}
                 type="button"
                 onClick={() => setSelected(vendor)}
-                className="text-left rounded-xl border border-gray-200 bg-white overflow-hidden hover:shadow-md transition-shadow"
+                className="text-left rounded-2xl bg-stone-50 overflow-hidden transition-all duration-300 hover:bg-white hover:shadow-lg group"
               >
                 {vendor.image_url ? (
-                  <div className="aspect-[16/9] overflow-hidden">
+                  <div className="aspect-[16/9] overflow-hidden relative">
                     <img
                       src={vendor.image_url}
                       alt={vendor.name}
                       className="w-full h-full object-cover"
                     />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                 ) : (
                   <div
-                    className="aspect-[16/9] flex items-center justify-center"
+                    className="h-16 w-16 rounded-full flex items-center justify-center mx-6 mt-6"
                     style={{ backgroundColor: 'var(--landing-primary)' }}
                   >
-                    <span className="text-3xl font-bold text-white/60">
+                    <span className="text-xl font-bold text-white/60">
                       {vendor.name.charAt(0).toUpperCase()}
                     </span>
                   </div>
                 )}
-                <div className="p-4">
-                  <div className="flex items-start justify-between gap-2 mb-1">
-                    <h3 className="font-bold text-gray-900 text-sm">
-                      {vendor.name}
-                    </h3>
-                    {vendor.category && (
-                      <span
-                        className="shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium text-white"
-                        style={{ backgroundColor: 'var(--landing-accent)' }}
-                      >
-                        <Tag className="h-3 w-3" />
-                        {vendor.category}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-500 line-clamp-2">
-                    {vendor.description}
-                  </p>
+                <div className="p-6">
+                  <h3
+                    className="text-sm font-bold"
+                    style={{ color: 'var(--landing-primary)' }}
+                  >
+                    {vendor.name}
+                  </h3>
+                  {vendor.category && (
+                    <span
+                      className="inline-flex rounded-full px-3 py-1 text-xs font-medium mt-2"
+                      style={{
+                        backgroundColor: 'color-mix(in srgb, var(--landing-accent) 10%, white)',
+                        color: 'var(--landing-accent)',
+                      }}
+                    >
+                      {vendor.category}
+                    </span>
+                  )}
+                  {vendor.description && (
+                    <p className="text-xs text-gray-500 mt-2 line-clamp-2">
+                      {vendor.description}
+                    </p>
+                  )}
                 </div>
               </button>
             ))}

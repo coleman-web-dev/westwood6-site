@@ -24,56 +24,105 @@ export function ContactSection({ community, config }: Props) {
   if (template === 'classic') {
     return (
       <section
-        className="py-16 px-6 bg-[#fafaf9]"
+        className="py-24 sm:py-28 px-6"
         style={py ? { paddingTop: py, paddingBottom: py } : undefined}
       >
-        <div className="mx-auto max-w-2xl">
-          <h2
-            className="text-2xl font-semibold mb-8 text-center"
-            style={{ color: 'var(--landing-primary)' }}
-          >
-            {title}
-          </h2>
-
-          {config.contact_body && (
-            <p className="text-sm text-gray-600 text-center mb-8 whitespace-pre-line leading-relaxed">
-              {config.contact_body}
-            </p>
-          )}
-
-          <div className="bg-white rounded-xl p-6 shadow-sm space-y-4">
-            {community.email && (
-              <div className="flex items-center gap-3">
-                <Mail className="h-5 w-5 text-gray-400 shrink-0" />
-                <a
-                  href={`mailto:${community.email}`}
-                  className="text-sm hover:underline"
-                  style={{ color: 'var(--landing-accent)' }}
-                >
-                  {community.email}
-                </a>
-              </div>
-            )}
-            {community.phone && (
-              <div className="flex items-center gap-3">
-                <Phone className="h-5 w-5 text-gray-400 shrink-0" />
-                <a
-                  href={`tel:${community.phone}`}
-                  className="text-sm hover:underline"
-                  style={{ color: 'var(--landing-accent)' }}
-                >
-                  {community.phone}
-                </a>
-              </div>
-            )}
-            {community.address && (
-              <div className="flex items-center gap-3">
-                <MapPin className="h-5 w-5 text-gray-400 shrink-0" />
-                <span className="text-sm text-gray-700">
-                  {community.address}
+        <div className="mx-auto max-w-6xl">
+          <div className="flex flex-col lg:flex-row gap-12 lg:gap-16">
+            {/* Left column */}
+            <div className="lg:w-1/2">
+              <div className="inline-flex items-center gap-2 mb-4">
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ backgroundColor: 'var(--landing-accent)' }}
+                />
+                <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">
+                  Contact
                 </span>
               </div>
-            )}
+              <h2
+                className="text-4xl sm:text-5xl font-bold tracking-tight leading-[1.1]"
+                style={{ color: 'var(--landing-primary)' }}
+              >
+                {title}
+              </h2>
+              {config.contact_body && (
+                <p className="text-sm text-gray-500 leading-relaxed mt-4 whitespace-pre-line">
+                  {config.contact_body}
+                </p>
+              )}
+            </div>
+
+            {/* Right column */}
+            <div className="lg:w-1/2">
+              <div className="rounded-2xl bg-stone-50 p-8">
+                {community.email && (
+                  <div className="flex items-center gap-4 rounded-full bg-white px-5 py-3 mb-3 shadow-sm">
+                    <div
+                      className="h-10 w-10 rounded-full flex items-center justify-center shrink-0"
+                      style={{
+                        backgroundColor:
+                          'color-mix(in srgb, var(--landing-accent) 10%, white)',
+                      }}
+                    >
+                      <Mail
+                        className="h-5 w-5"
+                        style={{ color: 'var(--landing-accent)' }}
+                      />
+                    </div>
+                    <a
+                      href={`mailto:${community.email}`}
+                      className="text-sm text-gray-700 hover:underline"
+                      style={{ textDecorationColor: 'var(--landing-accent)' }}
+                    >
+                      {community.email}
+                    </a>
+                  </div>
+                )}
+                {community.phone && (
+                  <div className="flex items-center gap-4 rounded-full bg-white px-5 py-3 mb-3 shadow-sm">
+                    <div
+                      className="h-10 w-10 rounded-full flex items-center justify-center shrink-0"
+                      style={{
+                        backgroundColor:
+                          'color-mix(in srgb, var(--landing-accent) 10%, white)',
+                      }}
+                    >
+                      <Phone
+                        className="h-5 w-5"
+                        style={{ color: 'var(--landing-accent)' }}
+                      />
+                    </div>
+                    <a
+                      href={`tel:${community.phone}`}
+                      className="text-sm text-gray-700 hover:underline"
+                      style={{ textDecorationColor: 'var(--landing-accent)' }}
+                    >
+                      {community.phone}
+                    </a>
+                  </div>
+                )}
+                {community.address && (
+                  <div className="flex items-center gap-4 rounded-full bg-white px-5 py-3 shadow-sm">
+                    <div
+                      className="h-10 w-10 rounded-full flex items-center justify-center shrink-0"
+                      style={{
+                        backgroundColor:
+                          'color-mix(in srgb, var(--landing-accent) 10%, white)',
+                      }}
+                    >
+                      <MapPin
+                        className="h-5 w-5"
+                        style={{ color: 'var(--landing-accent)' }}
+                      />
+                    </div>
+                    <span className="text-sm text-gray-700">
+                      {community.address}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </section>

@@ -71,47 +71,99 @@ export function PublicAnnouncementsSection({ config, data }: Props) {
 
   /* ── Classic ─────────────────────────────────────────────── */
   if (template === 'classic') {
+    const [featured, ...rest] = data.announcements;
     return (
       <section
-        className="py-20 px-6"
+        className="py-24 sm:py-28 px-6"
         style={py ? { paddingTop: py, paddingBottom: py } : undefined}
       >
-        <div className="mx-auto max-w-3xl">
-          <div className="text-center mb-12">
-            <h2
-              className="text-3xl font-bold mb-3"
-              style={{ color: 'var(--landing-primary)' }}
-            >
-              {title}
-            </h2>
-            <p className="text-sm text-gray-500">
-              Stay informed with the latest news from your community.
-            </p>
-          </div>
-          <div className="space-y-4">
-            {data.announcements.map((ann) => (
-              <div
-                key={ann.id}
-                className="rounded-xl border border-gray-200 bg-white p-6"
+        <div className="mx-auto max-w-6xl">
+          {/* Two-column section header */}
+          <div className="flex flex-col lg:flex-row lg:items-end gap-6 lg:gap-16 mb-14">
+            <div className="lg:w-2/5">
+              <div className="inline-flex items-center gap-2 mb-4">
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ backgroundColor: 'var(--landing-accent)' }}
+                />
+                <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">
+                  News
+                </span>
+              </div>
+              <p className="text-sm text-gray-500 leading-relaxed max-w-sm">
+                Stay informed with community updates
+              </p>
+            </div>
+            <div className="lg:w-3/5">
+              <h2
+                className="text-4xl sm:text-5xl font-bold tracking-tight leading-[1.1]"
+                style={{ color: 'var(--landing-primary)' }}
               >
-                <div className="flex items-center gap-2 flex-wrap mb-1">
+                {title}
+              </h2>
+            </div>
+          </div>
+
+          {/* Featured first announcement */}
+          <div
+            className="rounded-2xl p-8 sm:p-10 min-h-[200px] text-white relative overflow-hidden"
+            style={{ backgroundColor: 'var(--landing-primary)' }}
+          >
+            {featured.priority !== 'normal' && (
+              <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-white/20">
+                {featured.priority === 'urgent' ? 'Urgent' : 'Important'}
+              </span>
+            )}
+            <h3 className="text-xl sm:text-2xl font-bold mt-3">
+              {featured.title}
+            </h3>
+            <p className="text-sm text-white/70 mt-3 whitespace-pre-line line-clamp-3">
+              {featured.body}
+            </p>
+            <p className="text-xs text-white/40 mt-4">
+              {formatDate(featured.created_at)}
+            </p>
+            <div
+              className="absolute -bottom-8 -right-8 h-32 w-32 rounded-full opacity-[0.1]"
+              style={{ backgroundColor: 'var(--landing-accent)' }}
+            />
+          </div>
+
+          {/* Remaining announcements */}
+          {rest.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mt-5">
+              {rest.map((ann) => (
+                <div
+                  key={ann.id}
+                  className="rounded-2xl bg-stone-50 p-6 transition-all duration-300 hover:bg-white hover:shadow-lg"
+                >
+                  {ann.priority !== 'normal' && (
+                    <span
+                      className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium mb-2"
+                      style={{
+                        backgroundColor: 'color-mix(in srgb, var(--landing-accent) 10%, white)',
+                        color: 'var(--landing-accent)',
+                      }}
+                    >
+                      {ann.priority === 'urgent' ? 'Urgent' : 'Important'}
+                    </span>
+                  )}
                   <h3
                     className="text-sm font-bold"
                     style={{ color: 'var(--landing-primary)' }}
                   >
                     {ann.title}
                   </h3>
-                  <PriorityBadge priority={ann.priority} />
+                  <p className="text-xs text-gray-500 mt-2 whitespace-pre-line line-clamp-2 leading-relaxed">
+                    {ann.body}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-3">
+                    {formatDateShort(ann.created_at)}
+                  </p>
                 </div>
-                <p className="text-xs text-gray-400 mb-3">
-                  {formatDate(ann.created_at)}
-                </p>
-                <p className="text-sm text-gray-600 whitespace-pre-line line-clamp-4 leading-relaxed">
-                  {ann.body}
-                </p>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
     );

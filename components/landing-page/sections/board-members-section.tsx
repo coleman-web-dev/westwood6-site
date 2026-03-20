@@ -22,41 +22,104 @@ export function BoardMembersSection({ config, data }: Props) {
   if (template === 'classic') {
     return (
       <section
-        className="py-16 px-6 bg-stone-50/60"
+        className="py-24 sm:py-28 px-6"
         style={py ? { paddingTop: py, paddingBottom: py } : undefined}
       >
-        <div className="mx-auto max-w-4xl">
-          <h2
-            className="text-2xl font-bold mb-10 text-center"
-            style={{ color: 'var(--landing-primary)' }}
-          >
-            {title}
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
+        <div className="mx-auto max-w-6xl">
+          {/* Two-column section header */}
+          <div className="flex flex-col lg:flex-row lg:items-end gap-6 lg:gap-16 mb-14">
+            <div className="lg:w-2/5">
+              <div className="inline-flex items-center gap-2 mb-4">
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ backgroundColor: 'var(--landing-accent)' }}
+                />
+                <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">
+                  Our Team
+                </span>
+              </div>
+              <p className="text-sm text-gray-500 leading-relaxed max-w-sm">
+                Meet the people who serve our community
+              </p>
+            </div>
+            <div className="lg:w-3/5">
+              <h2
+                className="text-4xl sm:text-5xl font-bold tracking-tight leading-[1.1]"
+                style={{ color: 'var(--landing-primary)' }}
+              >
+                {title}
+              </h2>
+            </div>
+          </div>
+
+          {/* Overlapping avatar cluster */}
+          <div className="flex items-center -space-x-4 mb-10">
+            {data.boardMembers.slice(0, 6).map((_, i) => (
+              <div
+                key={i}
+                className="h-14 w-14 rounded-full flex items-center justify-center border-[3px] border-white shadow-md"
+                style={{
+                  backgroundColor:
+                    'color-mix(in srgb, var(--landing-accent) 12%, white)',
+                }}
+              >
+                <User
+                  className="h-6 w-6"
+                  style={{ color: 'var(--landing-accent)' }}
+                />
+              </div>
+            ))}
+            {data.boardMembers.length > 6 && (
+              <div
+                className="h-14 w-14 rounded-full flex items-center justify-center border-[3px] border-white shadow-md text-xs font-bold text-white"
+                style={{ backgroundColor: 'var(--landing-accent)' }}
+              >
+                +{data.boardMembers.length - 6}
+              </div>
+            )}
+          </div>
+
+          {/* Member cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {data.boardMembers.map((member, i) => (
               <div
                 key={i}
-                className="bg-white rounded-xl p-6 text-center shadow-sm"
+                className="rounded-2xl bg-stone-50 p-6 transition-all duration-300 hover:bg-white hover:shadow-lg group"
               >
-                {/* Circular avatar with accent-tinted background */}
-                <div
-                  className="mx-auto mb-4 h-14 w-14 rounded-full flex items-center justify-center"
-                  style={{ backgroundColor: 'color-mix(in srgb, var(--landing-accent) 12%, white)' }}
-                >
-                  <User
-                    className="h-6 w-6"
-                    style={{ color: 'var(--landing-accent)' }}
-                  />
+                <div className="flex items-center gap-4">
+                  <div
+                    className="h-12 w-12 rounded-full flex items-center justify-center shrink-0"
+                    style={{
+                      backgroundColor:
+                        'color-mix(in srgb, var(--landing-accent) 12%, white)',
+                    }}
+                  >
+                    <User
+                      className="h-5 w-5"
+                      style={{ color: 'var(--landing-accent)' }}
+                    />
+                  </div>
+                  <div>
+                    <p
+                      className="text-sm font-bold"
+                      style={{ color: 'var(--landing-primary)' }}
+                    >
+                      {member.first_name} {member.last_name}
+                    </p>
+                    {config.show_board_titles && member.board_title && (
+                      <span
+                        className="inline-block mt-1 rounded-full px-3 py-1 text-xs font-medium"
+                        style={{
+                          backgroundColor:
+                            'color-mix(in srgb, var(--landing-accent) 10%, white)',
+                          color: 'var(--landing-accent)',
+                        }}
+                      >
+                        {member.board_title}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <p
-                  className="text-sm font-semibold"
-                  style={{ color: 'var(--landing-primary)' }}
-                >
-                  {member.first_name} {member.last_name}
-                </p>
-                {config.show_board_titles && member.board_title && (
-                  <p className="text-xs text-gray-500 mt-1">{member.board_title}</p>
-                )}
               </div>
             ))}
           </div>

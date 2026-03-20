@@ -1,3 +1,4 @@
+import { Users, Building2 } from 'lucide-react';
 import type { Community } from '@/lib/types/database';
 import type { LandingPageConfig, LayoutTemplate, SectionStyleOverride } from '@/lib/types/landing';
 import type { LandingPageData } from '../landing-page-shell';
@@ -20,7 +21,7 @@ const MAX_WIDTH_MAP: Record<NonNullable<SectionStyleOverride['maxWidth']>, strin
   full: 'max-w-full',
 };
 
-export function AboutSection({ config }: Props) {
+export function AboutSection({ config, data }: Props) {
   if (!config.about_body) return null;
 
   const title = config.about_title || 'About Our Community';
@@ -30,26 +31,83 @@ export function AboutSection({ config }: Props) {
 
   /* ── Classic ─────────────────────────────────────────── */
   if (template === 'classic') {
+    // Determine stat for the side card
+    const statCount = data.boardMembers.length || data.amenities.length || 0;
+    const statLabel = data.boardMembers.length > 0 ? 'Board Members' : data.amenities.length > 0 ? 'Amenities' : '';
+    const StatIcon = data.boardMembers.length > 0 ? Users : Building2;
+
     return (
       <section
-        className="py-16 px-6 bg-stone-50/60"
+        className="py-24 sm:py-28 px-6"
         style={py ? { paddingTop: py, paddingBottom: py } : undefined}
       >
-        <div className="mx-auto max-w-3xl text-center">
-          {/* Decorative accent bar */}
-          <div
-            className="mx-auto mb-5 h-1 w-12 rounded-full"
-            style={{ backgroundColor: 'var(--landing-accent)' }}
-          />
-          <h2
-            className="text-2xl font-bold mb-6"
-            style={{ color: 'var(--landing-primary)' }}
-          >
-            {title}
-          </h2>
-          <p className="text-gray-600 leading-relaxed whitespace-pre-line text-base">
-            {config.about_body}
-          </p>
+        <div className="mx-auto max-w-6xl">
+          {/* Two-column section header */}
+          <div className="flex flex-col lg:flex-row lg:items-end gap-6 lg:gap-16 mb-14">
+            <div className="lg:w-2/5">
+              <div className="inline-flex items-center gap-2 mb-4">
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ backgroundColor: 'var(--landing-accent)' }}
+                />
+                <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">
+                  About Us
+                </span>
+              </div>
+              <p className="text-sm text-gray-500 leading-relaxed max-w-sm">
+                Learn more about what makes our community a great place to call home.
+              </p>
+            </div>
+            <div className="lg:w-3/5">
+              <h2
+                className="text-4xl sm:text-5xl font-bold tracking-tight leading-[1.1]"
+                style={{ color: 'var(--landing-primary)' }}
+              >
+                {title}
+              </h2>
+            </div>
+          </div>
+
+          {/* Bento grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {/* Large text card */}
+            <div className="lg:col-span-2 rounded-2xl p-8 sm:p-10 bg-stone-50 relative overflow-hidden">
+              <p className="text-gray-600 leading-relaxed whitespace-pre-line text-base relative z-10">
+                {config.about_body}
+              </p>
+              {/* Decorative accent circle */}
+              <div
+                className="absolute -bottom-10 -right-10 h-40 w-40 rounded-full opacity-[0.06]"
+                style={{ backgroundColor: 'var(--landing-accent)' }}
+              />
+            </div>
+
+            {/* Stat card */}
+            {statCount > 0 ? (
+              <div
+                className="rounded-2xl p-8 sm:p-10 text-white relative overflow-hidden flex flex-col justify-between"
+                style={{ backgroundColor: 'var(--landing-primary)' }}
+              >
+                <div>
+                  <StatIcon className="h-8 w-8 text-white/40 mb-4" />
+                  <p className="text-5xl sm:text-6xl font-bold">{statCount}</p>
+                  <p className="text-sm text-white/50 mt-2 font-medium">{statLabel}</p>
+                </div>
+                {/* Decorative shape */}
+                <div
+                  className="absolute -bottom-6 -right-6 h-24 w-24 rounded-full opacity-[0.08]"
+                  style={{ backgroundColor: 'var(--landing-accent)' }}
+                />
+              </div>
+            ) : (
+              <div className="rounded-2xl p-8 sm:p-10 bg-stone-50 flex items-center justify-center">
+                <div
+                  className="h-1 w-12 rounded-full"
+                  style={{ backgroundColor: 'var(--landing-accent)' }}
+                />
+              </div>
+            )}
+          </div>
         </div>
       </section>
     );

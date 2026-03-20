@@ -179,7 +179,7 @@ export function LandingPageShell({
               ? 'py-10 px-6 text-center'
               : template === 'editorial'
               ? 'py-16 px-6 text-center'
-              : 'border-t border-gray-200 py-8 px-6 text-center'
+              : 'py-12 px-6 text-center bg-stone-50'
           }
           style={
             template === 'modern'
@@ -190,10 +190,18 @@ export function LandingPageShell({
           {template === 'editorial' && (
             <div className="mx-auto w-16 h-px bg-gray-300 mb-8" />
           )}
+          {template === 'classic' && (
+            <div
+              className="mx-auto w-1.5 h-1.5 rounded-full mb-5"
+              style={{ backgroundColor: 'var(--landing-accent)' }}
+            />
+          )}
           <p
             className={
               template === 'modern'
                 ? 'text-sm text-white/60'
+                : template === 'classic'
+                ? 'text-xs text-gray-400'
                 : 'text-sm text-gray-500'
             }
           >

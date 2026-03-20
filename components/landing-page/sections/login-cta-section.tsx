@@ -137,30 +137,44 @@ export function LoginCtaSection({ slug, isMember, communityName, config }: Props
     );
   }
 
-  /* ── Classic CTA: primary bg with accent button ──────────────── */
+  /* ── Classic CTA: primary bg with floating elements + pill buttons ── */
   return (
-    <section className="relative">
+    <section className="relative overflow-hidden">
       <div
-        className="py-20 px-6"
+        className="py-24 sm:py-28 px-6"
         style={{ backgroundColor: 'var(--landing-primary)' }}
       >
-        <div className="mx-auto max-w-xl text-center">
-          {/* Small decorative accent bar */}
+        {/* Decorative floating elements */}
+        <div
+          className="absolute -top-16 -right-16 w-56 h-56 rounded-full opacity-[0.06]"
+          style={{ backgroundColor: 'var(--landing-accent)' }}
+        />
+        <div
+          className="absolute -bottom-12 -left-12 w-40 h-40 rounded-full opacity-[0.04]"
+          style={{ backgroundColor: 'var(--landing-accent)' }}
+        />
+        <div
+          className="absolute top-1/2 right-[15%] w-20 h-20 rounded-2xl rotate-12 opacity-[0.05]"
+          style={{ backgroundColor: 'var(--landing-accent)' }}
+        />
+
+        <div className="relative mx-auto max-w-2xl text-center">
+          {/* Accent dot */}
           <div
-            className="mx-auto w-10 h-1 rounded-full mb-8"
+            className="mx-auto w-2 h-2 rounded-full mb-8"
             style={{ backgroundColor: 'var(--landing-accent)' }}
           />
-          <h2 className="text-3xl font-bold text-white mb-4">
+          <h2 className="text-4xl sm:text-5xl font-bold text-white tracking-tight mb-5">
             {heading}
           </h2>
-          <p className="text-white/60 mb-10 text-sm leading-relaxed max-w-md mx-auto">
+          <p className="text-white/50 mb-10 text-sm leading-relaxed max-w-md mx-auto">
             {subtext}
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             {isMember ? (
               <Link
                 href={`/${slug}/dashboard`}
-                className="inline-flex items-center justify-center rounded-lg px-8 py-3.5 text-sm font-semibold text-white transition-all hover:opacity-90 hover:shadow-lg"
+                className="inline-flex items-center justify-center rounded-full px-10 py-3.5 text-sm font-semibold text-white transition-all hover:opacity-90 hover:shadow-lg"
                 style={{ backgroundColor: 'var(--landing-accent)' }}
               >
                 Go to Dashboard
@@ -169,14 +183,14 @@ export function LoginCtaSection({ slug, isMember, communityName, config }: Props
               <>
                 <Link
                   href={`/login?redirect=/${slug}/dashboard`}
-                  className="inline-flex items-center justify-center rounded-lg px-8 py-3.5 text-sm font-semibold text-white transition-all hover:opacity-90 hover:shadow-lg"
+                  className="inline-flex items-center justify-center rounded-full px-10 py-3.5 text-sm font-semibold text-white transition-all hover:opacity-90 hover:shadow-lg"
                   style={{ backgroundColor: 'var(--landing-accent)' }}
                 >
                   Member Login
                 </Link>
                 <Link
                   href={`/signup?community=${slug}`}
-                  className="inline-flex items-center justify-center rounded-lg border border-white/20 px-8 py-3.5 text-sm font-medium text-white/80 hover:bg-white/5 hover:text-white transition-all"
+                  className="inline-flex items-center justify-center rounded-full border border-white/20 px-10 py-3.5 text-sm font-medium text-white/70 hover:bg-white/5 hover:text-white transition-all"
                 >
                   Request Access
                 </Link>

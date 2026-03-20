@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import { User, ArrowRight, Users, Building2, Shield } from 'lucide-react';
 import type { Community } from '@/lib/types/database';
 import type { LandingPageConfig, HeroLayout, HeroThickness, LayoutTemplate, SectionStyleOverride } from '@/lib/types/landing';
 import type { LandingPageData } from '../landing-page-shell';
@@ -66,23 +67,124 @@ function LogoAndText({
 function ClassicHero({
   community,
   config,
+  data,
   headline,
   subheadline,
   layout,
   thickness,
+  slug,
 }: {
   community: Community;
   config: LandingPageConfig;
+  data: LandingPageData;
   headline: string;
   subheadline: string;
   layout: HeroLayout;
   thickness: HeroThickness;
+  slug: string;
 }) {
-  /* image_only WITH image: full-bleed, darker gradient, accent underline */
+  const hasStats = data.boardMembers.length > 0 || data.amenities.length > 0;
+
+  /* ── Shared pill CTA buttons ─────────────────────────── */
+  const ctaButtons = (variant: 'light' | 'dark' = 'light') => (
+    <div className="mt-8 flex flex-wrap gap-3">
+      <a
+        href={`/${slug}/login`}
+        className="inline-flex items-center gap-2 rounded-full px-7 py-3 text-sm font-semibold text-white transition-all duration-300 hover:opacity-90 hover:shadow-lg"
+        style={{ backgroundColor: 'var(--landing-accent)' }}
+      >
+        Get Started
+      </a>
+      <button
+        type="button"
+        onClick={() => {
+          const el = document.getElementById('section-about') || document.getElementById('section-contact');
+          el?.scrollIntoView({ behavior: 'smooth' });
+        }}
+        className={`inline-flex items-center gap-2 rounded-full px-7 py-3 text-sm font-medium transition-all duration-300 ${
+          variant === 'light'
+            ? 'border border-white/25 text-white hover:bg-white/10'
+            : 'border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400'
+        }`}
+      >
+        Learn More
+        <ArrowRight className="h-4 w-4" />
+      </button>
+    </div>
+  );
+
+  /* ── Floating stats card (glass-morphism) ────────────── */
+  const floatingStats = hasStats ? (
+    <div className="absolute bottom-6 left-6 sm:bottom-10 sm:left-10 z-10 hidden sm:block">
+      <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/15 p-5 shadow-2xl">
+        <div className="flex items-center gap-6">
+          {data.boardMembers.length > 0 && (
+            <div className="text-center">
+              <div className="flex items-center justify-center gap-1.5 mb-1">
+                <Shield className="h-3.5 w-3.5 text-white/60" />
+                <span className="text-2xl font-bold text-white">{data.boardMembers.length}</span>
+              </div>
+              <span className="text-[10px] text-white/50 uppercase tracking-wider font-medium">Board</span>
+            </div>
+          )}
+          {data.amenities.length > 0 && (
+            <div className="text-center">
+              <div className="flex items-center justify-center gap-1.5 mb-1">
+                <Building2 className="h-3.5 w-3.5 text-white/60" />
+                <span className="text-2xl font-bold text-white">{data.amenities.length}</span>
+              </div>
+              <span className="text-[10px] text-white/50 uppercase tracking-wider font-medium">Amenities</span>
+            </div>
+          )}
+          {community.address && (
+            <div className="text-center max-w-[120px]">
+              <p className="text-[10px] text-white/50 uppercase tracking-wider font-medium mb-1">Location</p>
+              <p className="text-xs text-white/80 leading-tight truncate">{community.address.split(',')[0]}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  /* ── Avatar cluster (board members) ──────────────────── */
+  const avatarCluster = data.boardMembers.length > 0 ? (
+    <div className="absolute bottom-6 right-6 sm:bottom-10 sm:right-10 z-10 hidden sm:block">
+      <div className="flex items-center gap-3">
+        <div className="flex -space-x-3">
+          {data.boardMembers.slice(0, 4).map((m, i) => (
+            <div
+              key={i}
+              className="h-10 w-10 rounded-full border-2 border-white/30 flex items-center justify-center shadow-lg"
+              style={{ backgroundColor: 'color-mix(in srgb, var(--landing-accent) 25%, rgba(0,0,0,0.3))' }}
+            >
+              <User className="h-4 w-4 text-white/80" />
+            </div>
+          ))}
+          {data.boardMembers.length > 4 && (
+            <div
+              className="h-10 w-10 rounded-full border-2 border-white/30 flex items-center justify-center text-xs font-bold text-white shadow-lg"
+              style={{ backgroundColor: 'var(--landing-accent)' }}
+            >
+              +{data.boardMembers.length - 4}
+            </div>
+          )}
+        </div>
+        <div>
+          <p className="text-xs font-semibold text-white">
+            {data.boardMembers.length} <span className="text-white/60">Members</span>
+          </p>
+          <p className="text-[10px] text-white/40">Board of Directors</p>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  /* ── image_only WITH image: full-bleed premium hero ──── */
   if (layout === 'image_only' && config.hero_image_url) {
     return (
       <section className="relative overflow-hidden">
-        <div className={`relative ${IMAGE_HEIGHT[thickness]}`}>
+        <div className="relative min-h-[560px] sm:min-h-[640px]">
           <Image
             src={config.hero_image_url}
             alt={headline}
@@ -90,28 +192,100 @@ function ClassicHero({
             className="object-cover"
             priority
           />
-          {/* Darker, richer gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/35 to-black/20" />
-          <div className="absolute inset-0 flex items-center justify-center px-6">
-            <div className="text-center max-w-2xl mx-auto">
-              {community.logo_url && (
-                <img
-                  src={community.logo_url}
-                  alt={`${community.name} logo`}
-                  className="mx-auto mb-6 h-16 w-16 rounded-xl object-cover shadow-lg"
+          {/* Horizontal gradient for left-aligned text */}
+          <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-black/10" />
+          {/* Bottom gradient for floating elements */}
+          <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/50 to-transparent" />
+
+          {/* Left-aligned content */}
+          <div className="absolute inset-0 flex items-center">
+            <div className="mx-auto w-full max-w-6xl px-6 sm:px-10">
+              <div className="max-w-xl">
+                {/* Pill badge */}
+                <div className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-medium bg-white/10 backdrop-blur-sm border border-white/10 text-white/90 mb-6">
+                  {community.logo_url && (
+                    <img
+                      src={community.logo_url}
+                      alt=""
+                      className="h-5 w-5 rounded-full object-cover"
+                    />
+                  )}
+                  {community.name}
+                </div>
+
+                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-[0.95]">
+                  {headline}
+                </h1>
+
+                {/* Accent underline */}
+                <div
+                  className="mt-5 h-1 w-16 rounded-full"
+                  style={{ backgroundColor: 'var(--landing-accent)' }}
                 />
-              )}
-              <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-white">
+
+                {subheadline && (
+                  <p className="mt-5 text-base sm:text-lg text-white/70 max-w-md leading-relaxed">
+                    {subheadline}
+                  </p>
+                )}
+
+                {ctaButtons('light')}
+              </div>
+            </div>
+          </div>
+
+          {/* Floating elements */}
+          {floatingStats}
+          {avatarCluster}
+        </div>
+      </section>
+    );
+  }
+
+  /* ── image_only WITHOUT image: primary bg with decorative elements ── */
+  if (layout === 'image_only') {
+    return (
+      <section className="relative overflow-hidden">
+        <div
+          className="relative flex items-center min-h-[480px] sm:min-h-[560px] px-6"
+          style={{ backgroundColor: 'var(--landing-primary)' }}
+        >
+          {/* Decorative accent shapes */}
+          <div
+            className="absolute top-[-20%] right-[-10%] h-[400px] w-[400px] rounded-full opacity-[0.06]"
+            style={{ backgroundColor: 'var(--landing-accent)' }}
+          />
+          <div
+            className="absolute bottom-[-15%] left-[-5%] h-[300px] w-[300px] rounded-full opacity-[0.04]"
+            style={{ backgroundColor: 'var(--landing-accent)' }}
+          />
+
+          <div className="relative mx-auto w-full max-w-6xl px-0 sm:px-4">
+            <div className="max-w-xl">
+              {/* Pill badge */}
+              <div className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-medium bg-white/10 border border-white/10 text-white/80 mb-6">
+                {community.logo_url && (
+                  <img src={community.logo_url} alt="" className="h-5 w-5 rounded-full object-cover" />
+                )}
+                {community.name}
+              </div>
+
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-[0.95]">
                 {headline}
               </h1>
-              {/* Decorative accent underline */}
+
               <div
-                className="mx-auto mt-4 h-0.5 w-16 rounded-full"
+                className="mt-5 h-1 w-16 rounded-full"
                 style={{ backgroundColor: 'var(--landing-accent)' }}
               />
+
               {subheadline && (
-                <p className="mt-4 text-lg text-white/80">{subheadline}</p>
+                <p className="mt-5 text-base sm:text-lg text-white/60 max-w-md leading-relaxed">
+                  {subheadline}
+                </p>
               )}
+
+              {ctaButtons('light')}
             </div>
           </div>
         </div>
@@ -119,136 +293,112 @@ function ClassicHero({
     );
   }
 
-  /* image_only WITHOUT image: primary bg with radial gradient pattern */
-  if (layout === 'image_only') {
-    return (
-      <section className="relative overflow-hidden">
-        <div
-          className={`relative flex items-center justify-center px-6 ${TEXT_BLOCK_HEIGHT[thickness]}`}
-          style={{ backgroundColor: 'var(--landing-primary)' }}
-        >
-          {/* Subtle radial gradient pattern for visual interest */}
-          <div
-            className="absolute inset-0 opacity-[0.07]"
-            style={{
-              backgroundImage:
-                'radial-gradient(circle at 20% 50%, var(--landing-accent) 0%, transparent 50%), radial-gradient(circle at 80% 20%, var(--landing-accent) 0%, transparent 40%), radial-gradient(circle at 60% 80%, var(--landing-accent) 0%, transparent 45%)',
-            }}
-          />
-          <div className="relative">
-            <LogoAndText
-              community={community}
-              headline={headline}
-              subheadline={subheadline}
-            />
-          </div>
-        </div>
-      </section>
-    );
-  }
-
-  /* image_above: image block, decorative divider, then color banner with text */
+  /* ── image_above: image + accent divider + text banner ─ */
   if (layout === 'image_above') {
     return (
       <section className="relative overflow-hidden">
         {config.hero_image_url && (
           <div className={`relative ${IMAGE_HEIGHT[thickness]}`}>
-            <Image
-              src={config.hero_image_url}
-              alt={community.name}
-              fill
-              className="object-cover"
-              priority
-            />
+            <Image src={config.hero_image_url} alt={community.name} fill className="object-cover" priority />
           </div>
         )}
-        {/* Decorative divider between image and text */}
-        <div className="relative">
-          <div
-            className="h-1 w-full"
-            style={{ backgroundColor: 'var(--landing-accent)' }}
-          />
-        </div>
+        <div className="h-1 w-full" style={{ backgroundColor: 'var(--landing-accent)' }} />
         <div
-          className={`flex items-center justify-center px-6 ${TEXT_BLOCK_HEIGHT[thickness]}`}
+          className="relative flex items-center px-6 py-16 sm:py-20"
           style={{ backgroundColor: 'var(--landing-primary)' }}
         >
-          <LogoAndText
-            community={community}
-            headline={headline}
-            subheadline={subheadline}
-          />
+          <div className="mx-auto w-full max-w-6xl">
+            <div className="max-w-xl">
+              <div className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-medium bg-white/10 border border-white/10 text-white/80 mb-6">
+                {community.name}
+              </div>
+              <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-white leading-[0.95]">
+                {headline}
+              </h1>
+              {subheadline && (
+                <p className="mt-4 text-base text-white/60 max-w-md">{subheadline}</p>
+              )}
+              {ctaButtons('light')}
+            </div>
+          </div>
         </div>
       </section>
     );
   }
 
-  /* image_below: color banner with text, decorative divider, then image block */
+  /* ── image_below: text banner + accent divider + image ─ */
   if (layout === 'image_below') {
     return (
       <section className="relative overflow-hidden">
         <div
-          className={`flex items-center justify-center px-6 ${TEXT_BLOCK_HEIGHT[thickness]}`}
+          className="relative flex items-center px-6 py-16 sm:py-20"
           style={{ backgroundColor: 'var(--landing-primary)' }}
         >
-          <LogoAndText
-            community={community}
-            headline={headline}
-            subheadline={subheadline}
-          />
+          <div className="mx-auto w-full max-w-6xl">
+            <div className="max-w-xl">
+              <div className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-medium bg-white/10 border border-white/10 text-white/80 mb-6">
+                {community.name}
+              </div>
+              <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-white leading-[0.95]">
+                {headline}
+              </h1>
+              {subheadline && (
+                <p className="mt-4 text-base text-white/60 max-w-md">{subheadline}</p>
+              )}
+              {ctaButtons('light')}
+            </div>
+          </div>
         </div>
-        {/* Decorative divider between text and image */}
-        <div className="relative">
-          <div
-            className="h-1 w-full"
-            style={{ backgroundColor: 'var(--landing-accent)' }}
-          />
-        </div>
+        <div className="h-1 w-full" style={{ backgroundColor: 'var(--landing-accent)' }} />
         {config.hero_image_url && (
           <div className={`relative ${IMAGE_HEIGHT[thickness]}`}>
-            <Image
-              src={config.hero_image_url}
-              alt={community.name}
-              fill
-              className="object-cover"
-              priority
-            />
+            <Image src={config.hero_image_url} alt={community.name} fill className="object-cover" priority />
           </div>
         )}
       </section>
     );
   }
 
-  /* split_left / split_right: basic split for classic */
+  /* ── split_left / split_right: premium split ─────────── */
   if (layout === 'split_left' || layout === 'split_right') {
     const isRight = layout === 'split_right';
 
     const textPanel = (
       <div
-        className="flex flex-col items-center justify-center px-8 sm:px-12 py-12 w-full lg:w-[45%]"
+        className="relative flex flex-col justify-center px-8 sm:px-12 py-16 w-full lg:w-[45%] overflow-hidden"
         style={{ backgroundColor: 'var(--landing-primary)' }}
       >
-        <LogoAndText
-          community={community}
-          headline={headline}
-          subheadline={subheadline}
+        {/* Decorative accent circle */}
+        <div
+          className="absolute -bottom-16 -right-16 h-48 w-48 rounded-full opacity-[0.06]"
+          style={{ backgroundColor: 'var(--landing-accent)' }}
         />
+        <div className="relative max-w-lg">
+          <div className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-medium bg-white/10 border border-white/10 text-white/80 mb-6">
+            {community.logo_url && (
+              <img src={community.logo_url} alt="" className="h-5 w-5 rounded-full object-cover" />
+            )}
+            {community.name}
+          </div>
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-white leading-[0.95]">
+            {headline}
+          </h1>
+          <div className="mt-4 h-1 w-14 rounded-full" style={{ backgroundColor: 'var(--landing-accent)' }} />
+          {subheadline && (
+            <p className="mt-4 text-base text-white/60 max-w-md">{subheadline}</p>
+          )}
+          {ctaButtons('light')}
+        </div>
       </div>
     );
 
     const imagePanel = config.hero_image_url ? (
-      <div className={`relative w-full lg:w-[55%] ${IMAGE_HEIGHT[thickness]}`}>
-        <Image
-          src={config.hero_image_url}
-          alt={headline}
-          fill
-          className="object-cover"
-          priority
-        />
+      <div className={`relative w-full lg:w-[55%] ${IMAGE_HEIGHT[thickness]} min-h-[320px]`}>
+        <Image src={config.hero_image_url} alt={headline} fill className="object-cover" priority />
       </div>
     ) : (
       <div
-        className={`w-full lg:w-[55%] ${IMAGE_HEIGHT[thickness]}`}
+        className={`w-full lg:w-[55%] ${IMAGE_HEIGHT[thickness]} min-h-[320px]`}
         style={{ backgroundColor: 'var(--landing-primary)', opacity: 0.85 }}
       />
     );
@@ -256,41 +406,50 @@ function ClassicHero({
     return (
       <section className="relative overflow-hidden">
         <div className="flex flex-col lg:flex-row">
-          {isRight ? (
-            <>
-              {textPanel}
-              {imagePanel}
-            </>
-          ) : (
-            <>
-              {imagePanel}
-              {textPanel}
-            </>
-          )}
+          {isRight ? <>{textPanel}{imagePanel}</> : <>{imagePanel}{textPanel}</>}
         </div>
       </section>
     );
   }
 
-  /* text_only: solid primary with subtle accent pattern */
+  /* ── text_only: solid primary with floating decorative elements ── */
   return (
     <section className="relative overflow-hidden">
       <div
-        className={`relative flex items-center justify-center px-6 ${TEXT_BLOCK_HEIGHT[thickness]}`}
+        className="relative flex items-center min-h-[420px] sm:min-h-[480px] px-6"
         style={{ backgroundColor: 'var(--landing-primary)' }}
       >
+        {/* Decorative floating shapes */}
         <div
-          className="absolute inset-0 opacity-[0.05]"
-          style={{
-            backgroundImage: 'radial-gradient(circle at 30% 40%, var(--landing-accent) 0%, transparent 50%)',
-          }}
+          className="absolute top-12 right-[15%] h-20 w-20 rounded-2xl rotate-12 opacity-[0.06]"
+          style={{ backgroundColor: 'var(--landing-accent)' }}
         />
-        <div className="relative">
-          <LogoAndText
-            community={community}
-            headline={headline}
-            subheadline={subheadline}
-          />
+        <div
+          className="absolute bottom-16 left-[10%] h-32 w-32 rounded-full opacity-[0.04]"
+          style={{ backgroundColor: 'var(--landing-accent)' }}
+        />
+        <div
+          className="absolute top-[40%] right-[8%] h-16 w-16 rounded-full border-2 opacity-[0.08]"
+          style={{ borderColor: 'var(--landing-accent)' }}
+        />
+
+        <div className="relative mx-auto w-full max-w-6xl">
+          <div className="max-w-xl">
+            <div className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-medium bg-white/10 border border-white/10 text-white/80 mb-6">
+              {community.logo_url && (
+                <img src={community.logo_url} alt="" className="h-5 w-5 rounded-full object-cover" />
+              )}
+              {community.name}
+            </div>
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-[0.95]">
+              {headline}
+            </h1>
+            <div className="mt-5 h-1 w-16 rounded-full" style={{ backgroundColor: 'var(--landing-accent)' }} />
+            {subheadline && (
+              <p className="mt-5 text-base sm:text-lg text-white/60 max-w-md leading-relaxed">{subheadline}</p>
+            )}
+            {ctaButtons('light')}
+          </div>
         </div>
       </div>
     </section>
@@ -710,7 +869,7 @@ function EditorialHero({
 }
 
 /* ── Main export ───────────────────────────────────────── */
-export function HeroSection({ community, config }: Props) {
+export function HeroSection({ community, config, data, slug }: Props) {
   const headline = config.hero_headline || `Welcome to ${community.name}`;
   const subheadline = config.hero_subheadline || community.address || '';
   const layout: HeroLayout = config.hero_layout || 'image_only';
@@ -749,10 +908,12 @@ export function HeroSection({ community, config }: Props) {
     <ClassicHero
       community={community}
       config={config}
+      data={data}
       headline={headline}
       subheadline={subheadline}
       layout={layout}
       thickness={thickness}
+      slug={slug}
     />
   );
 }

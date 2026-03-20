@@ -20,42 +20,57 @@ export function FaqSection({ config }: Props) {
   if (template === 'classic') {
     return (
       <section
-        className="py-16 px-6 bg-[#fafaf9]"
+        className="py-24 sm:py-28 px-6"
         style={py ? { paddingTop: py, paddingBottom: py } : undefined}
       >
-        <div className="mx-auto max-w-3xl">
-          <h2
-            className="text-2xl font-semibold mb-8 text-center"
-            style={{ color: 'var(--landing-primary)' }}
-          >
-            Frequently Asked Questions
-          </h2>
-          <div className="space-y-3">
-            {config.faq_items.map((item, i) => (
-              <details
-                key={i}
-                className="bg-white rounded-xl border border-gray-200 shadow-sm group"
+        <div className="mx-auto max-w-6xl">
+          {/* Two-column section header */}
+          <div className="flex flex-col lg:flex-row lg:items-end gap-6 lg:gap-16 mb-14">
+            <div className="lg:w-2/5">
+              <div className="inline-flex items-center gap-2 mb-4">
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ backgroundColor: 'var(--landing-accent)' }}
+                />
+                <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">
+                  FAQ
+                </span>
+              </div>
+              <p className="text-sm text-gray-500 leading-relaxed max-w-sm">
+                Find answers to commonly asked questions
+              </p>
+            </div>
+            <div className="lg:w-3/5">
+              <h2
+                className="text-4xl sm:text-5xl font-bold tracking-tight leading-[1.1]"
+                style={{ color: 'var(--landing-primary)' }}
               >
-                <summary className="flex items-center justify-between cursor-pointer px-6 py-5 text-sm font-medium text-gray-900 select-none [&::-webkit-details-marker]:hidden list-none">
-                  <span>{item.question}</span>
-                  <svg
-                    className="h-4 w-4 text-gray-400 shrink-0 ml-4 transition-transform duration-200 group-open:rotate-180"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M19 9l-7 7-7-7"
-                    />
-                  </svg>
-                </summary>
-                <div className="px-6 pb-5 text-sm text-gray-600 leading-relaxed whitespace-pre-line">
+                Frequently Asked Questions
+              </h2>
+            </div>
+          </div>
+
+          {/* 2-column card grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {config.faq_items.map((item, i) => (
+              <div key={i} className="rounded-2xl bg-stone-50 p-6 relative">
+                {/* Numbered badge */}
+                <span
+                  className="absolute top-4 right-4 h-8 w-8 rounded-full bg-white flex items-center justify-center text-xs font-bold shadow-sm"
+                  style={{ color: 'var(--landing-accent)' }}
+                >
+                  {String(i + 1).padStart(2, '0')}
+                </span>
+                <h3
+                  className="text-sm font-bold mb-3 pr-10"
+                  style={{ color: 'var(--landing-primary)' }}
+                >
+                  {item.question}
+                </h3>
+                <p className="text-xs text-gray-500 leading-relaxed whitespace-pre-line">
                   {item.answer}
-                </div>
-              </details>
+                </p>
+              </div>
             ))}
           </div>
         </div>

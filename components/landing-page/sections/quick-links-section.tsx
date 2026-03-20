@@ -19,51 +19,54 @@ export function QuickLinksSection({ config }: Props) {
 
   /* ── Classic ─────────────────────────────────────────────── */
   if (template === 'classic') {
-    const cols = overrides?.columns;
-    const gridClass = cols
-      ? 'grid gap-4'
-      : 'grid grid-cols-1 sm:grid-cols-2 gap-4';
-    const gridStyle = cols
-      ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }
-      : undefined;
-
     return (
       <section
-        className="py-16 px-6"
+        className="py-24 sm:py-28 px-6"
         style={py ? { paddingTop: py, paddingBottom: py } : undefined}
       >
-        <div className="mx-auto max-w-3xl">
-          <h2
-            className="text-2xl font-semibold mb-8 text-center"
-            style={{ color: 'var(--landing-primary)' }}
-          >
-            Quick Links
-          </h2>
-          <div className={gridClass} style={gridStyle}>
+        <div className="mx-auto max-w-6xl">
+          {/* Two-column section header */}
+          <div className="flex flex-col lg:flex-row lg:items-end gap-6 lg:gap-16 mb-14">
+            <div className="lg:w-2/5">
+              <div className="inline-flex items-center gap-2 mb-4">
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ backgroundColor: 'var(--landing-accent)' }}
+                />
+                <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">
+                  Quick Links
+                </span>
+              </div>
+              <p className="text-sm text-gray-500 leading-relaxed max-w-sm">
+                Helpful resources and shortcuts
+              </p>
+            </div>
+            <div className="lg:w-3/5">
+              <h2
+                className="text-4xl sm:text-5xl font-bold tracking-tight leading-[1.1]"
+                style={{ color: 'var(--landing-primary)' }}
+              >
+                Quick Links
+              </h2>
+            </div>
+          </div>
+
+          {/* Pill-shaped link buttons */}
+          <div className="flex flex-wrap gap-3">
             {config.quick_links.map((link, i) => (
               <a
                 key={i}
                 href={link.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md group"
+                className="inline-flex items-center gap-3 rounded-full px-6 py-3.5 text-sm font-medium border border-gray-200 bg-white hover:bg-stone-50 hover:border-gray-300 hover:shadow-md transition-all duration-300 group"
               >
-                <div
-                  className="shrink-0 h-10 w-10 rounded-full flex items-center justify-center"
-                  style={{
-                    backgroundColor:
-                      'color-mix(in srgb, var(--landing-accent) 12%, transparent)',
-                  }}
-                >
-                  <ExternalLink
-                    className="h-4 w-4"
-                    style={{ color: 'var(--landing-accent)' }}
-                  />
-                </div>
-                <span className="text-sm font-medium text-gray-900 group-hover:text-gray-700">
-                  {link.label}
-                </span>
-                <ArrowRight className="h-4 w-4 text-gray-300 ml-auto shrink-0 transition-transform duration-200 group-hover:translate-x-0.5" />
+                <span
+                  className="h-1.5 w-1.5 rounded-full shrink-0"
+                  style={{ backgroundColor: 'var(--landing-accent)' }}
+                />
+                <span className="text-gray-700">{link.label}</span>
+                <ArrowRight className="h-4 w-4 text-gray-400 transition-transform group-hover:translate-x-0.5" />
               </a>
             ))}
           </div>

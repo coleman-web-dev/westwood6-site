@@ -28,58 +28,82 @@ export function PublicDocumentsSection({ config, data }: Props) {
   if (template === 'classic') {
     return (
       <section
-        className="py-20 px-6"
+        className="py-24 sm:py-28 px-6"
         style={py ? { paddingTop: py, paddingBottom: py } : undefined}
       >
-        <div className="mx-auto max-w-3xl">
-          <div className="text-center mb-12">
-            <h2
-              className="text-3xl font-bold mb-3"
-              style={{ color: 'var(--landing-primary)' }}
-            >
-              Community Documents
-            </h2>
-            <p className="text-sm text-gray-500">
-              Important documents available for download.
-            </p>
+        <div className="mx-auto max-w-6xl">
+          {/* Two-column section header */}
+          <div className="flex flex-col lg:flex-row lg:items-end gap-6 lg:gap-16 mb-14">
+            <div className="lg:w-2/5">
+              <div className="inline-flex items-center gap-2 mb-4">
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ backgroundColor: 'var(--landing-accent)' }}
+                />
+                <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">
+                  Documents
+                </span>
+              </div>
+              <p className="text-sm text-gray-500 leading-relaxed max-w-sm">
+                Access important community documents
+              </p>
+            </div>
+            <div className="lg:w-3/5">
+              <h2
+                className="text-4xl sm:text-5xl font-bold tracking-tight leading-[1.1]"
+                style={{ color: 'var(--landing-primary)' }}
+              >
+                Documents
+              </h2>
+            </div>
           </div>
-          <div className="space-y-3">
+
+          {/* 2-column card grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             {data.publicDocs.map((doc) => (
               <a
                 key={doc.id}
                 href={doc.signed_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-5 hover:border-gray-300 hover:shadow-sm transition-all group"
+                className="rounded-2xl bg-stone-50 p-6 transition-all duration-300 hover:bg-white hover:shadow-lg group"
               >
                 <div
-                  className="shrink-0 h-10 w-10 rounded-lg flex items-center justify-center"
+                  className="h-12 w-12 rounded-xl flex items-center justify-center mb-4"
                   style={{
-                    backgroundColor: 'color-mix(in srgb, var(--landing-primary) 6%, transparent)',
+                    backgroundColor: 'color-mix(in srgb, var(--landing-primary) 8%, white)',
                   }}
                 >
                   <FileText
-                    className="h-5 w-5"
+                    className="h-6 w-6"
                     style={{ color: 'var(--landing-primary)' }}
                   />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 truncate">
-                    {doc.title}
+                <p
+                  className="text-sm font-bold"
+                  style={{ color: 'var(--landing-primary)' }}
+                >
+                  {doc.title}
+                </p>
+                {doc.category && (
+                  <span
+                    className="inline-flex rounded-full px-3 py-1 text-xs font-medium mt-2"
+                    style={{
+                      backgroundColor: 'color-mix(in srgb, var(--landing-accent) 10%, white)',
+                      color: 'var(--landing-accent)',
+                    }}
+                  >
+                    {doc.category}
+                  </span>
+                )}
+                {doc.file_size != null && doc.file_size > 0 && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    {formatFileSize(doc.file_size)}
                   </p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-gray-400">{doc.category}</span>
-                    {doc.file_size != null && doc.file_size > 0 && (
-                      <>
-                        <span className="text-gray-300">·</span>
-                        <span className="text-xs text-gray-400">
-                          {formatFileSize(doc.file_size)}
-                        </span>
-                      </>
-                    )}
-                  </div>
+                )}
+                <div className="flex items-center justify-end mt-3">
+                  <Download className="h-4 w-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
                 </div>
-                <Download className="h-4 w-4 text-gray-300 group-hover:text-gray-500 shrink-0 transition-colors" />
               </a>
             ))}
           </div>
