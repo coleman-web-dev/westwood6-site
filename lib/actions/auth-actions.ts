@@ -1,10 +1,13 @@
 'use server';
 
+import { render } from '@react-email/render';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { sendEmailDirect } from '@/lib/email/resend';
+import { PasswordResetEmail } from '@/lib/email/templates/password-reset';
 import { logAuditEvent } from '@/lib/audit';
 import { rateLimit } from '@/lib/rate-limit';
 
-// Send a password setup/reset link to the given email
+// Send a password setup/reset link to the given email via Resend
 // Rate limited to 3 requests per email per 15 minutes to prevent abuse
 export async function sendPasswordSetupLink(
   email: string,
@@ -17,21 +20,52 @@ export async function sendPasswordSetupLink(
   }
 
   const supabase = createAdminClient();
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
-  // Try to generate a recovery link. If the user does not exist in auth,
-  // this will error, but we return success anyway to avoid leaking info
-  // about which emails have accounts.
-  const { error } = await supabase.auth.admin.generateLink({
+  // Generate a recovery link via admin API (does NOT send email itself)
+  const { data, error } = await supabase.auth.admin.generateLink({
     type: 'recovery',
     email,
     options: {
-      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/callback?type=recovery`,
+      redirectTo: `${appUrl}/auth/callback?type=recovery`,
     },
   });
 
   if (error) {
     console.error('Failed to generate recovery link:', error);
     // Return success to not leak whether the email exists
+    return { success: true };
+  }
+
+  // Look up the member's community name for branding
+  let communityName = 'DuesIQ';
+  const { data: member } = await supabase
+    .from('members')
+    .select('community_id, communities(name)')
+    .ilike('email', email.toLowerCase().trim())
+    .single();
+  if (member?.communities && typeof member.communities === 'object' && 'name' in member.communities) {
+    communityName = (member.communities as { name: string }).name;
+  }
+
+  // Build the recovery URL from the generated link properties
+  // Supabase returns hashed_token and verification_url
+  const resetUrl = data.properties.action_link;
+
+  // Render and send via Resend (branded DuesIQ email)
+  try {
+    const html = await render(
+      PasswordResetEmail({ communityName, resetUrl }),
+    );
+
+    await sendEmailDirect({
+      to: email,
+      subject: `Reset your ${communityName} password`,
+      html,
+    });
+  } catch (emailError) {
+    console.error('Failed to send password reset email via Resend:', emailError);
+    // Return success to not leak info
     return { success: true };
   }
 
@@ -51,26 +85,20 @@ export async function checkIsFirstTimeUser(
   const supabase = createAdminClient();
 
   // Look up approved member by email (case-insensitive)
-  const { data: member, error: memberError } = await supabase
+  const { data: member } = await supabase
     .from('members')
-    .select('id, user_id, email, is_approved')
+    .select('id, user_id')
     .ilike('email', normalized)
     .eq('is_approved', true)
     .single();
 
-  console.log('[checkIsFirstTimeUser] lookup:', { normalized, member: member ? { id: member.id, user_id: member.user_id, email: member.email, is_approved: member.is_approved } : null, error: memberError?.message });
-
   if (!member) return { isFirstTime: false };
 
   // If no auth account linked yet, this is definitely first-time
-  if (!member.user_id) {
-    console.log('[checkIsFirstTimeUser] No user_id, is first-time');
-    return { isFirstTime: true };
-  }
+  if (!member.user_id) return { isFirstTime: true };
 
   // Check if the auth user has ever signed in
   const { data: authUser } = await supabase.auth.admin.getUserById(member.user_id);
-  console.log('[checkIsFirstTimeUser] authUser:', { exists: !!authUser?.user, last_sign_in_at: authUser?.user?.last_sign_in_at });
   if (!authUser?.user) return { isFirstTime: false };
 
   // Only first-time if they have never signed in

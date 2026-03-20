@@ -74,7 +74,6 @@ function LoginForm() {
 
     if (authError) {
       logLoginAttempt(email, false);
-      console.log('[login] auth error:', authError.message, authError.status);
 
       // Check if this is a first-time pre-provisioned member
       // (covers "Invalid login credentials", "Email not confirmed", etc.)
