@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { sendPasswordSetupLink } from '@/lib/actions/auth-actions';
 
 type PageMode = 'loading' | 'request-reset' | 'set-password';
 
@@ -227,17 +228,9 @@ function RequestResetForm() {
     setError(null);
     setLoading(true);
 
-    const supabase = createClient();
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-      email,
-      { redirectTo: `${window.location.origin}/auth/callback?type=recovery` },
-    );
-
-    if (resetError) {
-      setError(resetError.message);
-      setLoading(false);
-      return;
-    }
+    // Send via our server action (Resend-based, branded email)
+    // Always returns success to avoid leaking whether email exists
+    await sendPasswordSetupLink(email);
 
     setSuccess(true);
     setLoading(false);
