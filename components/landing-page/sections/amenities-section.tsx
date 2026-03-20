@@ -28,28 +28,39 @@ export function AmenitiesSection({ config, data }: Props) {
       : undefined;
 
     return (
-      <section className="py-16 px-6 bg-gray-50" style={py ? { paddingTop: py, paddingBottom: py } : undefined}>
-        <div className="mx-auto max-w-4xl">
-          <h2
-            className="text-2xl font-semibold mb-8 text-center"
-            style={{ color: 'var(--landing-primary)' }}
-          >
-            {title}
-          </h2>
+      <section
+        className="py-20 px-6 bg-gray-50"
+        style={py ? { paddingTop: py, paddingBottom: py } : undefined}
+      >
+        <div className="mx-auto max-w-5xl">
+          <div className="text-center mb-12">
+            <h2
+              className="text-3xl font-bold mb-3"
+              style={{ color: 'var(--landing-primary)' }}
+            >
+              {title}
+            </h2>
+            <p className="text-sm text-gray-500 max-w-lg mx-auto">
+              Explore the shared spaces and amenities available to our community members.
+            </p>
+          </div>
           <div className={gridClass} style={gridStyle}>
             {data.amenities.map((amenity) => (
               <div
                 key={amenity.id}
-                className="bg-white rounded-xl p-5 shadow-sm"
+                className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 text-center"
               >
                 {amenity.icon && (
-                  <span className="text-2xl mb-2 block">{amenity.icon}</span>
+                  <span className="text-3xl mb-3 block">{amenity.icon}</span>
                 )}
-                <h3 className="text-sm font-semibold text-gray-900">
+                <h3
+                  className="text-sm font-bold mb-1"
+                  style={{ color: 'var(--landing-primary)' }}
+                >
                   {amenity.name}
                 </h3>
                 {amenity.description && (
-                  <p className="text-xs text-gray-500 mt-1 line-clamp-3">
+                  <p className="text-xs text-gray-500 leading-relaxed line-clamp-3">
                     {amenity.description}
                   </p>
                 )}
@@ -61,78 +72,113 @@ export function AmenitiesSection({ config, data }: Props) {
     );
   }
 
-  /* ── Modern (alternating left/right) ─────────────────────── */
+  /* ── Modern ─────────────────────────────────────────────── */
   if (template === 'modern') {
+    const cols = overrides?.columns;
+    const gridClass = cols
+      ? 'grid gap-6'
+      : 'grid grid-cols-1 sm:grid-cols-2 gap-6';
+    const gridStyle = cols
+      ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }
+      : undefined;
+
     return (
-      <section className="py-16 px-6 bg-gray-50" style={py ? { paddingTop: py, paddingBottom: py } : undefined}>
-        <div className="mx-auto max-w-4xl">
-          <h2
-            className="text-2xl font-semibold mb-8 text-center"
-            style={{ color: 'var(--landing-primary)' }}
-          >
-            {title}
-          </h2>
-          <div className="space-y-6">
-            {data.amenities.map((amenity, i) => {
-              const isOdd = i % 2 === 0;
-              return (
-                <div
-                  key={amenity.id}
-                  className={`flex items-center gap-5 bg-white rounded-xl p-5 shadow-sm ${
-                    isOdd ? 'flex-row' : 'flex-row-reverse'
-                  }`}
-                >
-                  {amenity.icon && (
+      <section
+        className="py-20 px-6 bg-white"
+        style={py ? { paddingTop: py, paddingBottom: py } : undefined}
+      >
+        <div className="mx-auto max-w-5xl">
+          <div className="text-center mb-12">
+            <h2
+              className="text-3xl font-bold mb-3"
+              style={{ color: 'var(--landing-primary)' }}
+            >
+              {title}
+            </h2>
+            <div
+              className="w-12 h-1 rounded-full mx-auto"
+              style={{ backgroundColor: 'var(--landing-accent)' }}
+            />
+          </div>
+
+          <div className={gridClass} style={gridStyle}>
+            {data.amenities.map((amenity) => (
+              <div
+                key={amenity.id}
+                className="group bg-white rounded-xl p-6 border border-gray-100 transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
+                style={{ borderTopWidth: 4, borderTopColor: 'var(--landing-accent)' }}
+              >
+                <div className="mb-4">
+                  {amenity.icon ? (
                     <div
-                      className="shrink-0 h-14 w-14 rounded-xl flex items-center justify-center text-2xl"
-                      style={{ backgroundColor: 'color-mix(in srgb, var(--landing-accent) 12%, transparent)' }}
+                      className="h-14 w-14 rounded-full flex items-center justify-center text-2xl"
+                      style={{
+                        backgroundColor: 'color-mix(in srgb, var(--landing-accent) 12%, transparent)',
+                      }}
                     >
                       {amenity.icon}
                     </div>
+                  ) : (
+                    <div
+                      className="h-14 w-14 rounded-full flex items-center justify-center text-lg font-bold text-white"
+                      style={{ backgroundColor: 'var(--landing-accent)' }}
+                    >
+                      {amenity.name.charAt(0).toUpperCase()}
+                    </div>
                   )}
-                  <div className={isOdd ? 'text-left' : 'text-right'}>
-                    <h3 className="text-sm font-semibold text-gray-900">
-                      {amenity.name}
-                    </h3>
-                    {amenity.description && (
-                      <p className="text-xs text-gray-500 mt-1 line-clamp-3">
-                        {amenity.description}
-                      </p>
-                    )}
-                  </div>
                 </div>
-              );
-            })}
+                <h3
+                  className="text-sm font-bold mb-1.5"
+                  style={{ color: 'var(--landing-primary)' }}
+                >
+                  {amenity.name}
+                </h3>
+                {amenity.description && (
+                  <p className="text-xs text-gray-500 leading-relaxed line-clamp-3">
+                    {amenity.description}
+                  </p>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       </section>
     );
   }
 
-  /* ── Editorial (icon-forward, 4-col grid) ────────────────── */
+  /* ── Editorial ──────────────────────────────────────────── */
   const cols = overrides?.columns ?? 4;
   const gridStyle = { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` };
 
   return (
-    <section className="py-16 px-6 bg-gray-50" style={py ? { paddingTop: py, paddingBottom: py } : undefined}>
+    <section
+      className="py-24 px-6"
+      style={py ? { paddingTop: py, paddingBottom: py } : undefined}
+    >
       <div className="mx-auto max-w-5xl">
         <h2
-          className="text-2xl font-semibold mb-10 text-center"
+          className="text-3xl font-bold mb-16 text-center"
           style={{ color: 'var(--landing-primary)' }}
         >
           {title}
         </h2>
-        <div className="grid gap-8" style={gridStyle}>
+        <div className="grid gap-10" style={gridStyle}>
           {data.amenities.map((amenity) => (
-            <div key={amenity.id} className="text-center group">
+            <div
+              key={amenity.id}
+              className="text-center pb-8 border-b border-gray-100 last:border-b-0"
+            >
               {amenity.icon && (
-                <span className="text-4xl block mb-3">{amenity.icon}</span>
+                <span className="text-5xl block mb-4">{amenity.icon}</span>
               )}
-              <h3 className="text-sm font-semibold text-gray-900">
+              <h3
+                className="text-sm font-medium tracking-wide mb-2"
+                style={{ color: 'var(--landing-primary)' }}
+              >
                 {amenity.name}
               </h3>
               {amenity.description && (
-                <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                <p className="text-xs text-gray-400 leading-relaxed line-clamp-2 max-w-[200px] mx-auto">
                   {amenity.description}
                 </p>
               )}

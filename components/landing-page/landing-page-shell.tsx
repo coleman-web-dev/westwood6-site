@@ -170,11 +170,41 @@ export function LandingPageShell({
         return sectionElement;
       })}
 
-      <LoginCtaSection slug={slug} isMember={isMember} communityName={community.name} />
+      <LoginCtaSection slug={slug} isMember={isMember} communityName={community.name} config={config} />
 
       {config.footer_text && (
-        <footer className="border-t border-gray-200 py-8 px-6 text-center">
-          <p className="text-sm text-gray-500">{config.footer_text}</p>
+        <footer
+          className={
+            template === 'modern'
+              ? 'py-10 px-6 text-center'
+              : template === 'editorial'
+              ? 'py-16 px-6 text-center'
+              : 'border-t border-gray-200 py-8 px-6 text-center'
+          }
+          style={
+            template === 'modern'
+              ? { backgroundColor: 'var(--landing-primary)' }
+              : undefined
+          }
+        >
+          {template === 'editorial' && (
+            <div className="mx-auto w-16 h-px bg-gray-300 mb-8" />
+          )}
+          <p
+            className={
+              template === 'modern'
+                ? 'text-sm text-white/60'
+                : 'text-sm text-gray-500'
+            }
+          >
+            {config.footer_text}
+          </p>
+          {template === 'modern' && (
+            <div
+              className="mx-auto mt-4 w-12 h-0.5 rounded-full"
+              style={{ backgroundColor: 'var(--landing-accent)' }}
+            />
+          )}
         </footer>
       )}
     </div>

@@ -115,14 +115,33 @@ export function VendorsSection({ community, config }: Props) {
 
   /* ── Classic ─────────────────────────────────────────────── */
   if (template === 'classic') {
-    return (
-      <section className="py-16 px-6" style={py ? { paddingTop: py, paddingBottom: py } : undefined}>
-        <div className="mx-auto max-w-5xl">
-          <h2 className="text-2xl font-semibold text-gray-900 text-center mb-10">
-            {title}
-          </h2>
+    const cols = overrides?.columns;
+    const gridClass = cols
+      ? 'grid gap-6'
+      : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6';
+    const gridStyle = cols
+      ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }
+      : undefined;
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    return (
+      <section
+        className="py-20 px-6"
+        style={py ? { paddingTop: py, paddingBottom: py } : undefined}
+      >
+        <div className="mx-auto max-w-5xl">
+          <div className="text-center mb-12">
+            <h2
+              className="text-3xl font-bold mb-3"
+              style={{ color: 'var(--landing-primary)' }}
+            >
+              {title}
+            </h2>
+            <p className="text-sm text-gray-500 max-w-lg mx-auto">
+              Trusted local businesses recommended by our community.
+            </p>
+          </div>
+
+          <div className={gridClass} style={gridStyle}>
             {vendors.map((vendor, i) => (
               <button
                 key={i}
@@ -150,7 +169,7 @@ export function VendorsSection({ community, config }: Props) {
                 )}
                 <div className="p-4">
                   <div className="flex items-start justify-between gap-2 mb-1">
-                    <h3 className="font-semibold text-gray-900 text-sm">
+                    <h3 className="font-bold text-gray-900 text-sm">
                       {vendor.name}
                     </h3>
                     {vendor.category && (
@@ -172,7 +191,7 @@ export function VendorsSection({ community, config }: Props) {
           </div>
 
           {disclaimer && (
-            <p className="mt-10 text-xs text-gray-400 text-center max-w-2xl mx-auto leading-relaxed">
+            <p className="mt-12 text-xs text-gray-400 text-center max-w-2xl mx-auto leading-relaxed">
               {disclaimer}
             </p>
           )}
@@ -183,34 +202,49 @@ export function VendorsSection({ community, config }: Props) {
     );
   }
 
-  /* ── Modern (featured first vendor) ──────────────────────── */
+  /* ── Modern ─────────────────────────────────────────────── */
   if (template === 'modern') {
     const [featured, ...rest] = vendors;
+
     return (
-      <section className="py-16 px-6" style={py ? { paddingTop: py, paddingBottom: py } : undefined}>
+      <section
+        className="py-20 px-6"
+        style={py ? { paddingTop: py, paddingBottom: py } : undefined}
+      >
         <div className="mx-auto max-w-5xl">
-          <h2 className="text-2xl font-semibold text-gray-900 text-center mb-10">
-            {title}
-          </h2>
+          <div className="text-center mb-12">
+            <h2
+              className="text-3xl font-bold mb-3"
+              style={{ color: 'var(--landing-primary)' }}
+            >
+              {title}
+            </h2>
+            <div
+              className="w-12 h-1 rounded-full mx-auto"
+              style={{ backgroundColor: 'var(--landing-accent)' }}
+            />
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Featured: spans 2 cols */}
+            {/* Featured: spans 2 cols with larger presentation */}
             <button
               type="button"
               onClick={() => setSelected(featured)}
-              className="text-left rounded-xl border border-gray-200 bg-white overflow-hidden hover:shadow-md transition-shadow sm:col-span-2"
+              className="text-left rounded-xl bg-white overflow-hidden transition-all duration-300 hover:shadow-xl hover:scale-[1.02] sm:col-span-2"
+              style={{ borderBottomWidth: 4, borderBottomColor: 'var(--landing-accent)' }}
             >
               {featured.image_url ? (
-                <div className="aspect-[21/9] overflow-hidden">
+                <div className="aspect-[21/9] overflow-hidden relative">
                   <img
                     src={featured.image_url}
                     alt={featured.name}
                     className="w-full h-full object-cover"
                   />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
                 </div>
               ) : (
                 <div
-                  className="aspect-[21/9] flex items-center justify-center"
+                  className="aspect-[21/9] flex items-center justify-center relative"
                   style={{ backgroundColor: 'var(--landing-primary)' }}
                 >
                   <span className="text-5xl font-bold text-white/60">
@@ -220,7 +254,10 @@ export function VendorsSection({ community, config }: Props) {
               )}
               <div className="p-5">
                 <div className="flex items-start justify-between gap-2 mb-1">
-                  <h3 className="font-semibold text-gray-900 text-base">
+                  <h3
+                    className="font-bold text-base"
+                    style={{ color: 'var(--landing-primary)' }}
+                  >
                     {featured.name}
                   </h3>
                   {featured.category && (
@@ -245,15 +282,17 @@ export function VendorsSection({ community, config }: Props) {
                 key={i}
                 type="button"
                 onClick={() => setSelected(vendor)}
-                className="text-left rounded-xl border border-gray-200 bg-white overflow-hidden hover:shadow-md transition-shadow"
+                className="text-left rounded-xl bg-white overflow-hidden transition-all duration-300 hover:shadow-xl hover:scale-[1.02]"
+                style={{ borderBottomWidth: 4, borderBottomColor: 'var(--landing-accent)' }}
               >
                 {vendor.image_url ? (
-                  <div className="aspect-[16/9] overflow-hidden">
+                  <div className="aspect-[16/9] overflow-hidden relative">
                     <img
                       src={vendor.image_url}
                       alt={vendor.name}
                       className="w-full h-full object-cover"
                     />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
                   </div>
                 ) : (
                   <div
@@ -267,7 +306,10 @@ export function VendorsSection({ community, config }: Props) {
                 )}
                 <div className="p-4">
                   <div className="flex items-start justify-between gap-2 mb-1">
-                    <h3 className="font-semibold text-gray-900 text-sm">
+                    <h3
+                      className="font-bold text-sm"
+                      style={{ color: 'var(--landing-primary)' }}
+                    >
                       {vendor.name}
                     </h3>
                     {vendor.category && (
@@ -289,7 +331,7 @@ export function VendorsSection({ community, config }: Props) {
           </div>
 
           {disclaimer && (
-            <p className="mt-10 text-xs text-gray-400 text-center max-w-2xl mx-auto leading-relaxed">
+            <p className="mt-12 text-xs text-gray-400 text-center max-w-2xl mx-auto leading-relaxed">
               {disclaimer}
             </p>
           )}
@@ -300,36 +342,45 @@ export function VendorsSection({ community, config }: Props) {
     );
   }
 
-  /* ── Editorial (text-focused list, no images) ────────────── */
+  /* ── Editorial ──────────────────────────────────────────── */
   return (
-    <section className="py-16 px-6" style={py ? { paddingTop: py, paddingBottom: py } : undefined}>
+    <section
+      className="py-24 px-6"
+      style={py ? { paddingTop: py, paddingBottom: py } : undefined}
+    >
       <div className="mx-auto max-w-3xl">
-        <h2 className="text-2xl font-semibold text-gray-900 text-center mb-10">
+        <h2
+          className="text-3xl font-bold mb-16 text-center"
+          style={{ color: 'var(--landing-primary)' }}
+        >
           {title}
         </h2>
 
-        <div className="space-y-5">
+        <div className="space-y-0">
           {vendors.map((vendor, i) => (
             <button
               key={i}
               type="button"
               onClick={() => setSelected(vendor)}
-              className="w-full text-left py-4 border-b border-gray-100 last:border-b-0 hover:opacity-80 transition-opacity"
+              className="w-full text-left py-6 border-b border-gray-100 last:border-b-0 hover:opacity-70 transition-opacity"
             >
-              <div className="flex items-center gap-3 mb-1">
-                <h3 className="font-semibold text-gray-900 text-sm">
+              <div className="flex items-baseline gap-3 mb-1.5">
+                <h3
+                  className="font-bold text-base"
+                  style={{ color: 'var(--landing-primary)' }}
+                >
                   {vendor.name}
                 </h3>
                 {vendor.category && (
                   <span
-                    className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium text-white"
-                    style={{ backgroundColor: 'var(--landing-accent)' }}
+                    className="text-xs font-medium"
+                    style={{ color: 'var(--landing-accent)' }}
                   >
                     {vendor.category}
                   </span>
                 )}
               </div>
-              <p className="text-xs text-gray-500 line-clamp-2">
+              <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed">
                 {vendor.description}
               </p>
             </button>
@@ -337,7 +388,7 @@ export function VendorsSection({ community, config }: Props) {
         </div>
 
         {disclaimer && (
-          <p className="mt-10 text-xs text-gray-400 text-center max-w-2xl mx-auto leading-relaxed">
+          <p className="mt-16 text-xs text-gray-400 text-center max-w-2xl mx-auto leading-relaxed">
             {disclaimer}
           </p>
         )}

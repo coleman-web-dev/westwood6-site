@@ -30,6 +30,11 @@ export function LandingNavBar({
     .filter((s) => s.enabled && s.id !== 'hero')
     .sort((a, b) => a.order - b.order);
 
+  const dashboardHref = isMember
+    ? `/${slug}/dashboard`
+    : `/login?redirect=/${slug}/dashboard`;
+  const ctaLabel = isMember ? 'Dashboard' : 'Login';
+
   useEffect(() => {
     function onScroll() {
       setScrolled(window.scrollY > 40);
@@ -51,12 +56,11 @@ export function LandingNavBar({
     return (
       <nav
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-          scrolled
-            ? 'bg-white/80 backdrop-blur-md'
-            : 'bg-transparent'
+          scrolled ? 'bg-white/80 backdrop-blur-md' : 'bg-transparent'
         }`}
       >
         <div className="mx-auto max-w-6xl flex items-center justify-between px-4 sm:px-6 h-14">
+          {/* Left: logo + uppercase community name */}
           <button
             type="button"
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
@@ -66,11 +70,11 @@ export function LandingNavBar({
               <img
                 src={logoUrl}
                 alt={`${communityName} logo`}
-                className="h-8 w-8 rounded-lg object-cover"
+                className="h-7 w-7 rounded object-cover"
               />
             )}
             <span
-              className={`text-xs font-semibold tracking-wide uppercase transition-colors ${
+              className={`text-xs font-semibold tracking-widest uppercase transition-colors duration-300 ${
                 scrolled ? 'text-gray-900' : 'text-white'
               }`}
             >
@@ -78,16 +82,17 @@ export function LandingNavBar({
             </span>
           </button>
 
-          <div className="hidden md:flex items-center gap-1">
+          {/* Center-right: section links */}
+          <div className="hidden md:flex items-center gap-0.5">
             {navSections.map((s) => (
               <button
                 key={s.id}
                 type="button"
                 onClick={() => scrollTo(s.id)}
-                className={`px-3 py-1.5 rounded-lg text-[11px] font-medium tracking-wide uppercase transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-medium tracking-widest uppercase transition-colors duration-300 ${
                   scrolled
-                    ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                    : 'text-white/80 hover:text-white hover:bg-white/10'
+                    ? 'text-gray-500 hover:text-gray-900 hover:bg-gray-100/80'
+                    : 'text-white/70 hover:text-white hover:bg-white/10'
                 }`}
               >
                 {SECTION_LABELS[s.id]}
@@ -95,69 +100,82 @@ export function LandingNavBar({
             ))}
           </div>
 
+          {/* Right: login button + hamburger */}
           <div className="flex items-center gap-2">
             <Link
-              href={isMember ? `/${slug}/dashboard` : `/login?redirect=/${slug}/dashboard`}
-              className={`hidden sm:inline-flex items-center rounded-lg px-4 py-1.5 text-[11px] font-medium tracking-wide uppercase transition-colors ${
+              href={dashboardHref}
+              className={`hidden sm:inline-flex items-center rounded-lg px-4 py-1.5 text-[11px] font-medium tracking-wide uppercase border transition-colors duration-300 ${
                 scrolled
-                  ? 'bg-gray-900 text-white hover:bg-gray-800'
-                  : 'bg-white/20 text-white hover:bg-white/30 backdrop-blur-sm'
+                  ? 'border-gray-300 text-gray-900 hover:bg-gray-100'
+                  : 'border-white/30 text-white hover:bg-white/10'
               }`}
             >
-              {isMember ? 'Dashboard' : 'Login'}
+              {ctaLabel}
             </Link>
 
             <button
               type="button"
               onClick={() => setMenuOpen(!menuOpen)}
-              className={`md:hidden p-1.5 rounded-lg transition-colors ${
+              className={`md:hidden p-1.5 rounded-lg transition-colors duration-300 ${
                 scrolled
                   ? 'text-gray-700 hover:bg-gray-100'
                   : 'text-white hover:bg-white/10'
               }`}
             >
-              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              {menuOpen ? (
+                <X className="h-5 w-5" />
+              ) : (
+                <Menu className="h-5 w-5" />
+              )}
             </button>
           </div>
         </div>
 
-        {menuOpen && (
-          <div className="md:hidden bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-lg">
-            <div className="px-4 py-3 space-y-1">
+        {/* Mobile dropdown */}
+        <div
+          className={`md:hidden overflow-hidden transition-all duration-300 ${
+            menuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+          }`}
+        >
+          <div className="bg-white/95 backdrop-blur-md border-t border-gray-200/60">
+            <div className="px-4 py-3 space-y-0.5">
               {navSections.map((s) => (
                 <button
                   key={s.id}
                   type="button"
                   onClick={() => scrollTo(s.id)}
-                  className="block w-full text-left px-3 py-2 rounded-lg text-xs tracking-wide uppercase text-gray-700 hover:bg-gray-100"
+                  className="block w-full text-left px-3 py-2.5 rounded-lg text-[11px] font-medium tracking-widest uppercase text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors duration-200"
                 >
                   {SECTION_LABELS[s.id]}
                 </button>
               ))}
-              <Link
-                href={isMember ? `/${slug}/dashboard` : `/login?redirect=/${slug}/dashboard`}
-                className="block w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-gray-900 hover:bg-gray-100"
-              >
-                {isMember ? 'Dashboard' : 'Login'}
-              </Link>
+              <div className="pt-1 border-t border-gray-200/60 mt-1">
+                <Link
+                  href={dashboardHref}
+                  className="block w-full text-left px-3 py-2.5 rounded-lg text-[11px] font-semibold tracking-widest uppercase text-gray-900 hover:bg-gray-100/80 transition-colors duration-200"
+                >
+                  {ctaLabel}
+                </Link>
+              </div>
             </div>
           </div>
-        )}
+        </div>
       </nav>
     );
   }
 
-  /* ── Modern nav (accent bottom border) ───────────────────── */
+  /* ── Modern nav ──────────────────────────────────────────── */
   if (layoutTemplate === 'modern') {
     return (
       <nav
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
           scrolled
-            ? 'bg-white/90 backdrop-blur-md shadow-sm'
+            ? 'bg-white backdrop-blur-md shadow-sm'
             : 'bg-transparent'
         }`}
       >
-        <div className="mx-auto max-w-6xl flex items-center justify-between px-4 sm:px-6 h-14">
+        <div className="mx-auto max-w-6xl flex items-center justify-between px-4 sm:px-6 h-16">
+          {/* Left: logo + bold community name */}
           <button
             type="button"
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
@@ -171,7 +189,7 @@ export function LandingNavBar({
               />
             )}
             <span
-              className={`text-sm font-semibold transition-colors ${
+              className={`text-sm font-bold transition-colors duration-300 ${
                 scrolled ? 'text-gray-900' : 'text-white'
               }`}
             >
@@ -179,82 +197,106 @@ export function LandingNavBar({
             </span>
           </button>
 
-          <div className="hidden md:flex items-center gap-1">
-            {navSections.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => scrollTo(s.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  scrolled
-                    ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                    : 'text-white/80 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                {SECTION_LABELS[s.id]}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Link
-              href={isMember ? `/${slug}/dashboard` : `/login?redirect=/${slug}/dashboard`}
-              className={`hidden sm:inline-flex items-center rounded-lg px-4 py-1.5 text-xs font-medium transition-colors ${
-                scrolled
-                  ? 'bg-gray-900 text-white hover:bg-gray-800'
-                  : 'bg-white/20 text-white hover:bg-white/30 backdrop-blur-sm'
-              }`}
-            >
-              {isMember ? 'Dashboard' : 'Login'}
-            </Link>
-
-            <button
-              type="button"
-              onClick={() => setMenuOpen(!menuOpen)}
-              className={`md:hidden p-1.5 rounded-lg transition-colors ${
-                scrolled
-                  ? 'text-gray-700 hover:bg-gray-100'
-                  : 'text-white hover:bg-white/10'
-              }`}
-            >
-              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </button>
-          </div>
-        </div>
-
-        {/* Accent bottom border line */}
-        <div
-          className="h-0.5"
-          style={{ backgroundColor: 'var(--landing-accent)' }}
-        />
-
-        {menuOpen && (
-          <div className="md:hidden bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-lg">
-            <div className="px-4 py-3 space-y-1">
+          {/* Right-aligned: section links + login */}
+          <div className="flex items-center gap-1">
+            <div className="hidden md:flex items-center gap-0.5">
               {navSections.map((s) => (
                 <button
                   key={s.id}
                   type="button"
                   onClick={() => scrollTo(s.id)}
-                  className="block w-full text-left px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-100"
+                  className="group relative px-3 py-1.5 text-xs font-medium transition-colors duration-300"
+                >
+                  <span
+                    className={`transition-colors duration-300 ${
+                      scrolled
+                        ? 'text-gray-600 group-hover:text-gray-900'
+                        : 'text-white/80 group-hover:text-white'
+                    }`}
+                  >
+                    {SECTION_LABELS[s.id]}
+                  </span>
+                  {/* Animated accent underline on hover */}
+                  <span
+                    className="absolute bottom-0 left-3 right-3 h-0.5 scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left rounded-full"
+                    style={{ backgroundColor: 'var(--landing-accent)' }}
+                  />
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2 ml-3">
+              <Link
+                href={dashboardHref}
+                className="hidden sm:inline-flex items-center rounded-full px-5 py-1.5 text-xs font-semibold text-white transition-all duration-300 hover:opacity-90 hover:shadow-md"
+                style={{ backgroundColor: 'var(--landing-accent)' }}
+              >
+                {ctaLabel}
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => setMenuOpen(!menuOpen)}
+                className={`md:hidden p-1.5 rounded-lg transition-colors duration-300 ${
+                  scrolled
+                    ? 'text-gray-700 hover:bg-gray-100'
+                    : 'text-white hover:bg-white/10'
+                }`}
+              >
+                {menuOpen ? (
+                  <X className="h-5 w-5" />
+                ) : (
+                  <Menu className="h-5 w-5" />
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Thin accent line at bottom of nav */}
+        <div
+          className="h-[2px]"
+          style={{ backgroundColor: 'var(--landing-accent)' }}
+        />
+
+        {/* Mobile dropdown */}
+        <div
+          className={`md:hidden overflow-hidden transition-all duration-300 ${
+            menuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+          }`}
+        >
+          <div
+            className="bg-white/95 backdrop-blur-md border-t-2"
+            style={{ borderColor: 'var(--landing-accent)' }}
+          >
+            <div className="px-4 py-3 space-y-0.5">
+              {navSections.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => scrollTo(s.id)}
+                  className="block w-full text-left px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-200"
                 >
                   {SECTION_LABELS[s.id]}
                 </button>
               ))}
-              <Link
-                href={isMember ? `/${slug}/dashboard` : `/login?redirect=/${slug}/dashboard`}
-                className="block w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-gray-900 hover:bg-gray-100"
-              >
-                {isMember ? 'Dashboard' : 'Login'}
-              </Link>
+              <div className="pt-1 border-t border-gray-200/60 mt-1">
+                <Link
+                  href={dashboardHref}
+                  className="block w-full text-center px-3 py-2.5 rounded-full text-sm font-semibold text-white transition-colors duration-200 hover:opacity-90"
+                  style={{ backgroundColor: 'var(--landing-accent)' }}
+                >
+                  {ctaLabel}
+                </Link>
+              </div>
             </div>
           </div>
-        )}
+        </div>
       </nav>
     );
   }
 
-  /* ── Classic nav (original) ──────────────────────────────── */
+  /* ── Classic nav (default) ───────────────────────────────── */
   return (
     <nav
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
@@ -263,8 +305,8 @@ export function LandingNavBar({
           : 'bg-transparent'
       }`}
     >
-      <div className="mx-auto max-w-6xl flex items-center justify-between px-4 sm:px-6 h-14">
-        {/* Left: logo + name */}
+      <div className="mx-auto max-w-6xl flex items-center justify-between px-4 sm:px-6 h-16">
+        {/* Left: logo + community name */}
         <button
           type="button"
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
@@ -278,7 +320,7 @@ export function LandingNavBar({
             />
           )}
           <span
-            className={`text-sm font-semibold transition-colors ${
+            className={`text-sm font-semibold transition-colors duration-300 ${
               scrolled ? 'text-gray-900' : 'text-white'
             }`}
           >
@@ -287,15 +329,15 @@ export function LandingNavBar({
         </button>
 
         {/* Center: section links (desktop) */}
-        <div className="hidden md:flex items-center gap-1">
+        <div className="hidden md:flex items-center gap-0.5 absolute left-1/2 -translate-x-1/2">
           {navSections.map((s) => (
             <button
               key={s.id}
               type="button"
               onClick={() => scrollTo(s.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors duration-300 ${
                 scrolled
-                  ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/80'
                   : 'text-white/80 hover:text-white hover:bg-white/10'
               }`}
             >
@@ -307,54 +349,61 @@ export function LandingNavBar({
         {/* Right: login/dashboard + hamburger */}
         <div className="flex items-center gap-2">
           <Link
-            href={isMember ? `/${slug}/dashboard` : `/login?redirect=/${slug}/dashboard`}
-            className={`hidden sm:inline-flex items-center rounded-lg px-4 py-1.5 text-xs font-medium transition-colors ${
-              scrolled
-                ? 'bg-gray-900 text-white hover:bg-gray-800'
-                : 'bg-white/20 text-white hover:bg-white/30 backdrop-blur-sm'
-            }`}
+            href={dashboardHref}
+            className="hidden sm:inline-flex items-center rounded-lg px-5 py-2 text-xs font-semibold text-white transition-all duration-300 hover:opacity-90 hover:shadow-md"
+            style={{ backgroundColor: 'var(--landing-accent)' }}
           >
-            {isMember ? 'Dashboard' : 'Login'}
+            {ctaLabel}
           </Link>
 
-          {/* Mobile hamburger */}
           <button
             type="button"
             onClick={() => setMenuOpen(!menuOpen)}
-            className={`md:hidden p-1.5 rounded-lg transition-colors ${
+            className={`md:hidden p-1.5 rounded-lg transition-colors duration-300 ${
               scrolled
                 ? 'text-gray-700 hover:bg-gray-100'
                 : 'text-white hover:bg-white/10'
             }`}
           >
-            {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            {menuOpen ? (
+              <X className="h-5 w-5" />
+            ) : (
+              <Menu className="h-5 w-5" />
+            )}
           </button>
         </div>
       </div>
 
       {/* Mobile dropdown */}
-      {menuOpen && (
-        <div className="md:hidden bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-lg">
-          <div className="px-4 py-3 space-y-1">
+      <div
+        className={`md:hidden overflow-hidden transition-all duration-300 ${
+          menuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+        }`}
+      >
+        <div className="bg-white/95 backdrop-blur-md border-t border-gray-200/60 shadow-lg">
+          <div className="px-4 py-3 space-y-0.5">
             {navSections.map((s) => (
               <button
                 key={s.id}
                 type="button"
                 onClick={() => scrollTo(s.id)}
-                className="block w-full text-left px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-100"
+                className="block w-full text-left px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-200"
               >
                 {SECTION_LABELS[s.id]}
               </button>
             ))}
-            <Link
-              href={isMember ? `/${slug}/dashboard` : `/login?redirect=/${slug}/dashboard`}
-              className="block w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-gray-900 hover:bg-gray-100"
-            >
-              {isMember ? 'Dashboard' : 'Login'}
-            </Link>
+            <div className="pt-1 border-t border-gray-200/60 mt-1">
+              <Link
+                href={dashboardHref}
+                className="block w-full text-center px-3 py-2.5 rounded-lg text-sm font-semibold text-white transition-colors duration-200 hover:opacity-90"
+                style={{ backgroundColor: 'var(--landing-accent)' }}
+              >
+                {ctaLabel}
+              </Link>
+            </div>
           </div>
         </div>
-      )}
+      </div>
     </nav>
   );
 }
