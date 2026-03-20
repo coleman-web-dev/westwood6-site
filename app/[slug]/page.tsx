@@ -49,6 +49,11 @@ export default async function CommunityLandingPage({ params }: Props) {
         ...DEFAULT_LANDING_CONFIG,
         ...rawLandingConfig,
         sections: rawLandingConfig.sections ?? DEFAULT_LANDING_CONFIG.sections,
+        // Migrate renamed template: 'editorial' was renamed to 'luxury'
+        layout_template:
+          (rawLandingConfig.layout_template as string) === 'editorial'
+            ? 'luxury'
+            : rawLandingConfig.layout_template ?? DEFAULT_LANDING_CONFIG.layout_template,
       }
     : {
         ...DEFAULT_LANDING_CONFIG,

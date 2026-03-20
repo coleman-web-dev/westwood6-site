@@ -99,7 +99,9 @@ export function LandingPageShell({
   onSectionResize,
 }: LandingPageShellProps) {
   const { primary, accent } = resolveLandingColors(config);
-  const template = config.layout_template || 'classic';
+  const rawTemplate = config.layout_template || 'classic';
+  // Migrate renamed template: 'editorial' was renamed to 'luxury'
+  const template = (rawTemplate as string) === 'editorial' ? 'luxury' as const : rawTemplate;
 
   const enabledSections = config.sections
     .filter((s) => s.enabled)

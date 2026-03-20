@@ -102,7 +102,9 @@ export function LandingPageSettings() {
       .filter((d) => !savedIds.has(d.id))
       .map((d, i) => ({ ...d, enabled: false, order: maxOrder + 1 + i }));
     setSections(saved.length > 0 ? [...saved, ...missing] : DEFAULT_LANDING_CONFIG.sections);
-    setLayoutTemplate(lp.layout_template || 'classic');
+    setLayoutTemplate(
+      (lp.layout_template as string) === 'editorial' ? 'luxury' : lp.layout_template || 'classic'
+    );
     setSectionOverrides(lp.section_overrides || {});
     setThemePreset(lp.theme_preset ?? DEFAULT_LANDING_CONFIG.theme_preset);
     setCustomPrimary(lp.custom_primary_color);
