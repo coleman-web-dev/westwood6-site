@@ -92,7 +92,7 @@
     "react-plaid-link": "^4.1.1",
     "react-resizable-panels": "^2.1.8",
     "reading-time": "1.5.0",
-    "recharts": "^2.15.3",
+    "recharts": "^3.8.0",
     "rehype-autolink-headings": "^7.1.0",
     "rehype-citation": "^2.3.0",
     "rehype-katex": "^7.0.0",
