@@ -314,24 +314,45 @@ export default function PaymentsPage() {
 
       {/* Board: unit picker to scope all tabs to a household */}
       {isBoard && (
-        <div className="flex items-center gap-3">
-          <div className="w-80">
-            <UnitPicker
-              communityId={community.id}
-              value={selectedUnitId}
-              onValueChange={handleUnitChange}
-              placeholder="All households"
-            />
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="w-80">
+              <UnitPicker
+                communityId={community.id}
+                value={selectedUnitId}
+                onValueChange={handleUnitChange}
+                placeholder="All households"
+              />
+            </div>
+            {activeUnitFilter && (
+              <button
+                onClick={clearUnitFilter}
+                className="inline-flex items-center gap-1 text-label text-secondary-500 hover:text-secondary-600 dark:hover:text-secondary-400"
+              >
+                <X className="h-3.5 w-3.5" />
+                Clear
+              </button>
+            )}
           </div>
-          {activeUnitFilter && (
-            <button
-              onClick={clearUnitFilter}
-              className="inline-flex items-center gap-1 text-label text-secondary-500 hover:text-secondary-600 dark:hover:text-secondary-400"
-            >
-              <X className="h-3.5 w-3.5" />
-              Clear
-            </button>
-          )}
+
+          {/* Prominent household info when a unit is selected */}
+          {activeUnitFilter && (() => {
+            const selectedUnit = allUnits.find((u) => u.id === activeUnitFilter);
+            const ownerName = unitOwnerMap[activeUnitFilter];
+            if (!selectedUnit) return null;
+            return (
+              <div className="rounded-inner-card border border-secondary-200 dark:border-secondary-800 bg-secondary-50 dark:bg-secondary-950/40 px-5 py-3">
+                <p className="text-section-title text-text-primary-light dark:text-text-primary-dark">
+                  Unit {selectedUnit.unit_number}{selectedUnit.address ? `, ${selectedUnit.address}` : ''}
+                </p>
+                {ownerName && (
+                  <p className="text-body text-text-secondary-light dark:text-text-secondary-dark mt-0.5">
+                    {ownerName}
+                  </p>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
