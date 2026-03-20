@@ -1,5 +1,5 @@
 import Image from 'next/image';
-import { User, ArrowRight, Users, Building2, Shield } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import type { Community } from '@/lib/types/database';
 import type { LandingPageConfig, HeroLayout, HeroThickness, LayoutTemplate, SectionStyleOverride } from '@/lib/types/landing';
 import type { LandingPageData } from '../landing-page-shell';
@@ -83,8 +83,6 @@ function ClassicHero({
   thickness: HeroThickness;
   slug: string;
 }) {
-  const hasStats = data.boardMembers.length > 0 || data.amenities.length > 0;
-
   /* ── Shared pill CTA buttons ─────────────────────────── */
   const ctaButtons = (variant: 'light' | 'dark' = 'light') => (
     <div className="mt-8 flex flex-wrap gap-3">
@@ -113,72 +111,7 @@ function ClassicHero({
     </div>
   );
 
-  /* ── Floating stats card (glass-morphism) ────────────── */
-  const floatingStats = hasStats ? (
-    <div className="absolute bottom-6 left-6 sm:bottom-10 sm:left-10 z-10 hidden sm:block">
-      <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/15 p-5 shadow-2xl">
-        <div className="flex items-center gap-6">
-          {data.boardMembers.length > 0 && (
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-1.5 mb-1">
-                <Shield className="h-3.5 w-3.5 text-white/60" />
-                <span className="text-2xl font-bold text-white">{data.boardMembers.length}</span>
-              </div>
-              <span className="text-[10px] text-white/50 uppercase tracking-wider font-medium">Board</span>
-            </div>
-          )}
-          {data.amenities.length > 0 && (
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-1.5 mb-1">
-                <Building2 className="h-3.5 w-3.5 text-white/60" />
-                <span className="text-2xl font-bold text-white">{data.amenities.length}</span>
-              </div>
-              <span className="text-[10px] text-white/50 uppercase tracking-wider font-medium">Amenities</span>
-            </div>
-          )}
-          {community.address && (
-            <div className="text-center max-w-[120px]">
-              <p className="text-[10px] text-white/50 uppercase tracking-wider font-medium mb-1">Location</p>
-              <p className="text-xs text-white/80 leading-tight truncate">{community.address.split(',')[0]}</p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  ) : null;
-
-  /* ── Avatar cluster (board members) ──────────────────── */
-  const avatarCluster = data.boardMembers.length > 0 ? (
-    <div className="absolute bottom-6 right-6 sm:bottom-10 sm:right-10 z-10 hidden sm:block">
-      <div className="flex items-center gap-3">
-        <div className="flex -space-x-3">
-          {data.boardMembers.slice(0, 4).map((m, i) => (
-            <div
-              key={i}
-              className="h-10 w-10 rounded-full border-2 border-white/30 flex items-center justify-center shadow-lg"
-              style={{ backgroundColor: 'color-mix(in srgb, var(--landing-accent) 25%, rgba(0,0,0,0.3))' }}
-            >
-              <User className="h-4 w-4 text-white/80" />
-            </div>
-          ))}
-          {data.boardMembers.length > 4 && (
-            <div
-              className="h-10 w-10 rounded-full border-2 border-white/30 flex items-center justify-center text-xs font-bold text-white shadow-lg"
-              style={{ backgroundColor: 'var(--landing-accent)' }}
-            >
-              +{data.boardMembers.length - 4}
-            </div>
-          )}
-        </div>
-        <div>
-          <p className="text-xs font-semibold text-white">
-            {data.boardMembers.length} <span className="text-white/60">Members</span>
-          </p>
-          <p className="text-[10px] text-white/40">Board of Directors</p>
-        </div>
-      </div>
-    </div>
-  ) : null;
+  /* ── Floating elements removed — kept hero clean ────── */
 
   /* ── image_only WITH image: full-bleed premium hero ──── */
   if (layout === 'image_only' && config.hero_image_url) {
@@ -234,9 +167,6 @@ function ClassicHero({
             </div>
           </div>
 
-          {/* Floating elements */}
-          {floatingStats}
-          {avatarCluster}
         </div>
       </section>
     );
