@@ -212,12 +212,6 @@ export default function PaymentsPage() {
     }
   }, [searchParams, fetchData]);
 
-  // Calculate outstanding balance from pending, overdue, and partial invoices
-  const outstandingInvoices = invoices.filter(
-    (inv) => inv.status === 'pending' || inv.status === 'overdue' || inv.status === 'partial'
-  );
-  const totalOutstanding = outstandingInvoices.reduce((sum, inv) => sum + (inv.amount - (inv.amount_paid ?? 0)), 0);
-
   // When navigating from household page with a unit filter, scope data to that unit
   const filteredInvoices = useMemo(() => {
     if (!urlUnitId || !isBoard) return invoices;
@@ -229,6 +223,12 @@ export default function PaymentsPage() {
     const unitInvoiceIds = new Set(filteredInvoices.map((inv) => inv.id));
     return payments.filter((pmt) => unitInvoiceIds.has(pmt.invoice_id));
   }, [payments, urlUnitId, isBoard, filteredInvoices]);
+
+  // Calculate outstanding balance from filtered invoices (respects unit filter)
+  const outstandingInvoices = filteredInvoices.filter(
+    (inv) => inv.status === 'pending' || inv.status === 'overdue' || inv.status === 'partial'
+  );
+  const totalOutstanding = outstandingInvoices.reduce((sum, inv) => sum + (inv.amount - (inv.amount_paid ?? 0)), 0);
 
   const delinquentUnitIds = useMemo(() => {
     const ids = new Set<string>();
@@ -334,7 +334,7 @@ export default function PaymentsPage() {
             </div>
             <div>
               <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                Total Outstanding
+                {filterUnitLabel ? 'Household Outstanding' : 'Total Outstanding'}
               </p>
               <p className="text-metric-xl tabular-nums text-text-primary-light dark:text-text-primary-dark">
                 ${(totalOutstanding / 100).toFixed(2)}
