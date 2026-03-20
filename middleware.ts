@@ -50,7 +50,8 @@ export async function middleware(request: NextRequest) {
   }
 
   // Static public routes + auth callback
-  if (PUBLIC_ROUTES.has(pathname) || pathname.startsWith('/auth/')) {
+  // On custom domains, "/" should NOT short-circuit here — it needs to reach the rewrite logic below
+  if ((PUBLIC_ROUTES.has(pathname) && !(needsRewrite && pathname === '/')) || pathname.startsWith('/auth/')) {
     const { supabaseResponse } = await updateSession(request);
     return supabaseResponse;
   }
