@@ -23,6 +23,7 @@ import {
   HoverCardContent,
 } from '@/components/shared/ui/hover-card';
 import { DashboardCardShell } from './dashboard-card-shell';
+import { Button } from '@/components/shared/ui/button';
 import { ChevronLeftIcon, ChevronRightIcon, CalendarDays } from 'lucide-react';
 import { getAmenityIcon } from '@/lib/amenity-icons';
 import type { Amenity, BlockedDateRange } from '@/lib/types/database';
@@ -346,13 +347,12 @@ export function AmenityCalendarCard() {
             </div>
           )}
 
-          {/* Footer link */}
-          <Link
-            href={amenitiesHref}
-            className="block text-center text-label text-secondary-500 dark:text-secondary-400 hover:text-secondary-600 dark:hover:text-secondary-300 transition-colors mt-auto"
-          >
-            Reserve an amenity
-          </Link>
+          {/* Reserve button */}
+          <div className="mt-auto pt-1">
+            <Button asChild variant="outline" size="sm" className="w-full">
+              <Link href={amenitiesHref}>Reserve an amenity</Link>
+            </Button>
+          </div>
         </div>
       )}
     </DashboardCardShell>
