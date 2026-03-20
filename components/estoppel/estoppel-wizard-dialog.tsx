@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import {
   Dialog,
@@ -23,24 +23,28 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/shared/ui/tabs';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/shared/ui/popover';
 import { toast } from 'sonner';
 import {
   Upload,
   FileText,
   Sparkles,
   Loader2,
-  Trash2,
-  Plus,
-  ChevronRight,
-  ChevronLeft,
   Check,
   Send,
+  ChevronLeft,
   Bot,
   User,
+  X,
+  Trash2,
+  Plus,
 } from 'lucide-react';
 import {
   ALL_ESTOPPEL_VARIABLES,
-  fillEstoppelTemplateWithExamples,
 } from '@/lib/utils/estoppel-template';
 import type { EstoppelField, EstoppelFieldPhase, AgreementFieldType } from '@/lib/types/database';
 
@@ -60,19 +64,295 @@ const FIELD_TYPE_OPTIONS: { value: AgreementFieldType; label: string }[] = [
   { value: 'date', label: 'Date' },
 ];
 
-const PHASE_OPTIONS: { value: EstoppelFieldPhase; label: string; color: string }[] = [
-  { value: 'requester', label: 'Requester', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
-  { value: 'system', label: 'System', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
-  { value: 'board', label: 'Board', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200' },
-];
+const PHASE_CONFIG: Record<EstoppelFieldPhase, { label: string; color: string; bgClass: string; textClass: string; dotClass: string; description: string }> = {
+  requester: {
+    label: 'Requester fills this',
+    color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-200',
+    bgClass: 'bg-blue-100 dark:bg-blue-900/60',
+    textClass: 'text-blue-700 dark:text-blue-300',
+    dotClass: 'bg-blue-500',
+    description: 'Title company / attorney provides this on the request form',
+  },
+  system: {
+    label: 'Auto-filled',
+    color: 'bg-green-100 text-green-800 dark:bg-green-900/60 dark:text-green-200',
+    bgClass: 'bg-green-100 dark:bg-green-900/60',
+    textClass: 'text-green-700 dark:text-green-300',
+    dotClass: 'bg-green-500',
+    description: 'Pulled automatically from your HOA database',
+  },
+  board: {
+    label: 'Board fills this',
+    color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200',
+    bgClass: 'bg-amber-100 dark:bg-amber-900/60',
+    textClass: 'text-amber-700 dark:text-amber-300',
+    dotClass: 'bg-amber-500',
+    description: 'Board member fills this when reviewing the request',
+  },
+};
 
 function generateId(): string {
   return crypto.randomUUID();
 }
 
-function getPhaseBadgeColor(phase: EstoppelFieldPhase): string {
-  return PHASE_OPTIONS.find((p) => p.value === phase)?.color ?? '';
+/**
+ * Parse a template string into segments: text parts and placeholder parts.
+ * Returns an array of { type: 'text' | 'placeholder', content, fieldKey? }
+ */
+function parseTemplate(template: string): Array<{ type: 'text' | 'placeholder'; content: string; fieldKey?: string }> {
+  const segments: Array<{ type: 'text' | 'placeholder'; content: string; fieldKey?: string }> = [];
+  const regex = /\{\{\s*(\w+)\s*\}\}/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(template)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({ type: 'text', content: template.slice(lastIndex, match.index) });
+    }
+    segments.push({ type: 'placeholder', content: match[0], fieldKey: match[1] });
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < template.length) {
+    segments.push({ type: 'text', content: template.slice(lastIndex) });
+  }
+
+  return segments;
 }
+
+/**
+ * Look up the human-readable label for a field key.
+ */
+function getFieldLabel(key: string, fields: EstoppelField[]): string {
+  const field = fields.find((f) => f.key === key);
+  if (field) return field.label;
+  const variable = ALL_ESTOPPEL_VARIABLES.find((v) => v.key === key);
+  if (variable) return variable.label;
+  return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
+ * Look up the phase for a field key.
+ */
+function getFieldPhase(key: string, fields: EstoppelField[]): EstoppelFieldPhase {
+  const field = fields.find((f) => f.key === key);
+  if (field) return field.fill_phase;
+  const variable = ALL_ESTOPPEL_VARIABLES.find((v) => v.key === key);
+  if (variable) return variable.phase;
+  return 'board';
+}
+
+// ─── Pill Component ─────────────────────────────────────────────────────────
+
+interface FieldPillProps {
+  fieldKey: string;
+  fields: EstoppelField[];
+  onUpdateField: (key: string, updates: Partial<EstoppelField>) => void;
+  onRemoveField: (key: string) => void;
+  onAiRefine: (instruction: string) => void;
+  isRefining: boolean;
+}
+
+function FieldPill({ fieldKey, fields, onUpdateField, onRemoveField, onAiRefine, isRefining }: FieldPillProps) {
+  const [aiInput, setAiInput] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const field = fields.find((f) => f.key === fieldKey);
+  const phase = getFieldPhase(fieldKey, fields);
+  const label = getFieldLabel(fieldKey, fields);
+  const config = PHASE_CONFIG[phase];
+
+  function handleAiSubmit() {
+    if (!aiInput.trim()) return;
+    onAiRefine(`For the "${label}" field ({{${fieldKey}}}): ${aiInput.trim()}`);
+    setAiInput('');
+    setIsOpen(false);
+  }
+
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium cursor-pointer transition-all hover:ring-2 hover:ring-offset-1 hover:ring-current/30 ${config.bgClass} ${config.textClass}`}
+        >
+          <span className={`w-1.5 h-1.5 rounded-full ${config.dotClass} shrink-0`} />
+          {label}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-0" align="start" side="bottom">
+        <div className="p-3 border-b border-stroke-light dark:border-stroke-dark">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-body font-semibold text-text-primary-light dark:text-text-primary-dark">
+              {label}
+            </span>
+            <Badge variant="secondary" className={`text-[10px] ${config.color}`}>
+              {config.label}
+            </Badge>
+          </div>
+          <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+            {config.description}
+          </p>
+          <p className="text-meta text-text-muted-light dark:text-text-muted-dark font-mono mt-1">
+            {`{{${fieldKey}}}`}
+          </p>
+        </div>
+
+        {field && (
+          <div className="p-3 space-y-2 border-b border-stroke-light dark:border-stroke-dark">
+            <div>
+              <label className="text-[11px] text-text-muted-light dark:text-text-muted-dark">Label</label>
+              <Input
+                value={field.label}
+                onChange={(e) => onUpdateField(fieldKey, { label: e.target.value })}
+                className="h-7 text-sm mt-0.5"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[11px] text-text-muted-light dark:text-text-muted-dark">Type</label>
+                <Select
+                  value={field.type}
+                  onValueChange={(v) => onUpdateField(fieldKey, { type: v as AgreementFieldType })}
+                >
+                  <SelectTrigger className="h-7 text-sm mt-0.5">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FIELD_TYPE_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-[11px] text-text-muted-light dark:text-text-muted-dark">Who fills this</label>
+                <Select
+                  value={field.fill_phase}
+                  onValueChange={(v) => onUpdateField(fieldKey, { fill_phase: v as EstoppelFieldPhase })}
+                >
+                  <SelectTrigger className="h-7 text-sm mt-0.5">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="requester">Requester</SelectItem>
+                    <SelectItem value="system">Auto-filled</SelectItem>
+                    <SelectItem value="board">Board</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-1.5 text-[11px] text-text-muted-light dark:text-text-muted-dark">
+                <input
+                  type="checkbox"
+                  checked={field.required}
+                  onChange={(e) => onUpdateField(fieldKey, { required: e.target.checked })}
+                />
+                Required field
+              </label>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-[11px] text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+                onClick={() => {
+                  onRemoveField(fieldKey);
+                  setIsOpen(false);
+                }}
+              >
+                <Trash2 className="h-3 w-3 mr-1" />
+                Remove
+              </Button>
+            </div>
+            {field.type === 'select' && (
+              <div>
+                <label className="text-[11px] text-text-muted-light dark:text-text-muted-dark">
+                  Options (comma separated)
+                </label>
+                <Input
+                  value={(field.options ?? []).join(', ')}
+                  onChange={(e) =>
+                    onUpdateField(fieldKey, {
+                      options: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
+                    })
+                  }
+                  className="h-7 text-sm mt-0.5"
+                  placeholder="Option 1, Option 2"
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="p-3">
+          <label className="text-[11px] text-text-muted-light dark:text-text-muted-dark mb-1 block">
+            Ask AI to change this field
+          </label>
+          <div className="flex gap-1.5">
+            <Input
+              value={aiInput}
+              onChange={(e) => setAiInput(e.target.value)}
+              placeholder="e.g. Make this optional"
+              className="h-7 text-sm flex-1"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !isRefining) {
+                  e.preventDefault();
+                  handleAiSubmit();
+                }
+              }}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={handleAiSubmit}
+              disabled={isRefining || !aiInput.trim()}
+            >
+              {isRefining ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+            </Button>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// ─── Interactive Document Preview ───────────────────────────────────────────
+
+interface DocumentPreviewProps {
+  template: string;
+  fields: EstoppelField[];
+  onUpdateField: (key: string, updates: Partial<EstoppelField>) => void;
+  onRemoveField: (key: string) => void;
+  onAiRefine: (instruction: string) => void;
+  isRefining: boolean;
+}
+
+function DocumentPreview({ template, fields, onUpdateField, onRemoveField, onAiRefine, isRefining }: DocumentPreviewProps) {
+  const segments = useMemo(() => parseTemplate(template), [template]);
+
+  return (
+    <div className="bg-white dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark rounded-panel p-6 font-serif text-sm leading-relaxed whitespace-pre-wrap">
+      {segments.map((seg, i) => {
+        if (seg.type === 'text') {
+          return <span key={i}>{seg.content}</span>;
+        }
+        return (
+          <FieldPill
+            key={`${seg.fieldKey}-${i}`}
+            fieldKey={seg.fieldKey!}
+            fields={fields}
+            onUpdateField={onUpdateField}
+            onRemoveField={onRemoveField}
+            onAiRefine={onAiRefine}
+            isRefining={isRefining}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Main Wizard ────────────────────────────────────────────────────────────
 
 export function EstoppelWizardDialog({
   open,
@@ -81,30 +361,28 @@ export function EstoppelWizardDialog({
   existingTemplate,
   existingFields,
 }: EstoppelWizardDialogProps) {
-  const [step, setStep] = useState<1 | 2 | 3>(existingTemplate ? 2 : 1);
+  const [step, setStep] = useState<1 | 2>(existingTemplate ? 2 : 1);
   const [rawText, setRawText] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
   const [extractingPdf, setExtractingPdf] = useState(false);
 
   const [template, setTemplate] = useState(existingTemplate ?? '');
   const [fields, setFields] = useState<EstoppelField[]>(existingFields ?? []);
-  const [aiSummary, setAiSummary] = useState('');
 
   const [chatHistory, setChatHistory] = useState<{ role: 'ai' | 'user'; message: string }[]>([]);
   const [refinementInput, setRefinementInput] = useState('');
   const [refining, setRefining] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
-  const templateRef = useRef<HTMLTextAreaElement>(null);
+  const [showFieldList, setShowFieldList] = useState(false);
 
   useEffect(() => {
     if (open) {
       setTemplate(existingTemplate ?? '');
       setFields(existingFields ?? []);
       setChatHistory([]);
-      setEditingFieldId(null);
       setStep(existingTemplate ? 2 : 1);
+      setShowFieldList(false);
     }
   }, [open, existingTemplate, existingFields]);
 
@@ -113,10 +391,10 @@ export function EstoppelWizardDialog({
       if (!newOpen) {
         setRawText('');
         setAnalyzing(false);
-        setAiSummary('');
         setChatHistory([]);
         setRefinementInput('');
         setRefining(false);
+        setShowFieldList(false);
         if (!existingTemplate) {
           setTemplate('');
           setFields([]);
@@ -126,6 +404,8 @@ export function EstoppelWizardDialog({
     },
     [onOpenChange, existingTemplate],
   );
+
+  // ── File upload ──
 
   async function handlePdfUpload(file: File) {
     setExtractingPdf(true);
@@ -141,64 +421,71 @@ export function EstoppelWizardDialog({
       const data = await res.json();
 
       if (!res.ok) {
-        toast.error(data.error || 'Failed to extract text from PDF. Try pasting the text instead.');
+        toast.error(data.error || 'Failed to extract text. Try pasting the text instead.');
         return;
       }
 
       if (!data.text) {
-        toast.error(
-          'No text found in this PDF. It may be a scanned image. Try pasting the text instead.',
-        );
+        toast.error('No text found in this file. It may be a scanned image. Try pasting the text instead.');
         return;
       }
 
       setRawText(data.text);
-      toast.success(`Extracted text from ${data.pageCount} page${data.pageCount > 1 ? 's' : ''}.`);
+      toast.success(
+        data.pageCount
+          ? `Extracted text from ${data.pageCount} page${data.pageCount > 1 ? 's' : ''}.`
+          : 'Text extracted successfully.',
+      );
     } catch (err) {
-      console.error('PDF extraction error:', err);
-      toast.error('Failed to extract text from PDF. Try pasting the text instead.');
+      console.error('File extraction error:', err);
+      toast.error('Failed to extract text. Try pasting the text instead.');
     } finally {
       setExtractingPdf(false);
     }
   }
 
+  // ── AI analysis ──
+
+  async function callEdgeFunction(body: Record<string, unknown>): Promise<{ template?: string; fields?: EstoppelField[]; summary?: string }> {
+    const supabase = createClient();
+    await supabase.auth.getUser();
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      throw new Error('You must be logged in to use AI analysis.');
+    }
+
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/analyze-estoppel`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
+        },
+        body: JSON.stringify(body),
+      },
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || `Edge function returned ${response.status}`);
+    }
+
+    return data;
+  }
+
   async function handleAnalyze() {
     if (!rawText.trim()) {
-      toast.error('Please upload a PDF or paste the estoppel form text first.');
+      toast.error('Please upload a file or paste the estoppel form text first.');
       return;
     }
 
     setAnalyzing(true);
     try {
-      const supabase = createClient();
-      // Use getUser() to force token refresh, then get the fresh session
-      await supabase.auth.getUser();
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (!session?.access_token) {
-        toast.error('You must be logged in to use AI analysis.');
-        setAnalyzing(false);
-        return;
-      }
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/analyze-estoppel`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
-          },
-          body: JSON.stringify({ estoppel_text: rawText.trim() }),
-        },
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || `Edge function returned ${response.status}`);
-      }
+      const data = await callEdgeFunction({ estoppel_text: rawText.trim() });
 
       if (!data.template) {
         throw new Error('AI returned an invalid response');
@@ -206,71 +493,47 @@ export function EstoppelWizardDialog({
 
       setTemplate(data.template);
       setFields(data.fields ?? []);
-      setAiSummary(data.summary ?? '');
+      if (data.summary) {
+        setChatHistory([{ role: 'ai', message: data.summary }]);
+      }
       setStep(2);
-      toast.success('Estoppel form analyzed successfully!');
+      toast.success('Form analyzed! Click any colored field to edit it.');
     } catch (err) {
       console.error('AI analysis error:', err);
-      toast.error(
-        err instanceof Error ? err.message : 'AI analysis failed. Please try again.',
-      );
+      toast.error(err instanceof Error ? err.message : 'AI analysis failed. Please try again.');
     } finally {
       setAnalyzing(false);
     }
   }
 
+  // ── AI refinement ──
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory]);
 
-  async function handleRefine() {
-    const instruction = refinementInput.trim();
-    if (!instruction) return;
+  async function handleRefine(instruction?: string) {
+    const text = instruction ?? refinementInput.trim();
+    if (!text) return;
 
     setRefining(true);
-    setChatHistory((prev) => [...prev, { role: 'user', message: instruction }]);
-    setRefinementInput('');
+    setChatHistory((prev) => [...prev, { role: 'user', message: text }]);
+    if (!instruction) setRefinementInput('');
 
     try {
-      const supabase = createClient();
-      await supabase.auth.getUser();
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (!session?.access_token) {
-        toast.error('You must be logged in.');
-        setRefining(false);
-        return;
-      }
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/analyze-estoppel`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
-          },
-          body: JSON.stringify({
-            refinement: {
-              current_template: template,
-              current_fields: fields,
-              instruction,
-            },
-          }),
+      const data = await callEdgeFunction({
+        refinement: {
+          current_template: template,
+          current_fields: fields,
+          instruction: text,
         },
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Refinement failed');
-      }
+      });
 
       if (data.template) setTemplate(data.template);
       if (data.fields) setFields(data.fields);
       if (data.summary) {
-        setChatHistory((prev) => [...prev, { role: 'ai', message: data.summary }]);
+        const summary = data.summary;
+        setChatHistory((prev) => [...prev, { role: 'ai' as const, message: summary }]);
       }
     } catch (err) {
       console.error('Refinement error:', err);
@@ -283,42 +546,33 @@ export function EstoppelWizardDialog({
     }
   }
 
+  // ── Field operations ──
+
+  function updateField(key: string, updates: Partial<EstoppelField>) {
+    setFields((prev) => prev.map((f) => (f.key === key ? { ...f, ...updates } : f)));
+  }
+
+  function removeField(key: string) {
+    setFields((prev) => prev.filter((f) => f.key !== key));
+    // Also remove from template
+    setTemplate((prev) => prev.replace(new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g'), ''));
+  }
+
   function addField() {
+    const idx = fields.length + 1;
+    const newKey = `custom_field_${idx}`;
     const newField: EstoppelField = {
       id: generateId(),
-      key: `custom_field_${fields.length + 1}`,
-      label: 'New field',
+      key: newKey,
+      label: `Custom Field ${idx}`,
       type: 'text',
       required: false,
       fill_phase: 'board',
     };
     setFields((prev) => [...prev, newField]);
-    setEditingFieldId(newField.id);
-  }
-
-  function removeField(id: string) {
-    setFields((prev) => prev.filter((f) => f.id !== id));
-    if (editingFieldId === id) setEditingFieldId(null);
-  }
-
-  function updateField(id: string, updates: Partial<EstoppelField>) {
-    setFields((prev) =>
-      prev.map((f) => (f.id === id ? { ...f, ...updates } : f)),
-    );
-  }
-
-  function insertVariable(key: string) {
-    const textarea = templateRef.current;
-    if (!textarea) return;
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const text = template;
-    const insertion = `{{${key}}}`;
-    setTemplate(text.substring(0, start) + insertion + text.substring(end));
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start + insertion.length, start + insertion.length);
-    }, 0);
+    // Append placeholder to template
+    setTemplate((prev) => prev + `\n{{${newKey}}}`);
+    toast.success('Field added to the end of the document. Click it to configure.');
   }
 
   const requesterFieldCount = fields.filter((f) => f.fill_phase === 'requester').length;
@@ -327,29 +581,27 @@ export function EstoppelWizardDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-page-title">
-            {step === 1 && 'Upload Estoppel Form'}
-            {step === 2 && 'Review Template & Fields'}
-            {step === 3 && 'Preview Certificate'}
+            {step === 1 ? 'Upload Estoppel Form' : 'Review Your Estoppel Certificate'}
           </DialogTitle>
           <DialogDescription>
-            {step === 1 && 'Upload your estoppel certificate PDF or paste the form text. AI will analyze it and identify all fields.'}
-            {step === 2 && 'Review the extracted fields and their categories. You can edit, add, or remove fields.'}
-            {step === 3 && 'Preview how the completed certificate will look with example data.'}
+            {step === 1
+              ? 'Upload your estoppel certificate or paste the form text. AI will analyze it and identify all fields.'
+              : 'Click any colored field to edit it, change who fills it, or ask AI to modify it.'}
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden">
-          {/* Step 1: Upload/Paste */}
+          {/* ── Step 1: Upload/Paste ── */}
           {step === 1 && (
             <div className="space-y-4">
               <Tabs defaultValue="upload">
                 <TabsList>
                   <TabsTrigger value="upload">
                     <Upload className="h-4 w-4 mr-1.5" />
-                    Upload PDF
+                    Upload File
                   </TabsTrigger>
                   <TabsTrigger value="paste">
                     <FileText className="h-4 w-4 mr-1.5" />
@@ -411,335 +663,177 @@ export function EstoppelWizardDialog({
             </div>
           )}
 
-          {/* Step 2: AI Review & Edit */}
+          {/* ── Step 2: Interactive Document Preview ── */}
           {step === 2 && (
-            <div className="space-y-4 h-full">
-              {aiSummary && (
-                <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-inner-card p-3">
-                  <p className="text-body text-blue-800 dark:text-blue-200">
-                    <Sparkles className="h-4 w-4 inline mr-1.5" />
-                    {aiSummary}
-                  </p>
+            <div className="flex flex-col gap-3" style={{ height: 'calc(90vh - 220px)', minHeight: 0 }}>
+              {/* Legend */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 text-meta">
+                  <span className="text-text-muted-light dark:text-text-muted-dark mr-1">Fields:</span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className={`w-2 h-2 rounded-full ${PHASE_CONFIG.requester.dotClass}`} />
+                    <span className="text-text-secondary-light dark:text-text-secondary-dark">
+                      Requester ({requesterFieldCount})
+                    </span>
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className={`w-2 h-2 rounded-full ${PHASE_CONFIG.system.dotClass}`} />
+                    <span className="text-text-secondary-light dark:text-text-secondary-dark">
+                      Auto-filled ({systemFieldCount})
+                    </span>
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className={`w-2 h-2 rounded-full ${PHASE_CONFIG.board.dotClass}`} />
+                    <span className="text-text-secondary-light dark:text-text-secondary-dark">
+                      Board ({boardFieldCount})
+                    </span>
+                  </span>
                 </div>
-              )}
-
-              <div className="flex gap-2 text-meta">
-                <Badge variant="secondary" className={getPhaseBadgeColor('requester')}>
-                  {requesterFieldCount} Requester
-                </Badge>
-                <Badge variant="secondary" className={getPhaseBadgeColor('system')}>
-                  {systemFieldCount} System
-                </Badge>
-                <Badge variant="secondary" className={getPhaseBadgeColor('board')}>
-                  {boardFieldCount} Board
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => setShowFieldList(!showFieldList)}
+                  >
+                    {showFieldList ? (
+                      <>
+                        <X className="h-3 w-3 mr-1" />
+                        Hide fields
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="h-3 w-3 mr-1" />
+                        All fields ({fields.length})
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={addField}
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add field
+                  </Button>
+                </div>
               </div>
 
-              <ScrollArea className="h-[400px]">
-                <div className="space-y-4 pr-4">
-                  {/* Template */}
-                  <div className="space-y-2">
-                    <label className="text-label font-semibold text-text-primary-light dark:text-text-primary-dark">
-                      Template
-                    </label>
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      {ALL_ESTOPPEL_VARIABLES.map((v) => (
-                        <button
-                          key={v.key}
-                          type="button"
-                          onClick={() => insertVariable(v.key)}
-                          className="text-[10px] px-1.5 py-0.5 rounded bg-surface-light-2 dark:bg-surface-dark-2 text-text-muted-light dark:text-text-muted-dark hover:text-text-primary-light dark:hover:text-text-primary-dark transition-colors"
-                          title={`Insert {{${v.key}}} - ${v.label}`}
-                        >
-                          {v.key}
-                        </button>
-                      ))}
-                    </div>
-                    <Textarea
-                      ref={templateRef}
-                      value={template}
-                      onChange={(e) => setTemplate(e.target.value)}
-                      className="min-h-[150px] font-mono text-xs"
+              {/* Main content area */}
+              <div className="flex-1 min-h-0 overflow-hidden flex gap-3">
+                {/* Document preview */}
+                <ScrollArea className={`flex-1 ${showFieldList ? '' : 'w-full'}`}>
+                  <div className="pr-2">
+                    <DocumentPreview
+                      template={template}
+                      fields={fields}
+                      onUpdateField={updateField}
+                      onRemoveField={removeField}
+                      onAiRefine={(instruction) => handleRefine(instruction)}
+                      isRefining={refining}
                     />
                   </div>
+                </ScrollArea>
 
-                  {/* Fields */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-label font-semibold text-text-primary-light dark:text-text-primary-dark">
-                        Fields ({fields.length})
-                      </label>
-                      <Button variant="outline" size="sm" onClick={addField}>
-                        <Plus className="h-3.5 w-3.5 mr-1" />
-                        Add Field
-                      </Button>
-                    </div>
-
-                    {fields.map((field) => (
-                      <div
-                        key={field.id}
-                        className="border border-stroke-light dark:border-stroke-dark rounded-inner-card p-3"
-                      >
-                        {editingFieldId === field.id ? (
-                          <div className="space-y-2">
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <label className="text-[11px] text-text-muted-light dark:text-text-muted-dark">
-                                  Label
-                                </label>
-                                <Input
-                                  value={field.label}
-                                  onChange={(e) => updateField(field.id, { label: e.target.value })}
-                                  className="h-8 text-sm"
-                                />
-                              </div>
-                              <div>
-                                <label className="text-[11px] text-text-muted-light dark:text-text-muted-dark">
-                                  Key
-                                </label>
-                                <Input
-                                  value={field.key}
-                                  onChange={(e) => updateField(field.id, { key: e.target.value })}
-                                  className="h-8 text-sm font-mono"
-                                />
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2">
-                              <div>
-                                <label className="text-[11px] text-text-muted-light dark:text-text-muted-dark">
-                                  Type
-                                </label>
-                                <Select
-                                  value={field.type}
-                                  onValueChange={(v) => updateField(field.id, { type: v as AgreementFieldType })}
-                                >
-                                  <SelectTrigger className="h-8 text-sm">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {FIELD_TYPE_OPTIONS.map((opt) => (
-                                      <SelectItem key={opt.value} value={opt.value}>
-                                        {opt.label}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div>
-                                <label className="text-[11px] text-text-muted-light dark:text-text-muted-dark">
-                                  Phase
-                                </label>
-                                <Select
-                                  value={field.fill_phase}
-                                  onValueChange={(v) => updateField(field.id, { fill_phase: v as EstoppelFieldPhase })}
-                                >
-                                  <SelectTrigger className="h-8 text-sm">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {PHASE_OPTIONS.map((opt) => (
-                                      <SelectItem key={opt.value} value={opt.value}>
-                                        {opt.label}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div className="flex items-end gap-2">
-                                <label className="flex items-center gap-1.5 text-[11px] text-text-muted-light dark:text-text-muted-dark">
-                                  <input
-                                    type="checkbox"
-                                    checked={field.required}
-                                    onChange={(e) => updateField(field.id, { required: e.target.checked })}
-                                  />
-                                  Required
-                                </label>
-                              </div>
-                            </div>
-                            {field.type === 'select' && (
-                              <div>
-                                <label className="text-[11px] text-text-muted-light dark:text-text-muted-dark">
-                                  Options (comma separated)
-                                </label>
-                                <Input
-                                  value={(field.options ?? []).join(', ')}
-                                  onChange={(e) =>
-                                    updateField(field.id, {
-                                      options: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
-                                    })
-                                  }
-                                  className="h-8 text-sm"
-                                  placeholder="Option 1, Option 2, Option 3"
-                                />
-                              </div>
-                            )}
-                            <div className="flex justify-end">
-                              <Button variant="ghost" size="sm" onClick={() => setEditingFieldId(null)}>
-                                Done
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-between">
+                {/* Field list sidebar */}
+                {showFieldList && (
+                  <div className="w-64 shrink-0 border-l border-stroke-light dark:border-stroke-dark pl-3">
+                    <ScrollArea className="h-full">
+                      <div className="space-y-1 pr-2">
+                        <p className="text-label font-semibold text-text-primary-light dark:text-text-primary-dark mb-2">
+                          All Fields
+                        </p>
+                        {fields.map((field) => {
+                          const config = PHASE_CONFIG[field.fill_phase];
+                          return (
                             <div
-                              className="flex-1 cursor-pointer"
-                              onClick={() => setEditingFieldId(field.id)}
+                              key={field.id}
+                              className="flex items-center gap-2 py-1 px-2 rounded text-xs group"
                             >
-                              <div className="flex items-center gap-2">
-                                <span className="text-body text-text-primary-light dark:text-text-primary-dark">
-                                  {field.label}
-                                </span>
-                                <Badge variant="secondary" className={`text-[10px] ${getPhaseBadgeColor(field.fill_phase)}`}>
-                                  {field.fill_phase}
-                                </Badge>
-                                <span className="text-meta text-text-muted-light dark:text-text-muted-dark font-mono">
-                                  {`{{${field.key}}}`}
-                                </span>
-                              </div>
+                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${config.dotClass}`} />
+                              <span className="flex-1 truncate text-text-primary-light dark:text-text-primary-dark">
+                                {field.label}
+                              </span>
+                              {field.required && (
+                                <span className="text-red-400 text-[10px]">req</span>
+                              )}
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0 text-text-muted-light dark:text-text-muted-dark hover:text-red-500"
-                              onClick={() => removeField(field.id)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
+                          );
+                        })}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                )}
+              </div>
+
+              {/* AI Chat bar */}
+              <div className="border-t border-stroke-light dark:border-stroke-dark pt-3">
+                {chatHistory.length > 0 && (
+                  <div className="space-y-1.5 max-h-[100px] overflow-y-auto mb-2 px-1">
+                    {chatHistory.map((msg, i) => (
+                      <div
+                        key={i}
+                        className={`flex gap-2 text-xs ${msg.role === 'user' ? 'justify-end' : ''}`}
+                      >
+                        {msg.role === 'ai' && (
+                          <Bot className="h-3.5 w-3.5 mt-0.5 text-blue-500 shrink-0" />
+                        )}
+                        <span
+                          className={
+                            msg.role === 'user'
+                              ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2.5 py-1 rounded-lg max-w-[80%]'
+                              : 'text-text-secondary-light dark:text-text-secondary-dark max-w-[80%]'
+                          }
+                        >
+                          {msg.message}
+                        </span>
+                        {msg.role === 'user' && (
+                          <User className="h-3.5 w-3.5 mt-0.5 text-text-muted-light dark:text-text-muted-dark shrink-0" />
                         )}
                       </div>
                     ))}
+                    <div ref={chatEndRef} />
                   </div>
+                )}
 
-                  {/* Chat refinement */}
-                  <div className="space-y-2 border-t border-stroke-light dark:border-stroke-dark pt-4">
-                    <label className="text-label font-semibold text-text-primary-light dark:text-text-primary-dark">
-                      AI Refinement
-                    </label>
-                    <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                      Ask the AI to make changes to the template or fields.
-                    </p>
-
-                    {chatHistory.length > 0 && (
-                      <div className="space-y-2 max-h-[150px] overflow-y-auto">
-                        {chatHistory.map((msg, i) => (
-                          <div
-                            key={i}
-                            className={`flex gap-2 text-sm ${
-                              msg.role === 'user' ? 'justify-end' : ''
-                            }`}
-                          >
-                            {msg.role === 'ai' && (
-                              <Bot className="h-4 w-4 mt-0.5 text-blue-500 shrink-0" />
-                            )}
-                            <span
-                              className={`${
-                                msg.role === 'user'
-                                  ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-3 py-1.5 rounded-lg'
-                                  : 'text-text-secondary-light dark:text-text-secondary-dark'
-                              }`}
-                            >
-                              {msg.message}
-                            </span>
-                            {msg.role === 'user' && (
-                              <User className="h-4 w-4 mt-0.5 text-text-muted-light dark:text-text-muted-dark shrink-0" />
-                            )}
-                          </div>
-                        ))}
-                        <div ref={chatEndRef} />
-                      </div>
-                    )}
-
-                    <div className="flex gap-2">
-                      <Input
-                        value={refinementInput}
-                        onChange={(e) => setRefinementInput(e.target.value)}
-                        placeholder='e.g., "Add a field for HOA management company"'
-                        className="flex-1"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey && !refining) {
-                            e.preventDefault();
-                            handleRefine();
-                          }
-                        }}
-                      />
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleRefine}
-                        disabled={refining || !refinementInput.trim()}
-                      >
-                        {refining ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Send className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </ScrollArea>
-            </div>
-          )}
-
-          {/* Step 3: Preview */}
-          {step === 3 && (
-            <ScrollArea className="h-[500px]">
-              <div className="pr-4">
-                <div className="bg-white dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark rounded-panel p-6">
-                  <div
-                    className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap"
-                    dangerouslySetInnerHTML={{
-                      __html: fillEstoppelTemplateWithExamples(template)
-                        .replace(/\n/g, '<br/>')
-                        .replace(
-                          /\{\{(\w+)\}\}/g,
-                          '<span style="background: #fef3c7; padding: 1px 4px; border-radius: 3px;">{{$1}}</span>',
-                        ),
+                <div className="flex gap-2 items-center">
+                  <Sparkles className="h-4 w-4 text-text-muted-light dark:text-text-muted-dark shrink-0" />
+                  <Input
+                    value={refinementInput}
+                    onChange={(e) => setRefinementInput(e.target.value)}
+                    placeholder="Ask AI to make changes... e.g. &quot;Add a field for HOA management company&quot;"
+                    className="flex-1 h-8 text-sm"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey && !refining) {
+                        e.preventDefault();
+                        handleRefine();
+                      }
                     }}
                   />
-                </div>
-
-                <div className="mt-4 space-y-2">
-                  <p className="text-label font-semibold text-text-primary-light dark:text-text-primary-dark">
-                    Field Summary
-                  </p>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-blue-50 dark:bg-blue-950 rounded-inner-card p-3">
-                      <p className="text-meta text-blue-600 dark:text-blue-400 font-semibold mb-1">
-                        Requester Fields ({requesterFieldCount})
-                      </p>
-                      <p className="text-[11px] text-blue-600/70 dark:text-blue-400/70">
-                        Filled by title company / attorney on the public form
-                      </p>
-                    </div>
-                    <div className="bg-green-50 dark:bg-green-950 rounded-inner-card p-3">
-                      <p className="text-meta text-green-600 dark:text-green-400 font-semibold mb-1">
-                        System Fields ({systemFieldCount})
-                      </p>
-                      <p className="text-[11px] text-green-600/70 dark:text-green-400/70">
-                        Auto-filled from HOA database
-                      </p>
-                    </div>
-                    <div className="bg-amber-50 dark:bg-amber-950 rounded-inner-card p-3">
-                      <p className="text-meta text-amber-600 dark:text-amber-400 font-semibold mb-1">
-                        Board Fields ({boardFieldCount})
-                      </p>
-                      <p className="text-[11px] text-amber-600/70 dark:text-amber-400/70">
-                        Filled by board during review
-                      </p>
-                    </div>
-                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8"
+                    onClick={() => handleRefine()}
+                    disabled={refining || !refinementInput.trim()}
+                  >
+                    {refining ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                  </Button>
                 </div>
               </div>
-            </ScrollArea>
+            </div>
           )}
         </div>
 
         <DialogFooter className="flex justify-between">
           <div>
-            {step > 1 && (
-              <Button variant="outline" onClick={() => setStep((s) => (s - 1) as 1 | 2 | 3)}>
+            {step === 2 && (
+              <Button variant="outline" onClick={() => setStep(1)}>
                 <ChevronLeft className="h-4 w-4 mr-1" />
                 Back
               </Button>
@@ -765,17 +859,12 @@ export function EstoppelWizardDialog({
               </Button>
             )}
             {step === 2 && (
-              <Button onClick={() => setStep(3)} disabled={!template.trim() || fields.length === 0}>
-                Preview
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
-            )}
-            {step === 3 && (
               <Button
                 onClick={() => {
                   onSave(template, fields);
                   handleOpenChange(false);
                 }}
+                disabled={!template.trim() || fields.length === 0}
               >
                 <Check className="h-4 w-4 mr-1.5" />
                 Save Template
