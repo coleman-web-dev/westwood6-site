@@ -171,13 +171,33 @@ export function EstoppelWizardDialog({
     setAnalyzing(true);
     try {
       const supabase = createClient();
+      // Use getUser() to force token refresh, then get the fresh session
+      await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
 
-      const { data, error: fnError } = await supabase.functions.invoke('analyze-estoppel', {
-        body: { estoppel_text: rawText.trim() },
-      });
+      if (!session?.access_token) {
+        toast.error('You must be logged in to use AI analysis.');
+        setAnalyzing(false);
+        return;
+      }
 
-      if (fnError) {
-        throw new Error(fnError.message || 'AI analysis failed');
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/analyze-estoppel`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
+          },
+          body: JSON.stringify({ estoppel_text: rawText.trim() }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || `Edge function returned ${response.status}`);
       }
 
       if (!data.template) {
@@ -213,19 +233,38 @@ export function EstoppelWizardDialog({
 
     try {
       const supabase = createClient();
+      await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
 
-      const { data, error: fnError } = await supabase.functions.invoke('analyze-estoppel', {
-        body: {
-          refinement: {
-            current_template: template,
-            current_fields: fields,
-            instruction,
+      if (!session?.access_token) {
+        toast.error('You must be logged in.');
+        setRefining(false);
+        return;
+      }
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/analyze-estoppel`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
           },
+          body: JSON.stringify({
+            refinement: {
+              current_template: template,
+              current_fields: fields,
+              instruction,
+            },
+          }),
         },
-      });
+      );
 
-      if (fnError) {
-        throw new Error(fnError.message || 'Refinement failed');
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Refinement failed');
       }
 
       if (data.template) setTemplate(data.template);
