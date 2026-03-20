@@ -30,15 +30,16 @@ interface UnitRow {
 export function SearchProviderWrapper({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { query } = useKBar();
-  const { community, actualIsBoard } = useCommunity();
+  const { community, actualIsBoard, viewMode } = useCommunity();
+  const isAdminView = actualIsBoard && viewMode === 'admin';
   const basePath = `/${community.slug}`;
 
-  // Explicitly hide KBar modal then navigate.
-  // KBar does NOT auto-close after perform(), and toggle() can
-  // double-toggle. setVisualState is the reliable way to close it.
+  // Close KBar then navigate via Next.js router for instant client-side
+  // transition. Using window.location.href caused a full reload and
+  // required double-click on some items.
   const navigate = (path: string) => {
     query.setVisualState(VisualState.hidden);
-    window.location.href = path;
+    router.push(path);
   };
 
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -113,8 +114,8 @@ export function SearchProviderWrapper({ children }: { children: React.ReactNode 
       perform: () => navigate(`${basePath}/documents`),
     }));
 
-    // Member actions - searchable by name, email, unit number, address
-    const memberActions = members.map((m) => {
+    // Member actions - only visible to board in admin view
+    const memberActions = !isAdminView ? [] : members.map((m) => {
       const name = `${m.first_name} ${m.last_name}`;
       const unitInfo = m.units ? `Lot ${m.units.unit_number}` : '';
       const keywords = [
@@ -144,8 +145,8 @@ export function SearchProviderWrapper({ children }: { children: React.ReactNode 
       };
     });
 
-    // Unit / lot actions - searchable by lot number and address
-    const unitActions = units.map((u) => {
+    // Unit / lot actions - only visible to board in admin view
+    const unitActions = !isAdminView ? [] : units.map((u) => {
       const name = u.address
         ? `Lot ${u.unit_number} - ${u.address}`
         : `Lot ${u.unit_number}`;
@@ -177,7 +178,7 @@ export function SearchProviderWrapper({ children }: { children: React.ReactNode 
       ...announcementActions,
       ...documentActions,
     ];
-  }, [basePath, router, announcements, documents, members, units, actualIsBoard]);
+  }, [basePath, router, announcements, documents, members, units, actualIsBoard, isAdminView]);
 
   useRegisterActions(actions, [actions]);
 
