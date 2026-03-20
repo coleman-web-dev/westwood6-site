@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import { Plus, DollarSign, ClipboardList, Bell, AlertTriangle, X, Filter } from 'lucide-react';
+import { Plus, DollarSign, ClipboardList, Bell, AlertTriangle, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Button } from '@/components/shared/ui/button';
@@ -18,6 +18,7 @@ import { CreateAssessmentDialog } from '@/components/payments/create-assessment-
 import { CreateSpecialAssessmentDialog } from '@/components/payments/create-special-assessment-dialog';
 import { FrequencySelector } from '@/components/payments/frequency-selector';
 import { ManagePaymentMethodButton } from '@/components/payments/manage-payment-method-button';
+import { UnitPicker } from '@/components/shared/unit-picker';
 import { BillingDatePicker } from '@/components/payments/billing-date-picker';
 import {
   AlertDialog,
@@ -52,6 +53,8 @@ export default function PaymentsPage() {
   const [walletDialogOpen, setWalletDialogOpen] = useState(false);
   const initialTab = searchParams.get('tab');
   const urlUnitId = searchParams.get('unit');
+  const [selectedUnitId, setSelectedUnitId] = useState<string>(urlUnitId ?? '');
+  const activeUnitFilter = isBoard ? selectedUnitId : '';
   const [activeTab, setActiveTab] = useState(
     initialTab && ['invoices', 'history', 'ledger', 'assessments'].includes(initialTab)
       ? initialTab
@@ -212,16 +215,16 @@ export default function PaymentsPage() {
     }
   }, [searchParams, fetchData]);
 
-  // When navigating from household page with a unit filter, scope data to that unit
+  // Scope data to selected unit (board unit picker or URL param)
   const filteredInvoices = useMemo(() => {
-    if (!urlUnitId || !isBoard) return invoices;
-    return invoices.filter((inv) => inv.unit_id === urlUnitId);
-  }, [invoices, urlUnitId, isBoard]);
+    if (!activeUnitFilter) return invoices;
+    return invoices.filter((inv) => inv.unit_id === activeUnitFilter);
+  }, [invoices, activeUnitFilter]);
 
   const filteredPayments = useMemo(() => {
-    if (!urlUnitId || !isBoard) return payments;
-    return payments.filter((pmt) => pmt.unit_id === urlUnitId);
-  }, [payments, urlUnitId, isBoard]);
+    if (!activeUnitFilter) return payments;
+    return payments.filter((pmt) => pmt.unit_id === activeUnitFilter);
+  }, [payments, activeUnitFilter]);
 
   // Calculate outstanding balance from filtered invoices (respects unit filter)
   const outstandingInvoices = filteredInvoices.filter(
@@ -252,15 +255,28 @@ export default function PaymentsPage() {
     }
   }
 
+  function handleUnitChange(unitId: string) {
+    setSelectedUnitId(unitId);
+    // Update URL to reflect the selection
+    if (unitId) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('unit', unitId);
+      router.replace(`${pathname}?${params.toString()}`);
+    } else {
+      router.replace(pathname);
+    }
+  }
+
   function clearUnitFilter() {
+    setSelectedUnitId('');
     router.replace(pathname);
   }
 
-  const filterUnitLabel = urlUnitId && isBoard
+  const filterUnitLabel = activeUnitFilter
     ? (() => {
-        const u = allUnits.find((u) => u.id === urlUnitId);
-        const owner = unitOwnerMap[urlUnitId];
-        return u ? `Unit ${u.unit_number}${owner ? ` - ${owner}` : ''}` : 'Selected unit';
+        const u = allUnits.find((u) => u.id === activeUnitFilter);
+        const owner = unitOwnerMap[activeUnitFilter];
+        return u ? `Unit ${u.unit_number}${owner ? ` - ${owner}` : ''}` : null;
       })()
     : null;
 
@@ -306,20 +322,26 @@ export default function PaymentsPage() {
         )}
       </div>
 
-      {/* Unit filter banner */}
-      {filterUnitLabel && (
-        <div className="flex items-center gap-2 rounded-inner-card bg-secondary-50 dark:bg-secondary-950/30 border border-secondary-200 dark:border-secondary-800 px-3 py-2">
-          <Filter className="h-4 w-4 text-secondary-500 shrink-0" />
-          <span className="text-body text-text-primary-light dark:text-text-primary-dark">
-            Filtered to <span className="font-semibold">{filterUnitLabel}</span>
-          </span>
-          <button
-            onClick={clearUnitFilter}
-            className="ml-auto inline-flex items-center gap-1 text-label text-secondary-500 hover:text-secondary-600 dark:hover:text-secondary-400"
-          >
-            <X className="h-3.5 w-3.5" />
-            Clear
-          </button>
+      {/* Board: unit picker to scope all tabs to a household */}
+      {isBoard && (
+        <div className="flex items-center gap-3">
+          <div className="w-80">
+            <UnitPicker
+              communityId={community.id}
+              value={selectedUnitId}
+              onValueChange={handleUnitChange}
+              placeholder="All households"
+            />
+          </div>
+          {activeUnitFilter && (
+            <button
+              onClick={clearUnitFilter}
+              className="inline-flex items-center gap-1 text-label text-secondary-500 hover:text-secondary-600 dark:hover:text-secondary-400"
+            >
+              <X className="h-3.5 w-3.5" />
+              Clear
+            </button>
+          )}
         </div>
       )}
 
@@ -333,7 +355,7 @@ export default function PaymentsPage() {
             </div>
             <div>
               <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                {filterUnitLabel ? 'Household Outstanding' : 'Total Outstanding'}
+                {activeUnitFilter ? 'Household Outstanding' : 'Total Outstanding'}
               </p>
               <p className="text-metric-xl tabular-nums text-text-primary-light dark:text-text-primary-dark">
                 ${(totalOutstanding / 100).toFixed(2)}
@@ -405,7 +427,7 @@ export default function PaymentsPage() {
         </TabsContent>
 
         <TabsContent value="ledger">
-          <HouseholdLedger refreshKey={refreshKey} initialUnitId={urlUnitId ?? undefined} />
+          <HouseholdLedger refreshKey={refreshKey} initialUnitId={activeUnitFilter || undefined} hideUnitPicker={!!activeUnitFilter} />
         </TabsContent>
 
         {isBoard && (

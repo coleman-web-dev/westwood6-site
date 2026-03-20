@@ -12,15 +12,23 @@ import type { Invoice, Payment, WalletTransaction, Unit, LedgerEntry } from '@/l
 interface HouseholdLedgerProps {
   refreshKey: number;
   initialUnitId?: string;
+  hideUnitPicker?: boolean;
 }
 
-export function HouseholdLedger({ refreshKey, initialUnitId }: HouseholdLedgerProps) {
+export function HouseholdLedger({ refreshKey, initialUnitId, hideUnitPicker }: HouseholdLedgerProps) {
   const { community, unit, isBoard } = useCommunity();
   const [entries, setEntries] = useState<LedgerEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Board: unit selector
+  // Board: unit selector (syncs with external initialUnitId when provided)
   const [selectedUnitId, setSelectedUnitId] = useState<string>(initialUnitId ?? unit?.id ?? '');
+
+  // Sync with external unit selection (e.g., page-level unit picker)
+  useEffect(() => {
+    if (initialUnitId) {
+      setSelectedUnitId(initialUnitId);
+    }
+  }, [initialUnitId]);
 
   const targetUnitId = isBoard ? selectedUnitId : unit?.id;
 
@@ -280,8 +288,8 @@ export function HouseholdLedger({ refreshKey, initialUnitId }: HouseholdLedgerPr
 
   return (
     <div className="space-y-4">
-      {/* Board: searchable unit selector */}
-      {isBoard && (
+      {/* Board: searchable unit selector (hidden when page-level picker is active) */}
+      {isBoard && !hideUnitPicker && (
         <div className="max-w-sm">
           <UnitPicker
             communityId={community.id}
