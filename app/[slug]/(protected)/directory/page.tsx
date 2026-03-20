@@ -68,6 +68,8 @@ export default function DirectoryPage() {
       return;
     }
 
+    let active = true;
+
     async function fetchMembers() {
       const supabase = createClient();
 
@@ -83,6 +85,7 @@ export default function DirectoryPage() {
       }
 
       const { data } = await query;
+      if (!active) return;
       setMembers((data as DirectoryMember[]) ?? []);
       setLoading(false);
 
@@ -93,6 +96,7 @@ export default function DirectoryPage() {
           .select('member_id')
           .eq('community_id', community.id);
 
+        if (!active) return;
         if (notesData) {
           const counts: NoteCountMap = {};
           for (const n of notesData as { member_id: string }[]) {
@@ -104,6 +108,7 @@ export default function DirectoryPage() {
     }
 
     fetchMembers();
+    return () => { active = false; };
   }, [community.id, isBoard, canView]);
 
   const fetchFolders = useCallback(async () => {

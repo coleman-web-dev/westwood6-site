@@ -3,6 +3,7 @@ import { getStripeClient } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import type { CreateSubscriptionsResponse } from '@/lib/types/stripe';
+import type { PaymentFrequency } from '@/lib/types/database';
 
 export const runtime = 'nodejs';
 
@@ -14,8 +15,26 @@ function delay(ms: number) {
 }
 
 /**
+ * Price configuration for each payment frequency.
+ * interval/interval_count map to Stripe recurring price params.
+ * divisor determines the per-period amount from annual_amount.
+ */
+const FREQUENCY_CONFIG: Record<PaymentFrequency, {
+  interval: 'month' | 'year';
+  interval_count: number;
+  divisor: number;
+}> = {
+  monthly: { interval: 'month', interval_count: 1, divisor: 12 },
+  quarterly: { interval: 'month', interval_count: 3, divisor: 4 },
+  semi_annual: { interval: 'month', interval_count: 6, divisor: 2 },
+  annual: { interval: 'year', interval_count: 1, divisor: 1 },
+};
+
+/**
  * POST /api/stripe/create-subscriptions
  * Creates Stripe subscriptions for all units with linked Stripe customers.
+ * Creates frequency-matched subscriptions (monthly, quarterly, semi-annual, annual)
+ * based on each unit's payment_frequency setting.
  * Requires board member authentication.
  */
 export async function POST(req: NextRequest) {
@@ -99,9 +118,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. Create Stripe Product and Price if they don't exist yet
+    // 3. Create Stripe Product and all frequency Prices if they don't exist yet
     let productId = stripeAccount.stripe_product_id;
-    let priceId = stripeAccount.stripe_default_price_id;
+    const stripePrices: Record<string, string> = (stripeAccount.stripe_prices as Record<string, string>) || {};
 
     if (!productId) {
       const product = await stripe.products.create({
@@ -109,36 +128,56 @@ export async function POST(req: NextRequest) {
         metadata: { community_id: communityId },
       });
       productId = product.id;
+    }
 
-      const monthlyAmount = Math.round(assessment.annual_amount / 12);
+    // Create any missing prices for each frequency
+    let pricesChanged = false;
+    for (const [freq, config] of Object.entries(FREQUENCY_CONFIG)) {
+      if (stripePrices[freq]) continue; // Already exists
+
+      const amount = Math.round(assessment.annual_amount / config.divisor);
       const price = await stripe.prices.create({
         product: productId,
-        unit_amount: monthlyAmount,
+        unit_amount: amount,
         currency: 'usd',
-        recurring: { interval: 'month' },
+        recurring: { interval: config.interval, interval_count: config.interval_count },
+        metadata: { frequency: freq, community_id: communityId },
       });
-      priceId = price.id;
 
-      // Save product and price IDs to stripe_accounts
+      stripePrices[freq] = price.id;
+      pricesChanged = true;
+    }
+
+    // Save product and price IDs to stripe_accounts
+    const updateFields: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    };
+    if (!stripeAccount.stripe_product_id) {
+      updateFields.stripe_product_id = productId;
+    }
+    if (!stripeAccount.stripe_default_price_id) {
+      updateFields.stripe_default_price_id = stripePrices.monthly || null;
+    }
+    if (pricesChanged) {
+      updateFields.stripe_prices = stripePrices;
+    }
+
+    if (Object.keys(updateFields).length > 1) {
       await supabase
         .from('stripe_accounts')
-        .update({
-          stripe_product_id: productId,
-          stripe_default_price_id: priceId,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updateFields)
         .eq('id', stripeAccount.id);
     }
 
-    if (!priceId) {
+    // Verify we have at least the monthly price
+    if (!stripePrices.monthly) {
       return NextResponse.json(
-        { error: 'Failed to resolve Stripe price' },
+        { error: 'Failed to resolve Stripe monthly price' },
         { status: 500 }
       );
     }
 
     // 4. Fetch all active units with their owner members who have stripe_customer_id
-    //    We need: unit.id, unit.stripe_subscription_id, owner member.stripe_customer_id
     const { data: units, error: unitsError } = await supabase
       .from('units')
       .select(`
@@ -146,6 +185,7 @@ export async function POST(req: NextRequest) {
         unit_number,
         stripe_subscription_id,
         preferred_billing_day,
+        payment_frequency,
         members!inner (
           id,
           stripe_customer_id,
@@ -219,31 +259,54 @@ export async function POST(req: NextRequest) {
             }
           }
 
-          // Compute next occurrence of billing day in a future month
+          // Determine frequency and matching price
+          const unitFreq = ((unit as unknown as { payment_frequency?: string }).payment_frequency as PaymentFrequency) || 'monthly';
+          const targetPriceId = stripePrices[unitFreq] || stripePrices.monthly;
+          const freqConfig = FREQUENCY_CONFIG[unitFreq];
+
+          // Compute next occurrence of billing day in the future
+          // For monthly: next month. For quarterly: next 3 months. For annual: next year.
           const now = new Date();
           let anchorDate: Date;
           const currentDay = now.getUTCDate();
-          if (currentDay < billingDay) {
-            // Billing day hasn't passed this month yet, anchor to this month
-            anchorDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), billingDay, 0, 0, 0));
+
+          if (unitFreq === 'annual') {
+            // For annual, anchor to the billing day in the next occurrence
+            if (currentDay < billingDay && now.getUTCMonth() === 0) {
+              // January and billing day hasn't passed
+              anchorDate = new Date(Date.UTC(now.getUTCFullYear(), 0, billingDay, 0, 0, 0));
+            } else {
+              // Next year
+              anchorDate = new Date(Date.UTC(now.getUTCFullYear() + 1, 0, billingDay, 0, 0, 0));
+            }
           } else {
-            // Billing day already passed, anchor to next month
-            anchorDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, billingDay, 0, 0, 0));
+            // For monthly/quarterly/semi_annual: anchor to next billing day
+            if (currentDay < billingDay) {
+              anchorDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), billingDay, 0, 0, 0));
+            } else {
+              anchorDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + freqConfig.interval_count, billingDay, 0, 0, 0));
+            }
           }
+
           // Ensure anchor is in the future
           if (anchorDate.getTime() <= now.getTime()) {
-            anchorDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, billingDay, 0, 0, 0));
+            if (unitFreq === 'annual') {
+              anchorDate = new Date(Date.UTC(now.getUTCFullYear() + 1, 0, billingDay, 0, 0, 0));
+            } else {
+              anchorDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + freqConfig.interval_count, billingDay, 0, 0, 0));
+            }
           }
           const billingCycleAnchor = Math.floor(anchorDate.getTime() / 1000);
 
           const subscription = await stripe.subscriptions.create({
             customer: owner.stripe_customer_id,
-            items: [{ price: priceId! }],
+            items: [{ price: targetPriceId }],
             billing_cycle_anchor: billingCycleAnchor,
             proration_behavior: 'none',
             metadata: {
               unit_id: unit.id,
               community_id: communityId,
+              payment_frequency: unitFreq,
             },
           });
 

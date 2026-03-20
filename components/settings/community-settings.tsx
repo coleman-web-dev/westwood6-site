@@ -26,6 +26,7 @@ import { AmenityList } from '@/components/amenities/amenity-list';
 import { VendorsManager } from '@/components/settings/vendors-manager';
 
 import { StripeMigrationSection } from '@/components/settings/stripe-migration-section';
+import { StripeConnectSection } from '@/components/settings/stripe-connect-section';
 import { WalletImportSection } from '@/components/settings/wallet-import-section';
 import { InsuranceReminderSettings } from '@/components/settings/insurance-reminder-settings';
 import type { PaymentFrequency, BulletinSettings, LateFeeSettings, ConvenienceFeeSettings, EstoppelSettings, EstoppelField, VotingConfig, NoticeType } from '@/lib/types/database';
@@ -676,6 +677,9 @@ export function CommunitySettings() {
 
       {/* Stripe payment setup (direct mode) */}
       <StripeMigrationSection />
+
+      {/* DuesIQ Connect (switch from direct to connect mode) */}
+      <StripeConnectSection />
 
       {/* Wallet Balance Import */}
       <WalletImportSection />

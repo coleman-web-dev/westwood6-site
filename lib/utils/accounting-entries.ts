@@ -174,7 +174,7 @@ export async function postOverpaymentWalletCredit(
   });
 }
 
-/** Wallet applied to invoice: DR Wallet Credits, CR Accounts Receivable */
+/** Wallet applied to invoice: DR Wallet Credits (liability down), CR Assessment Revenue (recognized) */
 export async function postWalletApplied(
   communityId: string,
   invoiceId: string,
@@ -190,7 +190,7 @@ export async function postWalletApplied(
     unitId,
     lines: [
       { accountCode: '2110', debit: amount, credit: 0, description: 'Wallet Credits' },
-      { accountCode: '1100', debit: 0, credit: amount, description: 'Accounts Receivable' },
+      { accountCode: '4000', debit: 0, credit: amount, description: 'Assessment Revenue' },
     ],
   });
 }

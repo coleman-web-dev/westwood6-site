@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getPeriods } from '@/lib/utils/generate-assessment-invoices';
+import { applyWalletToInvoiceBatch } from '@/lib/utils/apply-wallet-to-invoices';
 import { queuePaymentReminder } from '@/lib/email/queue';
 import type { PaymentFrequency } from '@/lib/types/database';
 
 /**
  * POST /api/cron/generate-invoices
- * Daily cron: auto-generates invoices for upcoming billing periods (next 14 days).
- * Optionally sends notification emails to homeowners for new invoices.
+ * Daily cron: auto-generates monthly invoices for upcoming billing periods.
+ * - Monthly payers: 14-day lookahead
+ * - Non-monthly payers (quarterly/semi_annual/annual): 10-day lookahead
+ * After generating invoices, auto-applies wallet balances to cover them.
  * Idempotent: always checks for existing invoices before inserting.
  */
 export async function POST(req: NextRequest) {
@@ -32,12 +35,19 @@ export async function POST(req: NextRequest) {
   let totalGenerated = 0;
   let totalSkipped = 0;
   let totalNotified = 0;
+  let totalWalletApplied = 0;
 
   const today = new Date();
-  const lookAhead = new Date();
-  lookAhead.setDate(today.getDate() + 14);
   const todayStr = today.toISOString().split('T')[0];
-  const lookAheadStr = lookAhead.toISOString().split('T')[0];
+
+  // Pre-compute lookahead dates
+  const lookAhead14 = new Date(today);
+  lookAhead14.setDate(today.getDate() + 14);
+  const lookAhead14Str = lookAhead14.toISOString().split('T')[0];
+
+  const lookAhead10 = new Date(today);
+  lookAhead10.setDate(today.getDate() + 10);
+  const lookAhead10Str = lookAhead10.toISOString().split('T')[0];
 
   for (const community of communities) {
     const theme = community.theme as Record<string, unknown> | null;
@@ -57,7 +67,7 @@ export async function POST(req: NextRequest) {
 
     if (!assessments || assessments.length === 0) continue;
 
-    // Get active units
+    // Get active units (need payment_frequency for lookahead window)
     const { data: units } = await supabase
       .from('units')
       .select('id, payment_frequency')
@@ -89,14 +99,20 @@ export async function POST(req: NextRequest) {
       }[] = [];
 
       for (const unit of units) {
-        const freq = (unit.payment_frequency as PaymentFrequency) || defaultFrequency;
-        const periods = getPeriods(freq, assessment.fiscal_year_start, assessment.fiscal_year_end);
+        // Always generate monthly invoices regardless of payment_frequency.
+        // payment_frequency only controls Stripe billing interval.
+        const periods = getPeriods('monthly', assessment.fiscal_year_start, assessment.fiscal_year_end);
         if (periods.length === 0) continue;
 
         const perPeriodAmount = Math.round(assessment.annual_amount / periods.length);
         const remainder = assessment.annual_amount - perPeriodAmount * periods.length;
 
-        // Only generate for periods with due dates in the next 14 days
+        // Use per-unit lookahead: 14 days for monthly payers, 10 days for non-monthly.
+        // Non-monthly payers have prepaid via wallet, so we generate just-in-time.
+        const unitFreq = (unit.payment_frequency as PaymentFrequency) || defaultFrequency;
+        const lookAheadStr = unitFreq === 'monthly' ? lookAhead14Str : lookAhead10Str;
+
+        // Only generate for periods with due dates in the lookahead window
         for (let i = 0; i < periods.length; i++) {
           const period = periods[i];
           if (period.dueDate < todayStr || period.dueDate > lookAheadStr) continue;
@@ -121,6 +137,9 @@ export async function POST(req: NextRequest) {
       }
 
       if (newInvoices.length > 0) {
+        // Collect all inserted invoices for wallet auto-apply
+        const allInserted: { id: string; amount: number; unit_id: string; title: string }[] = [];
+
         // Insert in batches of 50
         for (let i = 0; i < newInvoices.length; i += 50) {
           const batch = newInvoices.slice(i, i + 50);
@@ -133,6 +152,18 @@ export async function POST(req: NextRequest) {
             console.error('Failed to insert invoices batch:', error);
           } else {
             totalGenerated += batch.length;
+
+            // Collect for wallet auto-apply
+            if (inserted) {
+              for (const inv of inserted) {
+                allInserted.push({
+                  id: inv.id,
+                  amount: inv.amount,
+                  unit_id: inv.unit_id,
+                  title: inv.title,
+                });
+              }
+            }
 
             // Auto-notify homeowners about new invoices
             if (autoNotify && inserted) {
@@ -156,9 +187,32 @@ export async function POST(req: NextRequest) {
             }
           }
         }
+
+        // Auto-apply wallet balances to newly generated invoices.
+        // This covers prepaid households (yearly/semi-annual payers with wallet credits).
+        if (allInserted.length > 0) {
+          try {
+            const walletResult = await applyWalletToInvoiceBatch(
+              supabase, allInserted, community.id, null
+            );
+            if (walletResult.totalApplied > 0) {
+              totalWalletApplied += walletResult.totalApplied;
+              console.log(
+                `Wallet auto-applied: ${walletResult.totalApplied} cents across ${walletResult.unitsAffected} units`
+              );
+            }
+          } catch (err) {
+            console.error('Wallet auto-apply failed:', err);
+          }
+        }
       }
     }
   }
 
-  return NextResponse.json({ generated: totalGenerated, skipped: totalSkipped, notified: totalNotified });
+  return NextResponse.json({
+    generated: totalGenerated,
+    skipped: totalSkipped,
+    notified: totalNotified,
+    walletApplied: totalWalletApplied,
+  });
 }

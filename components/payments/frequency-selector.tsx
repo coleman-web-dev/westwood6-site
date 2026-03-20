@@ -11,8 +11,7 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { toast } from 'sonner';
-import type { PaymentFrequency, Assessment, Unit } from '@/lib/types/database';
-import { generateRemainingInvoicesForUnit } from '@/lib/utils/generate-assessment-invoices';
+import type { PaymentFrequency } from '@/lib/types/database';
 
 const FREQUENCY_LABELS: Record<PaymentFrequency, string> = {
   monthly: 'Monthly',
@@ -51,7 +50,7 @@ export function FrequencySelector({ onFrequencyChanged }: FrequencySelectorProps
     setSaving(true);
     const supabase = createClient();
 
-    // Update unit preference
+    // Update unit's payment frequency (controls Stripe billing interval)
     const { error: unitError } = await supabase
       .from('units')
       .update({ payment_frequency: newFreq })
@@ -59,61 +58,41 @@ export function FrequencySelector({ onFrequencyChanged }: FrequencySelectorProps
 
     if (unitError) {
       setSaving(false);
-      toast.error('Failed to update payment frequency.');
+      toast.error('Failed to update billing frequency.');
       return;
     }
 
-    // Void future pending invoices from assessments and regenerate
-    const { data: futureInvoices } = await supabase
-      .from('invoices')
-      .select('id, assessment_id, amount, status')
-      .eq('unit_id', unit.id)
-      .not('assessment_id', 'is', null)
-      .eq('status', 'pending')
-      .gte('due_date', new Date().toISOString().split('T')[0]);
+    // Update the Stripe subscription interval to match the new frequency.
+    // Invoices are always monthly regardless of frequency, so no invoice changes needed.
+    if (unit.stripe_subscription_id) {
+      try {
+        const res = await fetch('/api/stripe/update-subscription-frequency', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            unitId: unit.id,
+            communityId: community.id,
+            newFrequency: newFreq,
+          }),
+        });
 
-    if (futureInvoices && futureInvoices.length > 0) {
-      // Void existing future pending invoices
-      const futureIds = futureInvoices.map((inv) => inv.id);
-      await supabase
-        .from('invoices')
-        .update({ status: 'voided', notes: 'Voided: payment frequency changed to ' + FREQUENCY_LABELS[newFreq] })
-        .in('id', futureIds);
-
-      // Get active assessments and regenerate invoices
-      const assessmentIds = [...new Set(futureInvoices.map((inv) => inv.assessment_id).filter(Boolean))];
-      if (assessmentIds.length > 0) {
-        const { data: assessments } = await supabase
-          .from('assessments')
-          .select('*')
-          .in('id', assessmentIds)
-          .eq('is_active', true);
-
-        if (assessments && assessments.length > 0) {
-          const updatedUnit: Unit = { ...unit, payment_frequency: newFreq };
-
-          for (const assessment of assessments as Assessment[]) {
-            // Calculate what has already been paid for this assessment
-            const { data: paidInvoices } = await supabase
-              .from('invoices')
-              .select('amount')
-              .eq('unit_id', unit.id)
-              .eq('assessment_id', assessment.id)
-              .eq('status', 'paid');
-
-            const paidAmount = (paidInvoices ?? []).reduce((sum, inv) => sum + inv.amount, 0);
-            const newInvoices = generateRemainingInvoicesForUnit(assessment, updatedUnit, newFreq, paidAmount);
-
-            if (newInvoices.length > 0) {
-              await supabase.from('invoices').insert(newInvoices);
-            }
-          }
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          toast.error(data?.error || 'Billing frequency saved but Stripe update failed.');
+          setSaving(false);
+          onFrequencyChanged?.();
+          return;
         }
+      } catch {
+        toast.error('Billing frequency saved but Stripe update failed.');
+        setSaving(false);
+        onFrequencyChanged?.();
+        return;
       }
     }
 
     setSaving(false);
-    toast.success('Payment frequency updated to ' + FREQUENCY_LABELS[newFreq] + '. Future invoices have been adjusted.');
+    toast.success('Billing frequency updated to ' + FREQUENCY_LABELS[newFreq] + '.');
     onFrequencyChanged?.();
   }
 
@@ -122,10 +101,10 @@ export function FrequencySelector({ onFrequencyChanged }: FrequencySelectorProps
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="min-w-0">
           <p className="text-body text-text-primary-light dark:text-text-primary-dark">
-            Payment Frequency
+            Billing Frequency
           </p>
           <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-            Choose how often you receive assessment invoices
+            Choose how often you are billed. Invoices are always monthly.
           </p>
         </div>
         <div className="w-44 shrink-0">
@@ -148,7 +127,7 @@ export function FrequencySelector({ onFrequencyChanged }: FrequencySelectorProps
       </div>
       {saving && (
         <p className="text-meta text-text-muted-light dark:text-text-muted-dark mt-2">
-          Updating invoices...
+          Updating billing...
         </p>
       )}
     </div>

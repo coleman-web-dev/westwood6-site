@@ -67,15 +67,22 @@ export async function GET(req: NextRequest) {
     // Retrieve the Stripe account to check current status
     const account = await stripe.accounts.retrieve(stripeAccount.stripe_account_id);
 
-    // Update the stripe_accounts row with current status
+    // Update the stripe_accounts row with current status.
+    // If onboarding is complete, switch mode to 'connect' (handles direct→connect upgrade).
+    const updateFields: Record<string, unknown> = {
+      onboarding_complete: account.details_submitted ?? false,
+      charges_enabled: account.charges_enabled ?? false,
+      payouts_enabled: account.payouts_enabled ?? false,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (account.details_submitted && account.charges_enabled) {
+      updateFields.mode = 'connect';
+    }
+
     const { error: updateError } = await supabase
       .from('stripe_accounts')
-      .update({
-        onboarding_complete: account.details_submitted ?? false,
-        charges_enabled: account.charges_enabled ?? false,
-        payouts_enabled: account.payouts_enabled ?? false,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateFields)
       .eq('community_id', communityId);
 
     if (updateError) {

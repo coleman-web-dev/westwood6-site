@@ -86,17 +86,53 @@ export async function POST(req: NextRequest) {
     let stripeAccountId: string;
 
     if (existingAccount) {
-      if (existingAccount.onboarding_complete) {
+      // Already fully onboarded in Connect mode, nothing to do
+      if (existingAccount.mode === 'connect' && existingAccount.onboarding_complete) {
         return NextResponse.json(
           { error: 'Stripe account already connected' },
           { status: 400 }
         );
       }
 
-      // Onboarding not complete, create a new account link for the existing account
-      stripeAccountId = existingAccount.stripe_account_id;
+      // Direct mode upgrading to Connect, or incomplete Connect onboarding
+      if (existingAccount.mode === 'direct' || !existingAccount.stripe_account_id) {
+        // Create a new Express connected account for the upgrade
+        const account = await stripe.accounts.create({
+          type: 'express',
+          metadata: {
+            community_id: communityId,
+            community_name: community.name,
+          },
+        });
+
+        stripeAccountId = account.id;
+
+        // Update the existing row with the new Express account ID
+        // Keep mode as 'direct' until onboarding completes (callback will switch it)
+        const { error: updateError } = await supabase
+          .from('stripe_accounts')
+          .update({
+            stripe_account_id: stripeAccountId,
+            onboarding_complete: false,
+            charges_enabled: false,
+            payouts_enabled: false,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('community_id', communityId);
+
+        if (updateError) {
+          console.error('Failed to update stripe_accounts row:', updateError);
+          return NextResponse.json(
+            { error: 'Failed to save Stripe account' },
+            { status: 500 }
+          );
+        }
+      } else {
+        // Incomplete Connect onboarding, resume with existing account
+        stripeAccountId = existingAccount.stripe_account_id;
+      }
     } else {
-      // Create a new Express connected account
+      // No existing row, create a brand new Express connected account
       const account = await stripe.accounts.create({
         type: 'express',
         metadata: {

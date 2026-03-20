@@ -133,9 +133,12 @@ export function generateInvoicesForAssessment(
   const isSpecial = assessment.type === 'special' && assessment.installments && assessment.installment_start_date;
 
   for (const unit of units) {
+    // Always generate monthly invoices for regular assessments.
+    // payment_frequency only controls Stripe billing interval, not invoice schedule.
+    // Special assessments use their own installment schedule.
     const periods = isSpecial
       ? getSpecialAssessmentPeriods(assessment.installments!, assessment.installment_start_date!)
-      : getPeriods(unit.payment_frequency ?? defaultFrequency, assessment.fiscal_year_start, assessment.fiscal_year_end);
+      : getPeriods('monthly', assessment.fiscal_year_start, assessment.fiscal_year_end);
     if (periods.length === 0) continue;
 
     const perPeriodAmount = Math.round(assessment.annual_amount / periods.length);

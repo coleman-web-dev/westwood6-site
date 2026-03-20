@@ -12,6 +12,7 @@ export interface StripeAccount {
   webhook_secret: string | null;
   stripe_product_id: string | null;
   stripe_default_price_id: string | null;
+  stripe_prices: Record<string, string> | null;  // { monthly: "price_xxx", quarterly: "price_yyy", ... }
   created_at: string;
   updated_at: string;
 }
