@@ -6,7 +6,7 @@ export interface ResolvedSender {
   replyTo?: string;
 }
 
-const DEFAULT_FROM_ADDRESS = 'notifications@duesiq.com';
+const DEFAULT_FROM_ADDRESS = 'no-reply@duesiq.com';
 
 /**
  * Resolves the "from" and "reply-to" addresses for a community's outbound email.
@@ -14,7 +14,7 @@ const DEFAULT_FROM_ADDRESS = 'notifications@duesiq.com';
  * Resolution chain:
  * 1. custom_domain → use verified domain's default address
  * 2. subdomain → use configured subdomain address (pre-verified on duesiq.com)
- * 3. default → notifications@duesiq.com with community name as display name
+ * 3. default → no-reply@duesiq.com with community name as display name
  *
  * Always falls back gracefully if a custom domain loses verification.
  */

@@ -27,7 +27,7 @@ export async function sendEmailDirect({
   attachments?: Array<{ filename: string; content: Buffer }>;
 }) {
   const resend = getResendClient();
-  const fromAddress = from || process.env.EMAIL_FROM_ADDRESS || 'DuesIQ <notifications@duesiq.com>';
+  const fromAddress = from || process.env.EMAIL_FROM_ADDRESS || 'DuesIQ <no-reply@duesiq.com>';
 
   const { data, error } = await resend.emails.send({
     from: fromAddress,
