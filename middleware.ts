@@ -13,8 +13,34 @@ const PUBLIC_ROUTES = new Set([
   '/status',
 ]);
 
+// Custom domain → community slug mapping
+// When a community has their own domain, requests are rewritten to /{slug}/* paths
+const CUSTOM_DOMAINS: Record<string, string> = {
+  'westwood6.com': 'westwood6',
+  'www.westwood6.com': 'westwood6',
+};
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const hostname = request.headers.get('host')?.split(':')[0] ?? '';
+  const customSlug = CUSTOM_DOMAINS[hostname];
+
+  // For custom domains, compute the effective pathname that the app will serve
+  // e.g., westwood6.com/dashboard → effectively /westwood6/dashboard
+  let effectivePathname = pathname;
+  let needsRewrite = false;
+
+  if (customSlug && !pathname.startsWith(`/${customSlug}`)) {
+    const isGlobalRoute =
+      pathname.startsWith('/api/') ||
+      pathname.startsWith('/auth/') ||
+      PUBLIC_ROUTES.has(pathname);
+
+    if (!isGlobalRoute) {
+      effectivePathname = `/${customSlug}${pathname === '/' ? '' : pathname}`;
+      needsRewrite = true;
+    }
+  }
 
   // Public API routes
   if (pathname.startsWith('/api/demo-request') || pathname.startsWith('/api/newsletter')) {
@@ -28,14 +54,25 @@ export async function middleware(request: NextRequest) {
   }
 
   // Community landing pages: single-segment paths like /westwood6 are public
-  const segments = pathname.split('/').filter(Boolean);
-  if (segments.length === 1) {
+  // For custom domains, the root "/" rewrites to "/{slug}" which is single-segment
+  const effectiveSegments = effectivePathname.split('/').filter(Boolean);
+  if (effectiveSegments.length === 1) {
+    if (needsRewrite) {
+      const url = request.nextUrl.clone();
+      url.pathname = effectivePathname;
+      return NextResponse.rewrite(url);
+    }
     const { supabaseResponse } = await updateSession(request);
     return supabaseResponse;
   }
 
   // Public community sub-pages (estoppel request form)
-  if (segments.length === 2 && segments[1] === 'estoppel') {
+  if (effectiveSegments.length === 2 && effectiveSegments[1] === 'estoppel') {
+    if (needsRewrite) {
+      const url = request.nextUrl.clone();
+      url.pathname = effectivePathname;
+      return NextResponse.rewrite(url);
+    }
     const { supabaseResponse } = await updateSession(request);
     return supabaseResponse;
   }
@@ -47,6 +84,11 @@ export async function middleware(request: NextRequest) {
     process.env.VERCEL_ENV !== 'production' &&
     request.cookies.get('dev-bypass')?.value === '1'
   ) {
+    if (needsRewrite) {
+      const url = request.nextUrl.clone();
+      url.pathname = effectivePathname;
+      return NextResponse.rewrite(url);
+    }
     return NextResponse.next();
   }
 
@@ -56,8 +98,17 @@ export async function middleware(request: NextRequest) {
   if (!user) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
-    url.searchParams.set('redirect', pathname);
+    // For custom domains, store the short path (e.g., /dashboard) as redirect
+    // so after login the user stays on westwood6.com/dashboard
+    url.searchParams.set('redirect', needsRewrite ? pathname : pathname);
     return NextResponse.redirect(url);
+  }
+
+  // Apply rewrite for authenticated custom domain requests
+  if (needsRewrite) {
+    const url = request.nextUrl.clone();
+    url.pathname = effectivePathname;
+    return NextResponse.rewrite(url);
   }
 
   return supabaseResponse;
