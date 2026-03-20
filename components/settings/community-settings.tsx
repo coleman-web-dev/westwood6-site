@@ -79,7 +79,6 @@ export function CommunitySettings() {
   const [estoppelExpeditedFee, setEstoppelExpeditedFee] = useState(10000); // cents ($100)
   const [estoppelDelinquentSurchargeEnabled, setEstoppelDelinquentSurchargeEnabled] = useState(true);
   const [estoppelDelinquentSurcharge, setEstoppelDelinquentSurcharge] = useState(10000); // cents ($100)
-  const [estoppelShowOnLanding, setEstoppelShowOnLanding] = useState(false);
   const [estoppelGlAccount, setEstoppelGlAccount] = useState('4600');
   const [revenueAccounts, setRevenueAccounts] = useState<Array<{ code: string; name: string }>>([]);
   const [estoppelWizardOpen, setEstoppelWizardOpen] = useState(false);
@@ -133,7 +132,6 @@ export function CommunitySettings() {
       setEstoppelExpeditedFee(es?.expedited_fee ?? 10000);
       setEstoppelDelinquentSurchargeEnabled(es?.delinquent_surcharge_enabled ?? true);
       setEstoppelDelinquentSurcharge(es?.delinquent_surcharge ?? 10000);
-      setEstoppelShowOnLanding(es?.show_on_landing_page ?? false);
       setEstoppelGlAccount(es?.gl_revenue_account_code ?? '4600');
 
       // Fetch revenue accounts for GL picker
@@ -207,7 +205,6 @@ export function CommunitySettings() {
       estoppelExpeditedFee !== ((community.theme?.estoppel_settings as EstoppelSettings | undefined)?.expedited_fee ?? 10000) ||
       estoppelDelinquentSurchargeEnabled !== ((community.theme?.estoppel_settings as EstoppelSettings | undefined)?.delinquent_surcharge_enabled ?? true) ||
       estoppelDelinquentSurcharge !== ((community.theme?.estoppel_settings as EstoppelSettings | undefined)?.delinquent_surcharge ?? 10000) ||
-      estoppelShowOnLanding !== ((community.theme?.estoppel_settings as EstoppelSettings | undefined)?.show_on_landing_page ?? false) ||
       estoppelGlAccount !== ((community.theme?.estoppel_settings as EstoppelSettings | undefined)?.gl_revenue_account_code ?? '4600')
     );
   }, [
@@ -221,7 +218,7 @@ export function CommunitySettings() {
     reminderDaysBefore, reminderDaysAfter, arcEnabled, votingConfig,
     autoEscalationEnabled, defaultDeadlineDays, escalationNoticeType,
     reportNotificationMode, reportNotificationMemberIds,
-    estoppelEnabled, estoppelStandardFee, estoppelExpeditedFeeEnabled, estoppelExpeditedFee, estoppelDelinquentSurchargeEnabled, estoppelDelinquentSurcharge, estoppelShowOnLanding, estoppelGlAccount,
+    estoppelEnabled, estoppelStandardFee, estoppelExpeditedFeeEnabled, estoppelExpeditedFee, estoppelDelinquentSurchargeEnabled, estoppelDelinquentSurcharge, estoppelGlAccount,
     community,
   ]);
 
@@ -297,7 +294,6 @@ export function CommunitySettings() {
             expedited_fee: estoppelExpeditedFee,
             delinquent_surcharge_enabled: estoppelDelinquentSurchargeEnabled,
             delinquent_surcharge: estoppelDelinquentSurcharge,
-            show_on_landing_page: estoppelShowOnLanding,
             gl_revenue_account_code: estoppelGlAccount,
           },
         },
@@ -1413,20 +1409,9 @@ export function CommunitySettings() {
 
                 <div className="border-t border-stroke-light dark:border-stroke-dark" />
 
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-body text-text-primary-light dark:text-text-primary-dark">
-                      Show on landing page
-                    </p>
-                    <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                      Display an estoppel request link on the public community page
-                    </p>
-                  </div>
-                  <Switch
-                    checked={estoppelShowOnLanding}
-                    onCheckedChange={setEstoppelShowOnLanding}
-                  />
-                </div>
+                <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+                  To show estoppel requests on the landing page, use the toggle in the Landing Page editor.
+                </p>
               </div>
             </CollapsibleContent>
           </Collapsible>
@@ -1459,7 +1444,6 @@ export function CommunitySettings() {
                   expedited_fee: estoppelExpeditedFee,
                   delinquent_surcharge_enabled: estoppelDelinquentSurchargeEnabled,
                   delinquent_surcharge: estoppelDelinquentSurcharge,
-                  show_on_landing_page: estoppelShowOnLanding,
                   gl_revenue_account_code: estoppelGlAccount,
                   template,
                   fields,

@@ -373,6 +373,9 @@ export function LandingPageSettings() {
             <LandingPageVendorsToggles />
           </Section>
 
+          {/* Estoppel Requests */}
+          <EstoppelLandingToggle />
+
           {/* Board Members */}
           <Section
             title="Board Members"
@@ -678,5 +681,64 @@ function Section({
       </p>
       {children}
     </div>
+  );
+}
+
+function EstoppelLandingToggle() {
+  const { community } = useCommunity();
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+
+  const estoppelSettings = community.theme?.estoppel_settings as
+    | { enabled?: boolean; show_on_landing_page?: boolean }
+    | undefined;
+
+  if (!estoppelSettings?.enabled) return null;
+
+  const isShown = estoppelSettings.show_on_landing_page ?? false;
+
+  async function handleToggle(checked: boolean) {
+    setSaving(true);
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('communities')
+      .update({
+        theme: {
+          ...community.theme,
+          estoppel_settings: {
+            ...community.theme?.estoppel_settings,
+            show_on_landing_page: checked,
+          },
+        },
+      })
+      .eq('id', community.id);
+
+    setSaving(false);
+    if (error) {
+      toast.error('Failed to update estoppel visibility.');
+      return;
+    }
+    toast.success(checked ? 'Estoppel requests will show on the landing page.' : 'Estoppel requests hidden from landing page.');
+    router.refresh();
+  }
+
+  return (
+    <Section title="Estoppel Requests" description="Show an estoppel request link on the public community page. Configure estoppel fees in Settings > Community.">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-body text-text-primary-light dark:text-text-primary-dark">
+            Show on landing page
+          </p>
+          <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+            Display an estoppel request link for title companies and closing agents
+          </p>
+        </div>
+        <Switch
+          checked={isShown}
+          onCheckedChange={handleToggle}
+          disabled={saving}
+        />
+      </div>
+    </Section>
   );
 }
