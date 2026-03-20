@@ -48,9 +48,16 @@ export async function sendPasswordSetupLink(
     communityName = (member.communities as { name: string }).name;
   }
 
-  // Build the recovery URL from the generated link properties
-  // Supabase returns hashed_token and verification_url
-  const resetUrl = data.properties.action_link;
+  // The action_link from Supabase embeds the Site URL (which may be localhost
+  // in development). Replace any localhost references with the real app URL
+  // so the link works in production.
+  let resetUrl = data.properties.action_link;
+  if (appUrl !== 'http://localhost:3000') {
+    resetUrl = resetUrl.replace(
+      /redirect_to=http%3A%2F%2Flocalhost%3A3000/g,
+      `redirect_to=${encodeURIComponent(appUrl)}`,
+    );
+  }
 
   // Render and send via Resend (branded DuesIQ email)
   try {
