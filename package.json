@@ -90,7 +90,7 @@
     "react-grid-layout": "^2.2.2",
     "react-hook-form": "^7.62.0",
     "react-plaid-link": "^4.1.1",
-    "react-resizable-panels": "^2.1.8",
+    "react-resizable-panels": "^4.7.1",
     "reading-time": "1.5.0",
     "recharts": "^2.15.3",
     "rehype-autolink-headings": "^7.1.0",
