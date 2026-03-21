@@ -11,6 +11,7 @@ import type { PaymentFrequency } from '@/lib/types/database';
  * - Monthly payers: 14-day lookahead
  * - Non-monthly payers (quarterly/semi_annual/annual): 10-day lookahead
  * After generating invoices, auto-applies wallet balances to cover them.
+ * Auto-rolls regular assessments forward when their fiscal year ends.
  * Idempotent: always checks for existing invoices before inserting.
  */
 export async function POST(req: NextRequest) {
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
   let totalSkipped = 0;
   let totalNotified = 0;
   let totalWalletApplied = 0;
+  let totalRolledOver = 0;
 
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
@@ -66,6 +68,35 @@ export async function POST(req: NextRequest) {
       .eq('is_active', true);
 
     if (!assessments || assessments.length === 0) continue;
+
+    // Auto-rollover: regular assessments whose fiscal year has ended get rolled forward 1 year.
+    // This keeps recurring dues generating invoices indefinitely without manual intervention.
+    for (const assessment of assessments) {
+      if (assessment.type === 'special') continue;
+      if (assessment.fiscal_year_end >= todayStr) continue;
+
+      const fyStart = new Date(assessment.fiscal_year_start + 'T00:00:00Z');
+      const fyEnd = new Date(assessment.fiscal_year_end + 'T00:00:00Z');
+      fyStart.setUTCFullYear(fyStart.getUTCFullYear() + 1);
+      fyEnd.setUTCFullYear(fyEnd.getUTCFullYear() + 1);
+
+      const newStart = `${fyStart.getUTCFullYear()}-${String(fyStart.getUTCMonth() + 1).padStart(2, '0')}-${String(fyStart.getUTCDate()).padStart(2, '0')}`;
+      const newEnd = `${fyEnd.getUTCFullYear()}-${String(fyEnd.getUTCMonth() + 1).padStart(2, '0')}-${String(fyEnd.getUTCDate()).padStart(2, '0')}`;
+
+      const { error: rollError } = await supabase
+        .from('assessments')
+        .update({ fiscal_year_start: newStart, fiscal_year_end: newEnd })
+        .eq('id', assessment.id);
+
+      if (!rollError) {
+        assessment.fiscal_year_start = newStart;
+        assessment.fiscal_year_end = newEnd;
+        totalRolledOver++;
+        console.log(`Auto-rolled assessment "${assessment.title}" to ${newStart} - ${newEnd}`);
+      } else {
+        console.error(`Failed to rollover assessment "${assessment.title}":`, rollError);
+      }
+    }
 
     // Get active units (need payment_frequency for lookahead window)
     const { data: units } = await supabase
@@ -214,5 +245,6 @@ export async function POST(req: NextRequest) {
     skipped: totalSkipped,
     notified: totalNotified,
     walletApplied: totalWalletApplied,
+    rolledOver: totalRolledOver,
   });
 }
