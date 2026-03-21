@@ -79,11 +79,23 @@ export function HouseholdFinancialSummary({ unitId, communityId }: HouseholdFina
       });
     }
     for (const tx of (walletTxResult.data as Pick<WalletTransaction, 'id' | 'amount' | 'type' | 'description' | 'created_at'>[]) ?? []) {
+      // Skip wallet-only entries (internal corrections, imports) — same filter as full ledger
+      const isWalletOnly =
+        tx.type === 'manual_credit' &&
+        (tx.description?.includes('monthly invoicing conversion') ||
+          tx.description?.includes('imported from previous system') ||
+          tx.description?.includes('Wallet import correction'));
+      if (isWalletOnly) continue;
+
+      // payment_applied is stored as negative (money leaving wallet) but already
+      // represents a credit in the account ledger, so keep the sign as-is.
+      const amount = tx.type === 'payment_applied' ? tx.amount : -tx.amount;
+
       entries.push({
         entry_date: tx.created_at,
         entry_type: tx.type,
         description: tx.description ?? tx.type.replace(/_/g, ' '),
-        amount: -tx.amount,
+        amount,
         running_balance: 0,
         reference_id: tx.id,
         member_name: null,

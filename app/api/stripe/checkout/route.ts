@@ -12,13 +12,24 @@ import type { ConvenienceFeeSettings } from '@/lib/types/database';
  */
 export async function POST(req: NextRequest) {
   try {
-    const { invoiceId, communityId, successUrl, cancelUrl, paymentMethod } = await req.json();
+    const { invoiceId, communityId, successUrl, cancelUrl, paymentMethod, enableAutopay, billingDay } = await req.json();
 
     if (!invoiceId || !communityId || !successUrl || !cancelUrl) {
       return NextResponse.json(
         { error: 'invoiceId, communityId, successUrl, and cancelUrl are required' },
         { status: 400 }
       );
+    }
+
+    // Validate autopay parameters
+    if (enableAutopay) {
+      const day = Number(billingDay);
+      if (!Number.isInteger(day) || day < 1 || day > 28) {
+        return NextResponse.json(
+          { error: 'billingDay must be an integer between 1 and 28' },
+          { status: 400 }
+        );
+      }
     }
 
     // Verify the user is authenticated
@@ -206,6 +217,30 @@ export async function POST(req: NextRequest) {
       paymentMethod === 'ach' ? ['us_bank_account'] :
       ['card', 'us_bank_account'];
 
+    // Build metadata — include autopay info if opted in
+    const sessionMetadata: Record<string, string> = {
+      invoice_id: invoiceId,
+      community_id: communityId,
+    };
+    if (enableAutopay) {
+      sessionMetadata.autopay = 'true';
+      sessionMetadata.billing_day = String(billingDay);
+    }
+
+    // Build payment_intent_data — add setup_future_usage when autopay is enabled
+    // so Stripe saves the payment method for off-session subscription charges
+    const paymentIntentData: Record<string, unknown> = {};
+    if (enableAutopay) {
+      paymentIntentData.setup_future_usage = 'off_session';
+    }
+
+    if (isConnect) {
+      paymentIntentData.application_fee_amount = applicationFeeAmount;
+      paymentIntentData.transfer_data = {
+        destination: stripeAccount.stripe_account_id!,
+      };
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types: paymentMethodTypes,
@@ -213,19 +248,9 @@ export async function POST(req: NextRequest) {
       success_url: successUrl,
       cancel_url: cancelUrl,
       ...(stripeCustomerId ? { customer: stripeCustomerId } : {}),
-      metadata: {
-        invoice_id: invoiceId,
-        community_id: communityId,
-      },
-      ...(isConnect
-        ? {
-            payment_intent_data: {
-              application_fee_amount: applicationFeeAmount,
-              transfer_data: {
-                destination: stripeAccount.stripe_account_id!,
-              },
-            },
-          }
+      metadata: sessionMetadata,
+      ...(Object.keys(paymentIntentData).length > 0
+        ? { payment_intent_data: paymentIntentData }
         : {}),
     });
 

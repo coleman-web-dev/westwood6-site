@@ -65,6 +65,7 @@ interface InvoiceListProps {
   assessments?: Assessment[];
   stripeEnabled?: boolean;
   subscriptionActive?: boolean;
+  preferredBillingDay?: number | null;
 }
 
 export function InvoiceList({
@@ -77,6 +78,7 @@ export function InvoiceList({
   assessments,
   stripeEnabled,
   subscriptionActive,
+  preferredBillingDay,
 }: InvoiceListProps) {
   const { isBoard, community, member, unit } = useCommunity();
   const [statusFilter, setStatusFilter] = useState('all');
@@ -760,6 +762,8 @@ export function InvoiceList({
                     invoiceId={invoice.id}
                     communityId={community.id}
                     amount={invoice.status === 'partial' ? invoice.amount - invoice.amount_paid : invoice.amount}
+                    hasSubscription={subscriptionActive}
+                    preferredBillingDay={preferredBillingDay}
                   />
                 </div>
               )}

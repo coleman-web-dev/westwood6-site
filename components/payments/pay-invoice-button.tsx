@@ -3,8 +3,16 @@
 import { useState } from 'react';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { Button } from '@/components/shared/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/shared/ui/select';
 import { toast } from 'sonner';
-import { CreditCard, Landmark } from 'lucide-react';
+import { CreditCard, Landmark, CalendarClock } from 'lucide-react';
+import { Checkbox } from '@/components/shared/ui/checkbox';
 import type { ConvenienceFeeSettings, PaymentSettings } from '@/lib/types/database';
 
 interface PayInvoiceButtonProps {
@@ -12,6 +20,10 @@ interface PayInvoiceButtonProps {
   communityId: string;
   amount: number; // cents
   disabled?: boolean;
+  /** Whether the unit already has a Stripe subscription */
+  hasSubscription?: boolean;
+  /** Unit's current preferred billing day (1-28) */
+  preferredBillingDay?: number | null;
 }
 
 function calcFee(amount: number, settings?: ConvenienceFeeSettings): number {
@@ -19,6 +31,12 @@ function calcFee(amount: number, settings?: ConvenienceFeeSettings): number {
   const percentFee = Math.round(amount * (settings.fee_percent / 100));
   const fixedFee = settings.fee_fixed || 0;
   return percentFee + fixedFee;
+}
+
+function ordinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
 function ReceiptBreakdown({ amount, fee, label }: { amount: number; fee: number; label: string }) {
@@ -40,10 +58,81 @@ function ReceiptBreakdown({ amount, fee, label }: { amount: number; fee: number;
   );
 }
 
-export function PayInvoiceButton({ invoiceId, communityId, amount, disabled }: PayInvoiceButtonProps) {
+function AutopayOptIn({
+  enabled,
+  onToggle,
+  billingDay,
+  onBillingDayChange,
+}: {
+  enabled: boolean;
+  onToggle: (checked: boolean) => void;
+  billingDay: string;
+  onBillingDayChange: (day: string) => void;
+}) {
+  return (
+    <div className="rounded-inner-card border border-stroke-light dark:border-stroke-dark bg-surface-light-2 dark:bg-surface-dark-2 p-3 space-y-2.5">
+      <div className="flex items-center gap-2.5">
+        <Checkbox
+          id="autopay-opt-in"
+          checked={enabled}
+          onCheckedChange={(checked) => onToggle(checked === true)}
+        />
+        <label
+          htmlFor="autopay-opt-in"
+          className="text-label text-text-primary-light dark:text-text-primary-dark cursor-pointer select-none"
+        >
+          Set up auto-pay for future invoices
+        </label>
+      </div>
+
+      {enabled && (
+        <div className="flex items-center gap-2 pl-6">
+          <CalendarClock className="h-3.5 w-3.5 text-text-muted-light dark:text-text-muted-dark" />
+          <span className="text-meta text-text-secondary-light dark:text-text-secondary-dark">
+            Charge on the
+          </span>
+          <div className="w-20">
+            <Select value={billingDay} onValueChange={onBillingDayChange}>
+              <SelectTrigger className="h-7 text-meta">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 28 }, (_, i) => i + 1).map((day) => (
+                  <SelectItem key={day} value={String(day)}>
+                    {ordinal(day)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <span className="text-meta text-text-secondary-light dark:text-text-secondary-dark">
+            of each month
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function PayInvoiceButton({
+  invoiceId,
+  communityId,
+  amount,
+  disabled,
+  hasSubscription,
+  preferredBillingDay,
+}: PayInvoiceButtonProps) {
   const { community } = useCommunity();
   const [loading, setLoading] = useState<'card' | 'ach' | 'any' | null>(null);
   const [showAch, setShowAch] = useState(false);
+
+  // Autopay opt-in state
+  const showAutopayOption = !hasSubscription;
+  const [enableAutopay, setEnableAutopay] = useState(false);
+  const defaultDay = preferredBillingDay
+    ? String(Math.min(preferredBillingDay, 28))
+    : String(Math.min(new Date().getDate(), 28));
+  const [billingDay, setBillingDay] = useState(defaultDay);
 
   const theme = community.theme as Record<string, unknown> | null;
   const paymentSettings = (theme?.payment_settings as PaymentSettings) || undefined;
@@ -66,6 +155,7 @@ export function PayInvoiceButton({ invoiceId, communityId, amount, disabled }: P
           paymentMethod,
           successUrl: `${window.location.origin}/${community.slug}/payments?payment=success`,
           cancelUrl: `${window.location.origin}/${community.slug}/payments?payment=cancelled`,
+          ...(enableAutopay ? { enableAutopay: true, billingDay: Number(billingDay) } : {}),
         }),
       });
 
@@ -81,6 +171,15 @@ export function PayInvoiceButton({ invoiceId, communityId, amount, disabled }: P
       setLoading(null);
     }
   }
+
+  const autopaySection = showAutopayOption ? (
+    <AutopayOptIn
+      enabled={enableAutopay}
+      onToggle={setEnableAutopay}
+      billingDay={billingDay}
+      onBillingDayChange={setBillingDay}
+    />
+  ) : null;
 
   // Split flow: card primary, ACH toggled via link
   if (needsSplit) {
@@ -98,6 +197,7 @@ export function PayInvoiceButton({ invoiceId, communityId, amount, disabled }: P
           {achFee > 0 && (
             <ReceiptBreakdown amount={amount} fee={achFee} label="Processing fee" />
           )}
+          {autopaySection}
           <div className="flex items-center gap-3">
             <Button
               variant="outline"
@@ -122,7 +222,8 @@ export function PayInvoiceButton({ invoiceId, communityId, amount, disabled }: P
     }
 
     return (
-      <div className="flex flex-col items-start gap-1.5">
+      <div className="flex flex-col items-start gap-2">
+        {autopaySection}
         <Button
           variant="outline"
           size="sm"
@@ -151,7 +252,8 @@ export function PayInvoiceButton({ invoiceId, communityId, amount, disabled }: P
   const total = amount + fee;
 
   return (
-    <div className="flex flex-col items-start gap-1.5">
+    <div className="flex flex-col items-start gap-2">
+      {autopaySection}
       <Button
         variant="outline"
         size="sm"

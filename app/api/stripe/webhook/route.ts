@@ -4,6 +4,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { queuePaymentConfirmation } from '@/lib/email/queue';
 import { postPaymentReceived, postOverpaymentWalletCredit, postEstoppelFeeReceived, postAmenityDepositReceived, postEventRsvpFeeReceived, postProcessingFeeReceived } from '@/lib/utils/accounting-entries';
 import { logAuditEvent } from '@/lib/audit';
+import { computeNextBillingAnchor, FREQUENCY_CONFIG } from '@/lib/utils/billing-anchor';
+import type { PaymentFrequency } from '@/lib/types/database';
 import type Stripe from 'stripe';
 
 export const runtime = 'nodejs';
@@ -391,6 +393,174 @@ export async function POST(req: NextRequest) {
           targetId: invoiceId,
           metadata: { amount: stripeTotalAmount, method: 'stripe_checkout', title: invoice.title, processing_fee: processingFeeAmount },
         });
+
+        // --- Autopay enrollment: create subscription if opted in ---
+        if (session.metadata?.autopay === 'true' && session.customer) {
+          try {
+            const autopayBillingDay = parseInt(session.metadata.billing_day || '1', 10);
+            const stripeCustomerId = typeof session.customer === 'string'
+              ? session.customer
+              : session.customer.id;
+
+            // Guard: skip if unit already has a subscription
+            const { data: autopayUnit } = await supabase
+              .from('units')
+              .select('id, stripe_subscription_id, payment_frequency')
+              .eq('id', invoice.unit_id)
+              .single();
+
+            if (autopayUnit && !autopayUnit.stripe_subscription_id) {
+              // Look up stripe_accounts for prices and connect config
+              const { data: autopayStripeAccount } = await supabase
+                .from('stripe_accounts')
+                .select('*')
+                .eq('community_id', communityId)
+                .single();
+
+              if (autopayStripeAccount) {
+                const stripePrices = (autopayStripeAccount.stripe_prices as Record<string, string>) || {};
+                let productId = autopayStripeAccount.stripe_product_id;
+
+                // Create product and prices on the fly if they don't exist
+                if (!productId || !stripePrices.monthly) {
+                  const { data: assessment } = await supabase
+                    .from('assessments')
+                    .select('title, annual_amount')
+                    .eq('community_id', communityId)
+                    .eq('is_active', true)
+                    .single();
+
+                  if (assessment) {
+                    if (!productId) {
+                      const product = await stripe.products.create({
+                        name: assessment.title,
+                        metadata: { community_id: communityId },
+                      });
+                      productId = product.id;
+                    }
+
+                    let pricesChanged = false;
+                    for (const [freq, config] of Object.entries(FREQUENCY_CONFIG)) {
+                      if (stripePrices[freq]) continue;
+                      const amount = Math.round(assessment.annual_amount / config.divisor);
+                      const price = await stripe.prices.create({
+                        product: productId,
+                        unit_amount: amount,
+                        currency: 'usd',
+                        recurring: { interval: config.interval, interval_count: config.interval_count },
+                        metadata: { frequency: freq, community_id: communityId },
+                      });
+                      stripePrices[freq] = price.id;
+                      pricesChanged = true;
+                    }
+
+                    // Save back to stripe_accounts
+                    const updateFields: Record<string, unknown> = { updated_at: new Date().toISOString() };
+                    if (!autopayStripeAccount.stripe_product_id) updateFields.stripe_product_id = productId;
+                    if (!autopayStripeAccount.stripe_default_price_id) updateFields.stripe_default_price_id = stripePrices.monthly || null;
+                    if (pricesChanged) updateFields.stripe_prices = stripePrices;
+                    if (Object.keys(updateFields).length > 1) {
+                      await supabase.from('stripe_accounts').update(updateFields).eq('id', autopayStripeAccount.id);
+                    }
+                  }
+                }
+
+                const unitFreq = (autopayUnit.payment_frequency as PaymentFrequency) || 'monthly';
+                const targetPriceId = stripePrices[unitFreq] || stripePrices.monthly;
+
+                if (targetPriceId) {
+                  // Retrieve payment method from the PaymentIntent
+                  const paymentIntentId = typeof session.payment_intent === 'string'
+                    ? session.payment_intent
+                    : session.payment_intent?.id;
+
+                  let paymentMethodId: string | undefined;
+                  if (paymentIntentId) {
+                    const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
+                    paymentMethodId = typeof pi.payment_method === 'string'
+                      ? pi.payment_method
+                      : pi.payment_method?.id || undefined;
+                  }
+
+                  // Set as customer's default payment method for invoices
+                  if (paymentMethodId) {
+                    await stripe.customers.update(stripeCustomerId, {
+                      invoice_settings: { default_payment_method: paymentMethodId },
+                    });
+                  }
+
+                  // Compute billing cycle anchor
+                  const billingCycleAnchor = computeNextBillingAnchor(autopayBillingDay, unitFreq);
+
+                  const isAutopayConnect = autopayStripeAccount.mode === 'connect' && autopayStripeAccount.stripe_account_id;
+
+                  const subscription = await stripe.subscriptions.create({
+                    customer: stripeCustomerId,
+                    items: [{ price: targetPriceId }],
+                    billing_cycle_anchor: billingCycleAnchor,
+                    proration_behavior: 'none',
+                    ...(paymentMethodId ? { default_payment_method: paymentMethodId } : {}),
+                    metadata: {
+                      unit_id: autopayUnit.id,
+                      community_id: communityId,
+                      payment_frequency: unitFreq,
+                    },
+                    ...(isAutopayConnect ? {
+                      application_fee_percent: autopayStripeAccount.application_fee_percent,
+                      transfer_data: { destination: autopayStripeAccount.stripe_account_id! },
+                    } : {}),
+                  });
+
+                  // Update unit with subscription info
+                  await supabase.from('units').update({
+                    stripe_subscription_id: subscription.id,
+                    stripe_subscription_status: subscription.status,
+                    preferred_billing_day: autopayBillingDay,
+                  }).eq('id', autopayUnit.id);
+
+                  // Notify unit members about autopay enrollment
+                  const { data: unitMembers } = await supabase
+                    .from('members')
+                    .select('id')
+                    .eq('unit_id', autopayUnit.id)
+                    .eq('is_approved', true);
+
+                  if (unitMembers && unitMembers.length > 0) {
+                    const ordSuffix = ['th', 'st', 'nd', 'rd'];
+                    const v = autopayBillingDay % 100;
+                    const ord = autopayBillingDay + (ordSuffix[(v - 20) % 10] || ordSuffix[v] || ordSuffix[0]);
+                    void supabase.rpc('create_member_notifications', {
+                      p_community_id: communityId,
+                      p_type: 'general',
+                      p_title: 'Auto-pay enabled',
+                      p_body: `Your auto-pay is set up. Future charges will be billed on the ${ord} of each month.`,
+                      p_reference_id: null,
+                      p_reference_type: 'payment',
+                      p_member_ids: unitMembers.map((m: { id: string }) => m.id),
+                    });
+                  }
+
+                  await logAuditEvent({
+                    communityId,
+                    action: 'autopay_enrolled',
+                    targetType: 'unit',
+                    targetId: autopayUnit.id,
+                    metadata: { billing_day: autopayBillingDay, frequency: unitFreq, subscription_id: subscription.id },
+                  });
+
+                  console.log('Autopay subscription created for unit:', autopayUnit.id, 'subscription:', subscription.id);
+                } else {
+                  console.warn('No Stripe price found for autopay enrollment, skipping. Unit:', autopayUnit.id);
+                }
+              }
+            } else if (autopayUnit?.stripe_subscription_id) {
+              console.log('Unit already has subscription, skipping autopay enrollment:', autopayUnit.id);
+            }
+          } catch (autopayErr) {
+            // Log but don't fail the webhook — the payment itself was successful
+            console.error('Failed to create autopay subscription:', autopayErr);
+          }
+        }
 
         console.log('Checkout session completed for invoice:', invoiceId);
         break;

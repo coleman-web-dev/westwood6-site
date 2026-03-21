@@ -66,6 +66,7 @@ export default function PaymentsPage() {
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
   const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
   const [sendingReminders, setSendingReminders] = useState(false);
+  const [preferredBillingDay, setPreferredBillingDay] = useState<number | null>(null);
 
   const fetchData = useCallback(async () => {
     const supabase = createClient();
@@ -159,7 +160,7 @@ export default function PaymentsPage() {
     if (unit) {
       const { data: unitData } = await supabase
         .from('units')
-        .select('stripe_subscription_id, stripe_subscription_status')
+        .select('stripe_subscription_id, stripe_subscription_status, preferred_billing_day')
         .eq('id', unit.id)
         .single();
 
@@ -168,6 +169,7 @@ export default function PaymentsPage() {
       } else {
         setSubscriptionStatus(null);
       }
+      setPreferredBillingDay(unitData?.preferred_billing_day ?? null);
     }
 
     // Check if Stripe is enabled for this community
@@ -443,6 +445,7 @@ export default function PaymentsPage() {
             assessments={isBoard ? assessments : undefined}
             stripeEnabled={stripeEnabled}
             subscriptionActive={subscriptionStatus === 'active'}
+            preferredBillingDay={preferredBillingDay}
           />
         </TabsContent>
 
