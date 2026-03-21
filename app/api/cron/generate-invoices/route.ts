@@ -168,8 +168,8 @@ export async function POST(req: NextRequest) {
       }
 
       if (newInvoices.length > 0) {
-        // Collect all inserted invoices for wallet auto-apply
-        const allInserted: { id: string; amount: number; unit_id: string; title: string }[] = [];
+        // Collect all inserted invoice IDs for wallet auto-apply and notifications
+        const allInsertedIds: string[] = [];
 
         // Insert in batches of 50
         for (let i = 0; i < newInvoices.length; i += 50) {
@@ -177,37 +177,68 @@ export async function POST(req: NextRequest) {
           const { data: inserted, error } = await supabase
             .from('invoices')
             .insert(batch)
-            .select('id, unit_id, title, amount, due_date');
+            .select('id, unit_id, title, amount');
 
           if (error) {
             console.error('Failed to insert invoices batch:', error);
           } else {
             totalGenerated += batch.length;
 
-            // Collect for wallet auto-apply
             if (inserted) {
               for (const inv of inserted) {
-                allInserted.push({
-                  id: inv.id,
-                  amount: inv.amount,
-                  unit_id: inv.unit_id,
-                  title: inv.title,
-                });
+                allInsertedIds.push(inv.id);
               }
             }
+          }
+        }
 
-            // Auto-notify homeowners about new invoices
-            if (autoNotify && inserted) {
-              for (const inv of inserted) {
+        // Auto-apply wallet balances BEFORE sending notifications.
+        // This ensures emails reflect the actual amount owed after wallet deductions.
+        if (allInsertedIds.length > 0) {
+          // Fetch inserted invoices for wallet batch apply
+          const { data: invoicesForWallet } = await supabase
+            .from('invoices')
+            .select('id, amount, unit_id, title')
+            .in('id', allInsertedIds);
+
+          if (invoicesForWallet && invoicesForWallet.length > 0) {
+            try {
+              const walletResult = await applyWalletToInvoiceBatch(
+                supabase, invoicesForWallet, community.id, null
+              );
+              if (walletResult.totalApplied > 0) {
+                totalWalletApplied += walletResult.totalApplied;
+                console.log(
+                  `Wallet auto-applied: ${walletResult.totalApplied} cents across ${walletResult.unitsAffected} units`
+                );
+              }
+            } catch (err) {
+              console.error('Wallet auto-apply failed:', err);
+            }
+          }
+
+          // Now send notifications with actual remaining balances
+          if (autoNotify) {
+            const { data: finalInvoices } = await supabase
+              .from('invoices')
+              .select('id, unit_id, title, amount, amount_paid, due_date, status')
+              .in('id', allInsertedIds);
+
+            if (finalInvoices) {
+              for (const inv of finalInvoices) {
+                // Skip notification for invoices fully covered by wallet
+                if (inv.status === 'paid') continue;
+
+                const remaining = inv.amount - (inv.amount_paid || 0);
                 try {
                   await queuePaymentReminder(
                     community.id,
                     community.slug as string,
                     inv.id,
                     inv.title,
-                    inv.amount,
+                    remaining,
                     inv.due_date,
-                    false, // not overdue, it's a new invoice notification
+                    false,
                     inv.unit_id,
                   );
                   totalNotified++;
@@ -216,24 +247,6 @@ export async function POST(req: NextRequest) {
                 }
               }
             }
-          }
-        }
-
-        // Auto-apply wallet balances to newly generated invoices.
-        // This covers prepaid households (yearly/semi-annual payers with wallet credits).
-        if (allInserted.length > 0) {
-          try {
-            const walletResult = await applyWalletToInvoiceBatch(
-              supabase, allInserted, community.id, null
-            );
-            if (walletResult.totalApplied > 0) {
-              totalWalletApplied += walletResult.totalApplied;
-              console.log(
-                `Wallet auto-applied: ${walletResult.totalApplied} cents across ${walletResult.unitsAffected} units`
-              );
-            }
-          } catch (err) {
-            console.error('Wallet auto-apply failed:', err);
           }
         }
       }
