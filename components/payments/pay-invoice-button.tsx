@@ -127,7 +127,6 @@ export function PayInvoiceButton({
 }: PayInvoiceButtonProps) {
   const { community } = useCommunity();
   const [loading, setLoading] = useState<'card' | 'ach' | 'any' | null>(null);
-  const [showAch, setShowAch] = useState(false);
 
   // Only show autopay option on recurring assessment invoices when no subscription exists
   const showAutopayOption = !hasSubscription && isRecurringInvoice;
@@ -184,69 +183,48 @@ export function PayInvoiceButton({
     />
   ) : null;
 
-  // Split flow: card primary, ACH toggled via link
+  // Split flow: show both card and ACH buttons side by side
   if (needsSplit) {
     const cardFee = appliesTo === 'card' ? fee : 0;
     const achFee = appliesTo === 'ach' ? fee : 0;
     const cardTotal = amount + cardFee;
     const achTotal = amount + achFee;
 
-    if (showAch) {
-      return (
-        <div className="flex flex-col gap-2">
-          <p className="text-body text-text-secondary-light dark:text-text-secondary-dark">
-            ACH transfers take 3-5 business days to process.
-          </p>
-          {achFee > 0 && (
-            <ReceiptBreakdown amount={amount} fee={achFee} label="Processing fee" />
-          )}
-          {autopaySection}
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => startCheckout('ach')}
-              disabled={!!loading || disabled}
-              className="text-green-600 border-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-950"
-            >
-              <Landmark className="h-4 w-4 mr-1.5" />
-              {loading === 'ach' ? 'Redirecting...' : `Pay $${(achTotal / 100).toFixed(2)} via ACH`}
-            </Button>
-            <button
-              type="button"
-              onClick={() => setShowAch(false)}
-              className="text-label text-text-muted-light dark:text-text-muted-dark hover:text-text-primary-light dark:hover:text-text-primary-dark transition-colors"
-            >
-              Back to card
-            </button>
-          </div>
-        </div>
-      );
-    }
-
     return (
       <div className="flex flex-col items-start gap-2">
         {autopaySection}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => startCheckout('card')}
-          disabled={!!loading || disabled}
-          className="text-green-600 border-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-950"
-        >
-          <CreditCard className="h-4 w-4 mr-1.5" />
-          {loading === 'card' ? 'Redirecting...' : `Pay Instant $${(cardTotal / 100).toFixed(2)}`}
-        </Button>
-        {cardFee > 0 && (
-          <ReceiptBreakdown amount={amount} fee={cardFee} label="Processing fee" />
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => startCheckout('card')}
+            disabled={!!loading || disabled}
+            className="text-green-600 border-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-950"
+          >
+            <CreditCard className="h-4 w-4 mr-1.5" />
+            {loading === 'card' ? 'Redirecting...' : `Pay with Card $${(cardTotal / 100).toFixed(2)}`}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => startCheckout('ach')}
+            disabled={!!loading || disabled}
+            className="text-green-600 border-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-950"
+          >
+            <Landmark className="h-4 w-4 mr-1.5" />
+            {loading === 'ach' ? 'Redirecting...' : `Pay via ACH $${(achTotal / 100).toFixed(2)}`}
+          </Button>
+        </div>
+        {(cardFee > 0 || achFee > 0) && (
+          <div className="flex gap-6">
+            {cardFee > 0 && (
+              <ReceiptBreakdown amount={amount} fee={cardFee} label="Card processing fee" />
+            )}
+            {achFee > 0 && (
+              <ReceiptBreakdown amount={amount} fee={achFee} label="ACH processing fee" />
+            )}
+          </div>
         )}
-        <button
-          type="button"
-          onClick={() => setShowAch(true)}
-          className="text-label text-text-muted-light dark:text-text-muted-dark hover:text-text-primary-light dark:hover:text-text-primary-dark transition-colors underline underline-offset-2"
-        >
-          Pay via ACH
-        </button>
       </div>
     );
   }
