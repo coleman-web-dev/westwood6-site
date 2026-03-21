@@ -108,8 +108,18 @@ export function HouseholdLedger({ refreshKey, initialUnitId, hideUnitPicker }: H
       // represents a credit in the account ledger, so keep the sign as-is.
       const amount = tx.type === 'payment_applied' ? tx.amount : -tx.amount;
 
+      // For payment_applied, use the invoice's due_date so the credit appears
+      // alongside the charge it pays (not days/weeks earlier when auto-apply ran).
+      let entryDate = tx.created_at;
+      if (tx.type === 'payment_applied' && tx.reference_id) {
+        const matchedInvoice = invoices.find((inv) => inv.id === tx.reference_id);
+        if (matchedInvoice) {
+          entryDate = matchedInvoice.due_date;
+        }
+      }
+
       ledgerEntries.push({
-        entry_date: tx.created_at,
+        entry_date: entryDate,
         entry_type: tx.type,
         description: tx.description ?? tx.type.replace(/_/g, ' '),
         amount,
@@ -119,8 +129,15 @@ export function HouseholdLedger({ refreshKey, initialUnitId, hideUnitPicker }: H
       });
     }
 
-    // Sort by date
-    ledgerEntries.sort((a, b) => a.entry_date.localeCompare(b.entry_date));
+    // Sort by date, then charges before credits on the same date
+    ledgerEntries.sort((a, b) => {
+      const dateCompare = a.entry_date.localeCompare(b.entry_date);
+      if (dateCompare !== 0) return dateCompare;
+      // On the same date: charges (positive) first, then credits (negative)
+      if (a.amount >= 0 && b.amount < 0) return -1;
+      if (a.amount < 0 && b.amount >= 0) return 1;
+      return 0;
+    });
 
     // Compute running balance
     let running = 0;
