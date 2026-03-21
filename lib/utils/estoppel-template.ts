@@ -173,6 +173,7 @@ export function buildEstoppelSystemContext(params: {
   lateFees: number;
   specialAssessments: Array<{ title: string; amount: number; details?: string }>;
   violations: Array<{ title: string; status: string; description?: string }>;
+  futureSpecialAssessments?: Array<{ title: string; amount: number; dueDates?: string }>;
   completionDate: string;
 }): Record<string, string> {
   const formatCents = (cents: number) => `$${(cents / 100).toFixed(2)}`;
@@ -191,6 +192,15 @@ export function buildEstoppelSystemContext(params: {
         .join('; ')
     : 'N/A';
 
+  const futureSpecials = params.futureSpecialAssessments ?? [];
+  const hasFutureSpecial = futureSpecials.length > 0;
+  const futureSpecialAmount = hasFutureSpecial
+    ? futureSpecials.map((sa) => `${sa.title}: ${formatCents(sa.amount)}`).join('; ')
+    : '';
+  const futureSpecialDueDates = hasFutureSpecial
+    ? futureSpecials.map((sa) => sa.dueDates || 'TBD').join('; ')
+    : '';
+
   return {
     community_name: params.communityName,
     community_address: params.communityAddress || '',
@@ -203,6 +213,8 @@ export function buildEstoppelSystemContext(params: {
     special_assessment_details: specialDetails,
     has_violations: hasViolations ? 'Yes' : 'No',
     violation_details: violationDetails,
+    future_special_amount: futureSpecialAmount,
+    future_special_due_dates: futureSpecialDueDates,
     completion_date: params.completionDate,
   };
 }

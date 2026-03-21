@@ -62,8 +62,10 @@ export async function fetchEstoppelSystemFields(
     });
   }
 
-  // Fetch unit info + ledger data + assessment + violations in parallel
-  const [unitResult, invoiceResult, paymentResult, walletResult, assessmentResult, lastPaidResult, violationResult] =
+  const today = new Date().toISOString().split('T')[0];
+
+  // Fetch unit info + ledger data + assessment + violations + future specials in parallel
+  const [unitResult, invoiceResult, paymentResult, walletResult, assessmentResult, lastPaidResult, violationResult, futureSpecialResult] =
     await Promise.all([
       supabase
         .from('units')
@@ -91,6 +93,7 @@ export async function fetchEstoppelSystemFields(
         .select('annual_amount, default_frequency')
         .eq('community_id', communityId)
         .eq('is_active', true)
+        .eq('type', 'regular')
         .limit(1)
         .maybeSingle(),
       supabase
@@ -106,6 +109,13 @@ export async function fetchEstoppelSystemFields(
         .select('title, status, description')
         .eq('unit_id', unitId)
         .neq('status', 'resolved'),
+      supabase
+        .from('assessments')
+        .select('title, annual_amount, installments, installment_start_date, fiscal_year_start')
+        .eq('community_id', communityId)
+        .eq('is_active', true)
+        .eq('type', 'special')
+        .gte('fiscal_year_end', today),
     ]);
 
   const invoices = invoiceResult.data ?? [];
@@ -165,6 +175,19 @@ export async function fetchEstoppelSystemFields(
     description: v.description || undefined,
   }));
 
+  // Future special assessments (approved but not yet fully billed)
+  const futureSpecials = (futureSpecialResult.data ?? []).map((sa) => {
+    const startDate = sa.installment_start_date || sa.fiscal_year_start;
+    const dueDates = startDate
+      ? new Date(startDate + 'T00:00:00').toLocaleDateString('en-US')
+      : undefined;
+    return {
+      title: sa.title,
+      amount: sa.annual_amount,
+      dueDates,
+    };
+  });
+
   return buildEstoppelSystemContext({
     communityName: community.name,
     communityAddress: community.address || '',
@@ -175,6 +198,7 @@ export async function fetchEstoppelSystemFields(
     lateFees,
     specialAssessments: [],
     violations,
+    futureSpecialAssessments: futureSpecials,
     completionDate: new Date().toLocaleDateString('en-US'),
   });
 }

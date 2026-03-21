@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import {
@@ -10,6 +10,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/shared/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from '@/components/shared/ui/alert-dialog';
 import { Button } from '@/components/shared/ui/button';
 import { Input } from '@/components/shared/ui/input';
 import { Label } from '@/components/shared/ui/label';
@@ -41,14 +51,28 @@ export function EstoppelReviewDialog({
 
   const { boardFields: boardFieldDefs } = partitionEstoppelFieldsByPhase(templateFields);
 
-  const [boardAnswers, setBoardAnswers] = useState<Record<string, string>>(
-    (request.board_fields as Record<string, string>) ?? {},
-  );
+  // Pre-fill board answers: existing answers first, then defaults from template
+  const existingBoardFields = (request.board_fields as Record<string, string>) ?? {};
+  const initialBoardAnswers: Record<string, string> = {};
+  for (const field of boardFieldDefs) {
+    if (existingBoardFields[field.key]) {
+      initialBoardAnswers[field.key] = existingBoardFields[field.key];
+    } else if (field.default_value) {
+      initialBoardAnswers[field.key] = field.default_value;
+    }
+  }
+
+  const [boardAnswers, setBoardAnswers] = useState<Record<string, string>>(initialBoardAnswers);
   const [signatureName, setSignatureName] = useState(request.signature_name ?? '');
   const [signatureTitle, setSignatureTitle] = useState(request.completed_by_title ?? '');
   const [eSignConsent, setESignConsent] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
+
+  // Track which default values were changed during review
+  const [changedDefaults, setChangedDefaults] = useState<Record<string, string>>({});
+  const [showDefaultPrompt, setShowDefaultPrompt] = useState(false);
+  const pendingAction = useRef<'save' | 'send' | null>(null);
 
   // System fields: loaded on-demand from the ledger
   const existingSystemFields = (request.system_fields as Record<string, string>) ?? {};
@@ -77,6 +101,18 @@ export function EstoppelReviewDialog({
 
   function updateBoardAnswer(key: string, value: string) {
     setBoardAnswers((prev) => ({ ...prev, [key]: value }));
+
+    // Check if this field had a default_value that was changed
+    const field = boardFieldDefs.find((f) => f.key === key);
+    if (field?.default_value && value !== field.default_value) {
+      setChangedDefaults((prev) => ({ ...prev, [key]: value }));
+    } else if (field?.default_value && value === field.default_value) {
+      setChangedDefaults((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    }
   }
 
   function renderFieldInput(field: EstoppelField, value: string, onChange: (v: string) => void) {
@@ -123,7 +159,56 @@ export function EstoppelReviewDialog({
     }
   }
 
+  function checkChangedDefaultsThenRun(action: 'save' | 'send') {
+    if (Object.keys(changedDefaults).length > 0) {
+      pendingAction.current = action;
+      setShowDefaultPrompt(true);
+    } else if (action === 'save') {
+      doSaveDraft();
+    } else {
+      doApproveAndSend();
+    }
+  }
+
+  async function updateTemplateDefaults() {
+    if (!estoppelSettings || !community) return;
+    const updatedFields = templateFields.map((f) => {
+      if (changedDefaults[f.key] !== undefined) {
+        return { ...f, default_value: changedDefaults[f.key] };
+      }
+      return f;
+    });
+    const supabase = createClient();
+    const updatedSettings = { ...estoppelSettings, fields: updatedFields };
+    const updatedTheme = { ...(community.theme || {}), estoppel_settings: updatedSettings };
+    await supabase
+      .from('communities')
+      .update({ theme: updatedTheme })
+      .eq('id', community.id);
+    setChangedDefaults({});
+  }
+
+  async function handleDefaultPromptResponse(updateDefaults: boolean) {
+    setShowDefaultPrompt(false);
+    if (updateDefaults) {
+      await updateTemplateDefaults();
+      toast.success('Default answers updated for future requests.');
+    }
+    setChangedDefaults({});
+    const action = pendingAction.current;
+    pendingAction.current = null;
+    if (action === 'save') {
+      await doSaveDraft();
+    } else if (action === 'send') {
+      await doApproveAndSend();
+    }
+  }
+
   async function handleSaveDraft() {
+    checkChangedDefaultsThenRun('save');
+  }
+
+  async function doSaveDraft() {
     setSaving(true);
     const supabase = createClient();
     const { error } = await supabase
@@ -168,6 +253,10 @@ export function EstoppelReviewDialog({
       }
     }
 
+    checkChangedDefaultsThenRun('send');
+  }
+
+  async function doApproveAndSend() {
     setSending(true);
     try {
       const response = await fetch('/api/estoppel/complete', {
@@ -234,6 +323,7 @@ export function EstoppelReviewDialog({
     : '';
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
         <DialogHeader>
@@ -319,10 +409,18 @@ export function EstoppelReviewDialog({
               <div className="space-y-3">
                 {boardFieldDefs.map((field) => (
                   <div key={field.id} className="space-y-1">
-                    <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-                      {field.label}
-                      {field.required && <span className="text-red-500 ml-0.5">*</span>}
-                    </Label>
+                    <div className="flex items-center gap-1.5">
+                      <Label className="text-label text-text-secondary-light dark:text-text-secondary-dark">
+                        {field.label}
+                        {field.required && <span className="text-red-500 ml-0.5">*</span>}
+                      </Label>
+                      {field.default_value && !changedDefaults[field.key] && (
+                        <span className="text-[10px] text-green-600 dark:text-green-400">(default)</span>
+                      )}
+                      {changedDefaults[field.key] !== undefined && (
+                        <span className="text-[10px] text-amber-600 dark:text-amber-400">(changed)</span>
+                      )}
+                    </div>
                     {renderFieldInput(
                       field,
                       boardAnswers[field.key] ?? '',
@@ -443,5 +541,44 @@ export function EstoppelReviewDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog open={showDefaultPrompt} onOpenChange={(open) => { if (!open) handleDefaultPromptResponse(false); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Update Default Answers?</AlertDialogTitle>
+          <AlertDialogDescription>
+            You changed the following fields that have default answers:
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div className="space-y-2 py-2">
+          {Object.entries(changedDefaults).map(([key, newValue]) => {
+            const field = boardFieldDefs.find((f) => f.key === key);
+            if (!field) return null;
+            return (
+              <div key={key} className="text-sm bg-surface-light-2 dark:bg-surface-dark-2 rounded-inner-card p-2">
+                <span className="font-medium text-text-primary-light dark:text-text-primary-dark">
+                  {field.label}
+                </span>
+                <span className="text-text-muted-light dark:text-text-muted-dark">
+                  {' '}&ldquo;{field.default_value}&rdquo; &rarr; &ldquo;{newValue}&rdquo;
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark">
+          Would you like to answer this way in the future?
+        </p>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={() => handleDefaultPromptResponse(false)}>
+            Just this time
+          </AlertDialogCancel>
+          <AlertDialogAction onClick={() => handleDefaultPromptResponse(true)}>
+            Yes, update defaults
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

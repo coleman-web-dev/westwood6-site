@@ -537,6 +537,8 @@ export interface EstoppelField {
   options?: string[];
   placeholder?: string;
   fill_phase: EstoppelFieldPhase;
+  /** Pre-filled default value for board fields. Skips manual entry during review. */
+  default_value?: string;
 }
 
 export interface EstoppelSettings {

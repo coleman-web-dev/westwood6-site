@@ -280,6 +280,24 @@ function FieldPill({ fieldKey, fields, onUpdateField, onRemoveField, onAiRefine,
                 />
               </div>
             )}
+            {field.fill_phase === 'board' && (
+              <div>
+                <label className="text-[11px] text-text-muted-light dark:text-text-muted-dark">
+                  Default answer (pre-filled every time)
+                </label>
+                <Input
+                  value={field.default_value ?? ''}
+                  onChange={(e) => onUpdateField(fieldKey, { default_value: e.target.value || undefined })}
+                  className="h-7 text-sm mt-0.5"
+                  placeholder="Leave blank to require manual entry"
+                />
+                {field.default_value && (
+                  <p className="text-[10px] text-green-600 dark:text-green-400 mt-0.5">
+                    This will be pre-filled during review. Board can still change it.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         )}
 

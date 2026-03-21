@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { getStripeClient } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
+import { fuzzyMatchUnit } from '@/lib/utils/fuzzy-match-unit';
 import type { EstoppelSettings } from '@/lib/types/database';
 
 const CheckoutSchema = z.object({
@@ -72,36 +73,23 @@ export async function POST(req: NextRequest) {
       ? estoppelSettings.expedited_fee
       : estoppelSettings.standard_fee;
 
-    // Check for delinquency surcharge by looking up unit from lot_number
+    // Match requester input to a unit using fuzzy matching
     const delinquentEnabled = estoppelSettings.delinquent_surcharge_enabled !== false;
-    const lotNumber = requesterFields.lot_number?.trim();
     let unitId: string | null = null;
     let isDelinquent = false;
 
-    if (lotNumber && delinquentEnabled) {
-      const { data: unit } = await supabase
-        .from('units')
-        .select('id, status')
-        .eq('community_id', communityId)
-        .eq('unit_number', lotNumber)
-        .single();
+    const matchResult = await fuzzyMatchUnit(supabase, communityId, {
+      lotNumber: requesterFields.lot_number,
+      propertyAddress: requesterFields.property_address,
+      ownerNames: requesterFields.owner_names,
+    });
 
-      if (unit) {
-        unitId = unit.id;
-        if (unit.status === 'past_due') {
-          isDelinquent = true;
-          feeAmount += estoppelSettings.delinquent_surcharge || 0;
-        }
+    if (matchResult) {
+      unitId = matchResult.id;
+      if (delinquentEnabled && matchResult.status === 'past_due') {
+        isDelinquent = true;
+        feeAmount += estoppelSettings.delinquent_surcharge || 0;
       }
-    } else if (lotNumber) {
-      // Still look up the unit for reference, just don't apply surcharge
-      const { data: unit } = await supabase
-        .from('units')
-        .select('id')
-        .eq('community_id', communityId)
-        .eq('unit_number', lotNumber)
-        .single();
-      if (unit) unitId = unit.id;
     }
 
     if (feeAmount <= 0) {
