@@ -44,8 +44,14 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Public API routes
-  if (pathname.startsWith('/api/demo-request') || pathname.startsWith('/api/newsletter')) {
+  // Public API routes (crons, webhooks, and public endpoints authenticate via secrets, not sessions)
+  if (
+    pathname.startsWith('/api/cron/') ||
+    pathname.startsWith('/api/email/') ||
+    pathname.startsWith('/api/stripe/webhook') ||
+    pathname.startsWith('/api/demo-request') ||
+    pathname.startsWith('/api/newsletter')
+  ) {
     return NextResponse.next();
   }
 

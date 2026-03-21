@@ -14,7 +14,16 @@ import type { PaymentFrequency } from '@/lib/types/database';
  * Auto-rolls regular assessments forward when their fiscal year ends.
  * Idempotent: always checks for existing invoices before inserting.
  */
+// Vercel crons send GET requests
+export async function GET(req: NextRequest) {
+  return handler(req);
+}
+
 export async function POST(req: NextRequest) {
+  return handler(req);
+}
+
+async function handler(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
 
