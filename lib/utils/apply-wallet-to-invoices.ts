@@ -20,7 +20,8 @@ export async function applyWalletToInvoice(
   invoiceTitle: string,
   unitId: string,
   communityId: string,
-  memberId: string | null
+  memberId: string | null,
+  existingAmountPaid: number = 0
 ): Promise<ApplyResult> {
   // 1. Fetch wallet balance
   const { data: wallet } = await supabase
@@ -35,16 +36,17 @@ export async function applyWalletToInvoice(
     return { applied: 0, invoiceStatus: 'pending', newWalletBalance: currentBalance };
   }
 
-  // 2. Calculate apply amount
-  const applyAmount = Math.min(currentBalance, invoiceAmount);
-  const fullyPaid = applyAmount >= invoiceAmount;
+  // 2. Calculate apply amount (against remaining balance, not full amount)
+  const remaining = invoiceAmount - existingAmountPaid;
+  const applyAmount = Math.min(currentBalance, remaining);
+  const fullyPaid = (existingAmountPaid + applyAmount) >= invoiceAmount;
   const newStatus = fullyPaid ? 'paid' : 'partial';
   const newBalance = currentBalance - applyAmount;
 
   // 3. Update invoice
   const invoiceUpdate: Record<string, unknown> = {
     status: newStatus,
-    amount_paid: applyAmount,
+    amount_paid: existingAmountPaid + applyAmount,
   };
   if (fullyPaid) {
     invoiceUpdate.paid_at = new Date().toISOString();

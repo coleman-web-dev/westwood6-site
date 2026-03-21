@@ -14,7 +14,7 @@ import {
 } from '@/components/shared/ui/select';
 import { UnitPicker } from '@/components/shared/unit-picker';
 import { toast } from 'sonner';
-import { CreditCard, Download } from 'lucide-react';
+import { CreditCard, Download, Wallet } from 'lucide-react';
 import { Checkbox } from '@/components/shared/ui/checkbox';
 import {
   AlertDialog,
@@ -28,6 +28,7 @@ import {
 } from '@/components/shared/ui/alert-dialog';
 import { downloadCsv } from '@/lib/utils/export-csv';
 import { postInvoiceWaivedAction, postInvoiceVoidedAction, postLateFeeRemovedAction } from '@/lib/actions/accounting-actions';
+import { applyWalletToInvoice } from '@/lib/utils/apply-wallet-to-invoices';
 import { logAuditEvent } from '@/lib/audit';
 import { BounceInvoiceDialog } from '@/components/payments/bounce-invoice-dialog';
 import { RecordPaymentDialog } from '@/components/payments/record-payment-dialog';
@@ -220,6 +221,47 @@ export function InvoiceList({
       metadata: { title: invoice.title, late_fee_amount: invoice.late_fee_amount },
     });
     postLateFeeRemovedAction(community.id, invoice.id, invoice.unit_id, invoice.late_fee_amount);
+    onInvoiceUpdated();
+  }
+
+  async function handleApplyWallet(invoice: Invoice) {
+    setUpdatingId(invoice.id);
+    const supabase = createClient();
+
+    const result = await applyWalletToInvoice(
+      supabase,
+      invoice.id,
+      invoice.amount,
+      invoice.title,
+      invoice.unit_id,
+      community.id,
+      member?.id ?? null,
+      invoice.amount_paid ?? 0,
+    );
+
+    setUpdatingId(null);
+
+    if (result.applied === 0) {
+      toast.error('No wallet credit available for this unit.');
+      return;
+    }
+
+    const appliedDollars = (result.applied / 100).toFixed(2);
+    if (result.invoiceStatus === 'paid') {
+      toast.success(`Applied $${appliedDollars} from wallet. Invoice fully paid.`);
+    } else {
+      toast.success(`Applied $${appliedDollars} from wallet. Invoice partially paid.`);
+    }
+
+    logAuditEvent({
+      communityId: community.id,
+      actorId: member?.user_id,
+      actorEmail: member?.email,
+      action: 'wallet_applied',
+      targetType: 'invoice',
+      targetId: invoice.id,
+      metadata: { title: invoice.title, applied: result.applied, newBalance: result.newWalletBalance },
+    });
     onInvoiceUpdated();
   }
 
@@ -636,6 +678,15 @@ export function InvoiceList({
                     disabled={isUpdating}
                   >
                     Record Payment
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleApplyWallet(invoice)}
+                    disabled={isUpdating}
+                  >
+                    <Wallet className="h-3.5 w-3.5 mr-1" />
+                    Apply Wallet
                   </Button>
                   {invoice.late_fee_amount > 0 && (
                     <Button
