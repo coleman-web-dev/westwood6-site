@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useRegisterActions, useKBar, VisualState } from '@shipixen/kbar';
 import { createClient } from '@/lib/supabase/client';
@@ -36,11 +36,15 @@ export function SearchProviderWrapper({ children }: { children: React.ReactNode 
 
   // Close KBar then navigate via Next.js router for instant client-side
   // transition. Using window.location.href caused a full reload and
-  // required double-click on some items.
-  const navigate = (path: string) => {
+  // required double-click on some items. Wrapped in useCallback so action
+  // perform closures always reference the latest router/query.
+  const navigate = useCallback((path: string) => {
     query.setVisualState(VisualState.hidden);
-    router.push(path);
-  };
+    // Allow KBar animation to complete before navigating
+    requestAnimationFrame(() => {
+      router.push(path);
+    });
+  }, [query, router]);
 
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [documents, setDocuments] = useState<DocType[]>([]);
@@ -178,7 +182,7 @@ export function SearchProviderWrapper({ children }: { children: React.ReactNode 
       ...announcementActions,
       ...documentActions,
     ];
-  }, [basePath, router, announcements, documents, members, units, actualIsBoard, isAdminView]);
+  }, [basePath, navigate, announcements, documents, members, units, actualIsBoard, isAdminView]);
 
   useRegisterActions(actions, [actions]);
 
