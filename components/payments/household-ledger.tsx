@@ -18,6 +18,7 @@ interface HouseholdLedgerProps {
 export function HouseholdLedger({ refreshKey, initialUnitId, hideUnitPicker }: HouseholdLedgerProps) {
   const { community, unit, isBoard } = useCommunity();
   const [entries, setEntries] = useState<LedgerEntry[]>([]);
+  const [walletBalance, setWalletBalance] = useState(0);
   const [loading, setLoading] = useState(true);
 
   // Board: unit selector (syncs with external initialUnitId when provided)
@@ -41,7 +42,7 @@ export function HouseholdLedger({ refreshKey, initialUnitId, hideUnitPicker }: H
     setLoading(true);
     const supabase = createClient();
 
-    const [invoiceResult, paymentResult, walletResult] = await Promise.all([
+    const [invoiceResult, paymentResult, walletResult, walletBalanceResult] = await Promise.all([
       supabase
         .from('invoices')
         .select('*')
@@ -57,6 +58,11 @@ export function HouseholdLedger({ refreshKey, initialUnitId, hideUnitPicker }: H
         .select('*')
         .eq('unit_id', targetUnitId)
         .order('created_at', { ascending: true }),
+      supabase
+        .from('unit_wallets')
+        .select('balance')
+        .eq('unit_id', targetUnitId)
+        .single(),
     ]);
 
     const invoices = (invoiceResult.data as Invoice[]) ?? [];
@@ -147,6 +153,7 @@ export function HouseholdLedger({ refreshKey, initialUnitId, hideUnitPicker }: H
     }
 
     setEntries(ledgerEntries);
+    setWalletBalance(walletBalanceResult.data?.balance ?? 0);
     setLoading(false);
   }, [targetUnitId]);
 
@@ -290,9 +297,13 @@ export function HouseholdLedger({ refreshKey, initialUnitId, hideUnitPicker }: H
             <div class="value credits">-$${(Math.abs(totalCredits) / 100).toFixed(2)}</div>
           </div>
           <div class="summary-item">
-            <div class="label">Current Balance</div>
-            <div class="value">$${(finalBalance / 100).toFixed(2)}</div>
+            <div class="label">Balance Due</div>
+            <div class="value">${finalBalance > 0 ? `<span class="charges">$${(finalBalance / 100).toFixed(2)}</span>` : `$${(finalBalance / 100).toFixed(2)}`}</div>
           </div>
+          ${walletBalance > 0 ? `<div class="summary-item">
+            <div class="label">Account Credit</div>
+            <div class="value credits">$${(walletBalance / 100).toFixed(2)}</div>
+          </div>` : ''}
         </div>
         <table>
           <thead><tr><th>Date</th><th>Type</th><th>Description</th><th class="num">Amount</th><th class="num">Balance</th></tr></thead>
