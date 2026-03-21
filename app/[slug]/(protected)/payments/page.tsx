@@ -440,6 +440,7 @@ export default function PaymentsPage() {
             unitOwnerMap={isBoard ? unitOwnerMap : undefined}
             units={isBoard ? allUnits : undefined}
             allMembers={isBoard ? allMembers : undefined}
+            assessments={isBoard ? assessments : undefined}
             stripeEnabled={stripeEnabled}
             subscriptionActive={subscriptionStatus === 'active'}
           />

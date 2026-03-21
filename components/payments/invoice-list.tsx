@@ -14,7 +14,7 @@ import {
 } from '@/components/shared/ui/select';
 import { UnitPicker } from '@/components/shared/unit-picker';
 import { toast } from 'sonner';
-import { CreditCard, Download, Wallet } from 'lucide-react';
+import { CreditCard, Download, Printer, Wallet } from 'lucide-react';
 import { Checkbox } from '@/components/shared/ui/checkbox';
 import {
   AlertDialog,
@@ -33,7 +33,8 @@ import { logAuditEvent } from '@/lib/audit';
 import { BounceInvoiceDialog } from '@/components/payments/bounce-invoice-dialog';
 import { RecordPaymentDialog } from '@/components/payments/record-payment-dialog';
 import { PayInvoiceButton } from '@/components/payments/pay-invoice-button';
-import type { Invoice, InvoiceStatus, Unit } from '@/lib/types/database';
+import { printInvoices } from '@/lib/utils/print-invoice';
+import type { Assessment, Invoice, InvoiceStatus, Unit } from '@/lib/types/database';
 
 const STATUS_FILTERS: { value: string; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -61,6 +62,7 @@ interface InvoiceListProps {
   unitOwnerMap?: Record<string, string>;
   units?: Unit[];
   allMembers?: { unit_id: string | null; user_id: string | null }[];
+  assessments?: Assessment[];
   stripeEnabled?: boolean;
   subscriptionActive?: boolean;
 }
@@ -72,10 +74,11 @@ export function InvoiceList({
   unitOwnerMap,
   units,
   allMembers,
+  assessments,
   stripeEnabled,
   subscriptionActive,
 }: InvoiceListProps) {
-  const { isBoard, community, member } = useCommunity();
+  const { isBoard, community, member, unit } = useCommunity();
   const [statusFilter, setStatusFilter] = useState('all');
   const [unitFilter, setUnitFilter] = useState('all');
   const [unregisteredOnly, setUnregisteredOnly] = useState(false);
@@ -87,6 +90,9 @@ export function InvoiceList({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkAction, setBulkAction] = useState<string | null>(null);
   const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [assessmentFilter, setAssessmentFilter] = useState('all');
+  const [amountMin, setAmountMin] = useState('');
+  const [amountMax, setAmountMax] = useState('');
 
   // Compute set of unit IDs that have NO registered members (no user_id)
   const unregisteredUnitIds = useMemo(() => {
@@ -114,6 +120,9 @@ export function InvoiceList({
     if (unregisteredOnly && !unregisteredUnitIds.has(inv.unit_id)) return false;
     if (dateFrom && inv.due_date < dateFrom) return false;
     if (dateTo && inv.due_date > dateTo) return false;
+    if (assessmentFilter !== 'all' && inv.assessment_id !== assessmentFilter) return false;
+    if (amountMin && inv.amount < parseFloat(amountMin) * 100) return false;
+    if (amountMax && inv.amount > parseFloat(amountMax) * 100) return false;
     return true;
   });
 
@@ -441,8 +450,36 @@ export function InvoiceList({
               Unregistered Only
             </button>
 
+            {/* Assessment filter */}
+            {assessments && assessments.length > 0 && (
+              <div className="space-y-1 min-w-[160px]">
+                <label className="text-meta text-text-muted-light dark:text-text-muted-dark">Assessment</label>
+                <Select value={assessmentFilter} onValueChange={setAssessmentFilter}>
+                  <SelectTrigger><SelectValue placeholder="All" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    {assessments.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>{a.title}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Amount range */}
+            <div className="space-y-1">
+              <label className="text-meta text-text-muted-light dark:text-text-muted-dark">Min $</label>
+              <input type="number" value={amountMin} onChange={(e) => setAmountMin(e.target.value)} placeholder="0" min="0" step="0.01"
+                className="flex h-9 w-24 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-meta text-text-muted-light dark:text-text-muted-dark">Max $</label>
+              <input type="number" value={amountMax} onChange={(e) => setAmountMax(e.target.value)} placeholder="Any" min="0" step="0.01"
+                className="flex h-9 w-24 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
+            </div>
+
             {/* Clear filters */}
-            {(unitFilter !== 'all' || unregisteredOnly || dateFrom || dateTo) && (
+            {(unitFilter !== 'all' || unregisteredOnly || dateFrom || dateTo || assessmentFilter !== 'all' || amountMin || amountMax) && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -451,6 +488,9 @@ export function InvoiceList({
                   setUnregisteredOnly(false);
                   setDateFrom('');
                   setDateTo('');
+                  setAssessmentFilter('all');
+                  setAmountMin('');
+                  setAmountMax('');
                 }}
               >
                 Clear Filters
@@ -478,6 +518,35 @@ export function InvoiceList({
               >
                 <Download className="h-4 w-4 mr-1" />
                 Export CSV
+              </Button>
+            )}
+
+            {/* Print All */}
+            {filteredInvoices.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const printData = filteredInvoices.map((inv) => ({
+                    title: inv.title,
+                    description: inv.description,
+                    amount: inv.amount,
+                    amountPaid: inv.amount_paid,
+                    lateFeeAmount: inv.late_fee_amount,
+                    status: inv.status,
+                    dueDate: inv.due_date,
+                    paidAt: inv.paid_at,
+                    unitNumber: units?.find((u) => u.id === inv.unit_id)?.unit_number ?? '',
+                    unitAddress: units?.find((u) => u.id === inv.unit_id)?.address ?? null,
+                    ownerName: unitOwnerMap?.[inv.unit_id] ?? '',
+                    assessmentTitle: assessments?.find((a) => a.id === inv.assessment_id)?.title ?? null,
+                    notes: inv.notes,
+                  }));
+                  printInvoices({ communityName: community.name, communityAddress: community.address, invoices: printData });
+                }}
+              >
+                <Printer className="h-4 w-4 mr-1" />
+                Print All
               </Button>
             )}
           </div>
@@ -514,6 +583,33 @@ export function InvoiceList({
             disabled={bulkProcessing}
           >
             Void
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              const selected = filteredInvoices.filter((inv) => selectedIds.has(inv.id));
+              const printData = selected.map((inv) => ({
+                title: inv.title,
+                description: inv.description,
+                amount: inv.amount,
+                amountPaid: inv.amount_paid,
+                lateFeeAmount: inv.late_fee_amount,
+                status: inv.status,
+                dueDate: inv.due_date,
+                paidAt: inv.paid_at,
+                unitNumber: units?.find((u) => u.id === inv.unit_id)?.unit_number ?? '',
+                unitAddress: units?.find((u) => u.id === inv.unit_id)?.address ?? null,
+                ownerName: unitOwnerMap?.[inv.unit_id] ?? '',
+                assessmentTitle: assessments?.find((a) => a.id === inv.assessment_id)?.title ?? null,
+                notes: inv.notes,
+              }));
+              printInvoices({ communityName: community.name, communityAddress: community.address, invoices: printData });
+            }}
+            disabled={bulkProcessing}
+          >
+            <Printer className="h-4 w-4 mr-1" />
+            Print
           </Button>
           <Button
             variant="ghost"
@@ -715,6 +811,35 @@ export function InvoiceList({
                   >
                     Void
                   </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      const u = units?.find((u) => u.id === invoice.unit_id);
+                      printInvoices({
+                        communityName: community.name,
+                        communityAddress: community.address,
+                        invoices: [{
+                          title: invoice.title,
+                          description: invoice.description,
+                          amount: invoice.amount,
+                          amountPaid: invoice.amount_paid,
+                          lateFeeAmount: invoice.late_fee_amount,
+                          status: invoice.status,
+                          dueDate: invoice.due_date,
+                          paidAt: invoice.paid_at,
+                          unitNumber: u?.unit_number ?? '',
+                          unitAddress: u?.address ?? null,
+                          ownerName: unitOwnerMap?.[invoice.unit_id] ?? '',
+                          assessmentTitle: assessments?.find((a) => a.id === invoice.assessment_id)?.title ?? null,
+                          notes: invoice.notes,
+                        }],
+                      });
+                    }}
+                  >
+                    <Printer className="h-3.5 w-3.5 mr-1" />
+                    Print
+                  </Button>
                 </div>
               )}
 
@@ -728,6 +853,104 @@ export function InvoiceList({
                     className="text-destructive hover:text-destructive"
                   >
                     Mark as Bounced
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      const u = units?.find((u) => u.id === invoice.unit_id);
+                      printInvoices({
+                        communityName: community.name,
+                        communityAddress: community.address,
+                        invoices: [{
+                          title: invoice.title,
+                          description: invoice.description,
+                          amount: invoice.amount,
+                          amountPaid: invoice.amount_paid,
+                          lateFeeAmount: invoice.late_fee_amount,
+                          status: invoice.status,
+                          dueDate: invoice.due_date,
+                          paidAt: invoice.paid_at,
+                          unitNumber: u?.unit_number ?? '',
+                          unitAddress: u?.address ?? null,
+                          ownerName: unitOwnerMap?.[invoice.unit_id] ?? '',
+                          assessmentTitle: assessments?.find((a) => a.id === invoice.assessment_id)?.title ?? null,
+                          notes: invoice.notes,
+                        }],
+                      });
+                    }}
+                  >
+                    <Printer className="h-3.5 w-3.5 mr-1" />
+                    Print
+                  </Button>
+                </div>
+              )}
+
+              {/* Print for waived/voided invoices (board only) */}
+              {isBoard && !canUpdate && !canBounce && (
+                <div className="flex gap-2 mt-3 pt-3 border-t border-stroke-light dark:border-stroke-dark">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      const u = units?.find((u) => u.id === invoice.unit_id);
+                      printInvoices({
+                        communityName: community.name,
+                        communityAddress: community.address,
+                        invoices: [{
+                          title: invoice.title,
+                          description: invoice.description,
+                          amount: invoice.amount,
+                          amountPaid: invoice.amount_paid,
+                          lateFeeAmount: invoice.late_fee_amount,
+                          status: invoice.status,
+                          dueDate: invoice.due_date,
+                          paidAt: invoice.paid_at,
+                          unitNumber: u?.unit_number ?? '',
+                          unitAddress: u?.address ?? null,
+                          ownerName: unitOwnerMap?.[invoice.unit_id] ?? '',
+                          assessmentTitle: assessments?.find((a) => a.id === invoice.assessment_id)?.title ?? null,
+                          notes: invoice.notes,
+                        }],
+                      });
+                    }}
+                  >
+                    <Printer className="h-3.5 w-3.5 mr-1" />
+                    Print
+                  </Button>
+                </div>
+              )}
+
+              {/* Print for residents (non-board) */}
+              {!isBoard && (
+                <div className="flex gap-2 mt-3 pt-3 border-t border-stroke-light dark:border-stroke-dark">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      printInvoices({
+                        communityName: community.name,
+                        communityAddress: community.address,
+                        invoices: [{
+                          title: invoice.title,
+                          description: invoice.description,
+                          amount: invoice.amount,
+                          amountPaid: invoice.amount_paid,
+                          lateFeeAmount: invoice.late_fee_amount,
+                          status: invoice.status,
+                          dueDate: invoice.due_date,
+                          paidAt: invoice.paid_at,
+                          unitNumber: unit?.unit_number ?? '',
+                          unitAddress: unit?.address ?? null,
+                          ownerName: member ? `${member.first_name} ${member.last_name}` : '',
+                          assessmentTitle: null,
+                          notes: invoice.notes,
+                        }],
+                      });
+                    }}
+                  >
+                    <Printer className="h-3.5 w-3.5 mr-1" />
+                    Print
                   </Button>
                 </div>
               )}
