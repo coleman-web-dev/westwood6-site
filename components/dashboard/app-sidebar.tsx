@@ -50,7 +50,7 @@ interface AppSidebarProps {
 export function AppSidebar({ open, onClose }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { community, unit, isHeadOfHousehold, isBoard, actualIsBoard, canRead } = useCommunity();
+  const { community, unit, isHeadOfHousehold, isBoard, actualIsBoard, isTenant, canRead } = useCommunity();
 
   const onboardingComplete = !!community.theme?.onboarding?.completed_at;
   const basePath = `/${community.slug}`;
@@ -103,7 +103,9 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
 
       {/* Nav items */}
       <nav className="flex-1 min-h-0 flex flex-col gap-1 px-3 overflow-y-auto">
-        {NAV_ITEMS.map((item) => (
+        {NAV_ITEMS
+          .filter((item) => !(isTenant && item.href === '/payments'))
+          .map((item) => (
           <NavItem
             key={item.href}
             icon={item.icon}
@@ -120,7 +122,7 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
             label="Email"
           />
         )}
-        {community.theme?.voting_enabled && (
+        {community.theme?.voting_enabled && !isTenant && (
           <NavItem
             icon={Vote}
             href={`${basePath}/voting`}
@@ -152,7 +154,7 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
             label="ARC Requests"
           />
         )}
-        {canRead('budget') && (
+        {canRead('budget') && !isTenant && (
           <NavItem
             icon={PiggyBank}
             href={`${basePath}/budget`}
@@ -168,7 +170,7 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
             label="Vendors"
           />
         )}
-        {canRead('accounting') && (
+        {canRead('accounting') && !isTenant && (
           <NavItem
             icon={BookOpen}
             href={`${basePath}/accounting`}
@@ -176,7 +178,7 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
             label="Accounting"
           />
         )}
-        {canRead('reports') && (
+        {canRead('reports') && !isTenant && (
           <NavItem
             icon={BarChart3}
             href={`${basePath}/reports`}

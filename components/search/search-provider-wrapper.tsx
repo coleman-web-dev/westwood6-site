@@ -29,7 +29,7 @@ interface UnitRow {
 
 export function SearchProviderWrapper({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { community, actualIsBoard, viewMode } = useCommunity();
+  const { community, actualIsBoard, viewMode, isTenant } = useCommunity();
   const isAdminView = actualIsBoard && viewMode === 'admin';
   const basePath = `/${community.slug}`;
 
@@ -87,14 +87,19 @@ export function SearchProviderWrapper({ children }: { children: React.ReactNode 
 
   // Build actions
   const actions = useMemo(() => {
+    // IDs hidden from tenants (financial + voting features)
+    const TENANT_HIDDEN = new Set(['payments', 'voting', 'budget', 'reports', 'import-ledger']);
+
     // Static nav actions with community slug prefix
-    const navActions = searchLinks.map((link) => ({
-      id: `nav-${link.id}`,
-      name: link.name,
-      keywords: link.keywords,
-      section: link.section,
-      perform: () => navigate(`${basePath}${link.href}`),
-    }));
+    const navActions = searchLinks
+      .filter((link) => !(isTenant && TENANT_HIDDEN.has(link.id)))
+      .map((link) => ({
+        id: `nav-${link.id}`,
+        name: link.name,
+        keywords: link.keywords,
+        section: link.section,
+        perform: () => navigate(`${basePath}${link.href}`),
+      }));
 
     // Dynamic announcement actions
     const announcementActions = announcements.map((a) => ({
@@ -178,7 +183,7 @@ export function SearchProviderWrapper({ children }: { children: React.ReactNode 
       ...announcementActions,
       ...documentActions,
     ];
-  }, [basePath, navigate, announcements, documents, members, units, actualIsBoard, isAdminView]);
+  }, [basePath, navigate, announcements, documents, members, units, actualIsBoard, isAdminView, isTenant]);
 
   useRegisterActions(actions, [actions]);
 
