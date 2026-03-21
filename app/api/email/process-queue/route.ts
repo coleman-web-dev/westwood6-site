@@ -11,6 +11,7 @@ import { ViolationNoticeEmail } from '@/lib/email/templates/violation-notice';
 import { EventNotificationEmail } from '@/lib/email/templates/event-notification';
 import { ReservationBoardNotificationEmail } from '@/lib/email/templates/reservation-board-notification';
 import { BallotNotificationEmail } from '@/lib/email/templates/ballot-notification';
+import { SignupApprovedEmail } from '@/lib/email/templates/signup-approved';
 import { resolveSender } from '@/lib/email/resolve-sender';
 import type { EmailQueueItem, EmailSettings } from '@/lib/types/database';
 
@@ -42,6 +43,8 @@ function renderTemplate(templateId: string, data: Record<string, unknown>): Reac
       return ReservationBoardNotificationEmail(d);
     case 'ballot-notification':
       return BallotNotificationEmail(d);
+    case 'signup-approved':
+      return SignupApprovedEmail(d);
     default:
       console.error(`Unknown template: ${templateId}`);
       return null;
