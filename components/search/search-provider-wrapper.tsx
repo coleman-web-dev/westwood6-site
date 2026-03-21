@@ -33,11 +33,13 @@ export function SearchProviderWrapper({ children }: { children: React.ReactNode 
   const isAdminView = actualIsBoard && viewMode === 'admin';
   const basePath = `/${community.slug}`;
 
-  // KBar's internal execute() already calls query.toggle() after perform(),
-  // so we must NOT manually close KBar here — doing so conflicts with the
-  // built-in toggle and causes KBar to re-open instead of closing.
+  // KBar's execute() calls query.toggle() immediately after perform(),
+  // which triggers a React state update that can cancel pending navigation.
+  // setTimeout ensures navigation runs after KBar's re-render completes.
   const navigate = useCallback((path: string) => {
-    router.push(path);
+    setTimeout(() => {
+      router.push(path);
+    }, 10);
   }, [router]);
 
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
