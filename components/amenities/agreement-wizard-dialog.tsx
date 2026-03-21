@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import {
   Dialog,
@@ -15,7 +15,6 @@ import { Input } from '@/components/shared/ui/input';
 import { Textarea } from '@/components/shared/ui/textarea';
 import { Badge } from '@/components/shared/ui/badge';
 import { ScrollArea } from '@/components/shared/ui/scroll-area';
-import { Switch } from '@/components/shared/ui/switch';
 import {
   Select,
   SelectContent,
@@ -24,29 +23,30 @@ import {
   SelectValue,
 } from '@/components/shared/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/shared/ui/tabs';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/shared/ui/popover';
 import { toast } from 'sonner';
 import {
   Upload,
   FileText,
   Sparkles,
   Loader2,
-  Trash2,
-  Plus,
-  GripVertical,
-  ChevronRight,
-  ChevronLeft,
   Check,
-  AlertCircle,
   Send,
+  ChevronLeft,
   Bot,
   User,
+  X,
+  Trash2,
+  Plus,
 } from 'lucide-react';
 import {
   SYSTEM_VARIABLES,
-  fillTemplateWithExamples,
 } from '@/lib/utils/agreement-template';
 import type { AgreementField, AgreementFieldType, AgreementFieldPhase } from '@/lib/types/database';
-import { partitionFieldsByPhase } from '@/lib/utils/agreement-template';
 
 interface AgreementWizardDialogProps {
   open: boolean;
@@ -64,17 +64,293 @@ const FIELD_TYPE_OPTIONS: { value: AgreementFieldType; label: string }[] = [
   { value: 'date', label: 'Date' },
 ];
 
-const FIELD_TYPE_BADGE: Record<AgreementFieldType, string> = {
-  text: 'Text',
-  number: 'Number',
-  yes_no: 'Yes/No',
-  select: 'Dropdown',
-  date: 'Date',
+const PHASE_CONFIG: Record<string, { label: string; color: string; bgClass: string; textClass: string; dotClass: string; description: string }> = {
+  reservation: {
+    label: 'Member fills this',
+    color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-200',
+    bgClass: 'bg-blue-100 dark:bg-blue-900/60',
+    textClass: 'text-blue-700 dark:text-blue-300',
+    dotClass: 'bg-blue-500',
+    description: 'Member answers this when making a reservation',
+  },
+  system: {
+    label: 'Auto-filled',
+    color: 'bg-green-100 text-green-800 dark:bg-green-900/60 dark:text-green-200',
+    bgClass: 'bg-green-100 dark:bg-green-900/60',
+    textClass: 'text-green-700 dark:text-green-300',
+    dotClass: 'bg-green-500',
+    description: 'Pulled automatically from the reservation details',
+  },
+  post_event: {
+    label: 'Board fills after event',
+    color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200',
+    bgClass: 'bg-amber-100 dark:bg-amber-900/60',
+    textClass: 'text-amber-700 dark:text-amber-300',
+    dotClass: 'bg-amber-500',
+    description: 'Board member fills this during post-event inspection',
+  },
 };
 
 function generateId(): string {
   return crypto.randomUUID();
 }
+
+/**
+ * Parse a template string into segments: text parts and placeholder parts.
+ */
+function parseTemplate(template: string): Array<{ type: 'text' | 'placeholder'; content: string; fieldKey?: string }> {
+  const segments: Array<{ type: 'text' | 'placeholder'; content: string; fieldKey?: string }> = [];
+  const regex = /\{\{\s*(\w+)\s*\}\}/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(template)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({ type: 'text', content: template.slice(lastIndex, match.index) });
+    }
+    segments.push({ type: 'placeholder', content: match[0], fieldKey: match[1] });
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < template.length) {
+    segments.push({ type: 'text', content: template.slice(lastIndex) });
+  }
+
+  return segments;
+}
+
+/**
+ * Look up the human-readable label for a field key.
+ */
+function getFieldLabel(key: string, fields: AgreementField[]): string {
+  const field = fields.find((f) => f.key === key);
+  if (field) return field.label;
+  const variable = SYSTEM_VARIABLES.find((v) => v.key === key);
+  if (variable) return variable.label;
+  return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
+ * Look up the phase for a field key.
+ */
+function getFieldPhase(key: string, fields: AgreementField[]): string {
+  const field = fields.find((f) => f.key === key);
+  if (field) return field.fill_phase ?? 'reservation';
+  const variable = SYSTEM_VARIABLES.find((v) => v.key === key);
+  if (variable) return 'system';
+  return 'reservation';
+}
+
+// ─── Pill Component ─────────────────────────────────────────────────────────
+
+interface FieldPillProps {
+  fieldKey: string;
+  fields: AgreementField[];
+  onUpdateField: (key: string, updates: Partial<AgreementField>) => void;
+  onRemoveField: (key: string) => void;
+  onAiRefine: (instruction: string) => void;
+  isRefining: boolean;
+}
+
+function FieldPill({ fieldKey, fields, onUpdateField, onRemoveField, onAiRefine, isRefining }: FieldPillProps) {
+  const [aiInput, setAiInput] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const field = fields.find((f) => f.key === fieldKey);
+  const phase = getFieldPhase(fieldKey, fields);
+  const label = getFieldLabel(fieldKey, fields);
+  const config = PHASE_CONFIG[phase] ?? PHASE_CONFIG.reservation;
+
+  function handleAiSubmit() {
+    if (!aiInput.trim()) return;
+    onAiRefine(`For the "${label}" field ({{${fieldKey}}}): ${aiInput.trim()}`);
+    setAiInput('');
+    setIsOpen(false);
+  }
+
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium cursor-pointer transition-all hover:ring-2 hover:ring-offset-1 hover:ring-current/30 ${config.bgClass} ${config.textClass}`}
+        >
+          <span className={`w-1.5 h-1.5 rounded-full ${config.dotClass} shrink-0`} />
+          {label}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-0" align="start" side="bottom">
+        <div className="p-3 border-b border-stroke-light dark:border-stroke-dark">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-body font-semibold text-text-primary-light dark:text-text-primary-dark">
+              {label}
+            </span>
+            <Badge variant="secondary" className={`text-[10px] ${config.color}`}>
+              {config.label}
+            </Badge>
+          </div>
+          <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
+            {config.description}
+          </p>
+          <p className="text-meta text-text-muted-light dark:text-text-muted-dark font-mono mt-1">
+            {`{{${fieldKey}}}`}
+          </p>
+        </div>
+
+        {field && (
+          <div className="p-3 space-y-2 border-b border-stroke-light dark:border-stroke-dark">
+            <div>
+              <label className="text-[11px] text-text-muted-light dark:text-text-muted-dark">Label</label>
+              <Input
+                value={field.label}
+                onChange={(e) => onUpdateField(fieldKey, { label: e.target.value })}
+                className="h-7 text-sm mt-0.5"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[11px] text-text-muted-light dark:text-text-muted-dark">Type</label>
+                <Select
+                  value={field.type}
+                  onValueChange={(v) => onUpdateField(fieldKey, { type: v as AgreementFieldType })}
+                >
+                  <SelectTrigger className="h-7 text-sm mt-0.5">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FIELD_TYPE_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-[11px] text-text-muted-light dark:text-text-muted-dark">Who fills this</label>
+                <Select
+                  value={field.fill_phase ?? 'reservation'}
+                  onValueChange={(v) => onUpdateField(fieldKey, { fill_phase: v as AgreementFieldPhase })}
+                >
+                  <SelectTrigger className="h-7 text-sm mt-0.5">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="reservation">Member (during reservation)</SelectItem>
+                    <SelectItem value="post_event">Board (after event)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-1.5 text-[11px] text-text-muted-light dark:text-text-muted-dark">
+                <input
+                  type="checkbox"
+                  checked={field.required}
+                  onChange={(e) => onUpdateField(fieldKey, { required: e.target.checked })}
+                />
+                Required field
+              </label>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-[11px] text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+                onClick={() => {
+                  onRemoveField(fieldKey);
+                  setIsOpen(false);
+                }}
+              >
+                <Trash2 className="h-3 w-3 mr-1" />
+                Remove
+              </Button>
+            </div>
+            {field.type === 'select' && (
+              <div>
+                <label className="text-[11px] text-text-muted-light dark:text-text-muted-dark">
+                  Options (comma separated)
+                </label>
+                <Input
+                  value={(field.options ?? []).join(', ')}
+                  onChange={(e) =>
+                    onUpdateField(fieldKey, {
+                      options: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
+                    })
+                  }
+                  className="h-7 text-sm mt-0.5"
+                  placeholder="Option 1, Option 2"
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="p-3">
+          <label className="text-[11px] text-text-muted-light dark:text-text-muted-dark mb-1 block">
+            Ask AI to change this field
+          </label>
+          <div className="flex gap-1.5">
+            <Input
+              value={aiInput}
+              onChange={(e) => setAiInput(e.target.value)}
+              placeholder="e.g. Make this optional"
+              className="h-7 text-sm flex-1"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !isRefining) {
+                  e.preventDefault();
+                  handleAiSubmit();
+                }
+              }}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={handleAiSubmit}
+              disabled={isRefining || !aiInput.trim()}
+            >
+              {isRefining ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+            </Button>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// ─── Interactive Document Preview ───────────────────────────────────────────
+
+interface DocumentPreviewProps {
+  template: string;
+  fields: AgreementField[];
+  onUpdateField: (key: string, updates: Partial<AgreementField>) => void;
+  onRemoveField: (key: string) => void;
+  onAiRefine: (instruction: string) => void;
+  isRefining: boolean;
+}
+
+function DocumentPreview({ template, fields, onUpdateField, onRemoveField, onAiRefine, isRefining }: DocumentPreviewProps) {
+  const segments = useMemo(() => parseTemplate(template), [template]);
+
+  return (
+    <div className="bg-white dark:bg-surface-dark border border-stroke-light dark:border-stroke-dark rounded-panel p-6 font-serif text-sm leading-relaxed whitespace-pre-wrap">
+      {segments.map((seg, i) => {
+        if (seg.type === 'text') {
+          return <span key={i}>{seg.content}</span>;
+        }
+        return (
+          <FieldPill
+            key={`${seg.fieldKey}-${i}`}
+            fieldKey={seg.fieldKey!}
+            fields={fields}
+            onUpdateField={onUpdateField}
+            onRemoveField={onRemoveField}
+            onAiRefine={onAiRefine}
+            isRefining={isRefining}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Main Wizard ────────────────────────────────────────────────────────────
 
 export function AgreementWizardDialog({
   open,
@@ -83,51 +359,40 @@ export function AgreementWizardDialog({
   existingTemplate,
   existingFields,
 }: AgreementWizardDialogProps) {
-  // Wizard step: 1=upload/paste, 2=AI review/edit, 3=preview/confirm
-  const [step, setStep] = useState<1 | 2 | 3>(existingTemplate ? 2 : 1);
+  const [step, setStep] = useState<1 | 2>(existingTemplate ? 2 : 1);
   const [rawText, setRawText] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
   const [extractingPdf, setExtractingPdf] = useState(false);
 
-  // AI results (editable in step 2)
   const [template, setTemplate] = useState(existingTemplate ?? '');
   const [fields, setFields] = useState<AgreementField[]>(existingFields ?? []);
-  const [aiSummary, setAiSummary] = useState('');
 
-  // Chat refinement
   const [chatHistory, setChatHistory] = useState<{ role: 'ai' | 'user'; message: string }[]>([]);
   const [refinementInput, setRefinementInput] = useState('');
   const [refining, setRefining] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Editing a field
-  const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
+  const [showFieldList, setShowFieldList] = useState(false);
 
-  // Template textarea ref for variable insertion
-  const templateRef = useRef<HTMLTextAreaElement>(null);
-
-  // Sync state when dialog opens
   useEffect(() => {
     if (open) {
       setTemplate(existingTemplate ?? '');
       setFields(existingFields ?? []);
       setChatHistory([]);
-      setEditingFieldId(null);
       setStep(existingTemplate ? 2 : 1);
+      setShowFieldList(false);
     }
   }, [open, existingTemplate, existingFields]);
 
-  // Reset state when dialog opens/closes
   const handleOpenChange = useCallback(
     (newOpen: boolean) => {
       if (!newOpen) {
-        // Reset on close
         setRawText('');
         setAnalyzing(false);
-        setAiSummary('');
         setChatHistory([]);
         setRefinementInput('');
         setRefining(false);
+        setShowFieldList(false);
         if (!existingTemplate) {
           setTemplate('');
           setFields([]);
@@ -138,7 +403,8 @@ export function AgreementWizardDialog({
     [onOpenChange, existingTemplate],
   );
 
-  // PDF text extraction via server-side API (avoids client-side worker/CSP issues)
+  // ── File upload ──
+
   async function handlePdfUpload(file: File) {
     setExtractingPdf(true);
     try {
@@ -153,64 +419,71 @@ export function AgreementWizardDialog({
       const data = await res.json();
 
       if (!res.ok) {
-        toast.error(data.error || 'Failed to extract text from PDF. Try pasting the text instead.');
+        toast.error(data.error || 'Failed to extract text. Try pasting the text instead.');
         return;
       }
 
       if (!data.text) {
-        toast.error(
-          'No text found in this PDF. It may be a scanned image. Try pasting the text instead.',
-        );
+        toast.error('No text found in this file. It may be a scanned image. Try pasting the text instead.');
         return;
       }
 
       setRawText(data.text);
-      toast.success(`Extracted text from ${data.pageCount} page${data.pageCount > 1 ? 's' : ''}.`);
+      toast.success(
+        data.pageCount
+          ? `Extracted text from ${data.pageCount} page${data.pageCount > 1 ? 's' : ''}.`
+          : 'Text extracted successfully.',
+      );
     } catch (err) {
-      console.error('PDF extraction error:', err);
-      toast.error('Failed to extract text from PDF. Try pasting the text instead.');
+      console.error('File extraction error:', err);
+      toast.error('Failed to extract text. Try pasting the text instead.');
     } finally {
       setExtractingPdf(false);
     }
   }
 
-  // AI analysis
+  // ── AI analysis ──
+
+  async function callEdgeFunction(body: Record<string, unknown>): Promise<{ template?: string; fields?: AgreementField[]; summary?: string }> {
+    const supabase = createClient();
+    await supabase.auth.getUser();
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      throw new Error('You must be logged in to use AI analysis.');
+    }
+
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/analyze-agreement`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
+        },
+        body: JSON.stringify(body),
+      },
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || `Edge function returned ${response.status}`);
+    }
+
+    return data;
+  }
+
   async function handleAnalyze() {
     if (!rawText.trim()) {
-      toast.error('Please upload a PDF or paste the agreement text first.');
+      toast.error('Please upload a file or paste the agreement text first.');
       return;
     }
 
     setAnalyzing(true);
     try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (!session?.access_token) {
-        toast.error('You must be logged in to use AI analysis.');
-        setAnalyzing(false);
-        return;
-      }
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/analyze-agreement`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
-          },
-          body: JSON.stringify({ agreement_text: rawText.trim() }),
-        },
-      );
-
-      const data = await response.json();
-      console.log('Edge function response:', response.status, data);
-
-      if (!response.ok) {
-        throw new Error(data.error || `Edge function returned ${response.status}`);
-      }
+      const data = await callEdgeFunction({ agreement_text: rawText.trim() });
 
       if (!data.template) {
         throw new Error('AI returned an invalid response');
@@ -218,774 +491,393 @@ export function AgreementWizardDialog({
 
       setTemplate(data.template);
       setFields(data.fields ?? []);
-      setAiSummary(data.summary ?? '');
+      if (data.summary) {
+        setChatHistory([{ role: 'ai', message: data.summary }]);
+      }
       setStep(2);
-      toast.success('Agreement analyzed successfully!');
+      toast.success('Agreement analyzed! Click any colored field to edit it.');
     } catch (err) {
       console.error('AI analysis error:', err);
-      toast.error(
-        err instanceof Error ? err.message : 'AI analysis failed. Please try again.',
-      );
+      toast.error(err instanceof Error ? err.message : 'AI analysis failed. Please try again.');
     } finally {
       setAnalyzing(false);
     }
   }
 
-  // Auto-scroll chat to bottom
+  // ── AI refinement ──
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory]);
 
-  // AI refinement (conversational follow-up)
-  async function handleRefine() {
-    const instruction = refinementInput.trim();
-    if (!instruction) return;
+  async function handleRefine(instruction?: string) {
+    const text = instruction ?? refinementInput.trim();
+    if (!text) return;
 
     setRefining(true);
-    setChatHistory((prev) => [...prev, { role: 'user', message: instruction }]);
-    setRefinementInput('');
+    setChatHistory((prev) => [...prev, { role: 'user', message: text }]);
+    if (!instruction) setRefinementInput('');
 
     try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (!session?.access_token) {
-        toast.error('You must be logged in.');
-        setRefining(false);
-        return;
-      }
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/analyze-agreement`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
-          },
-          body: JSON.stringify({
-            refinement: {
-              current_template: template,
-              current_fields: fields,
-              instruction,
-            },
-          }),
+      const data = await callEdgeFunction({
+        refinement: {
+          current_template: template,
+          current_fields: fields,
+          instruction: text,
         },
-      );
+      });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || `Refinement failed (${response.status})`);
+      if (data.template) setTemplate(data.template);
+      if (data.fields) setFields(data.fields);
+      if (data.summary) {
+        const summary = data.summary;
+        setChatHistory((prev) => [...prev, { role: 'ai' as const, message: summary }]);
       }
-
-      if (!data.template) {
-        throw new Error('AI response was incomplete. Try editing the fields manually below instead.');
-      }
-
-      setTemplate(data.template);
-      setFields(data.fields ?? []);
-      setChatHistory((prev) => [...prev, { role: 'ai', message: data.summary ?? 'Changes applied.' }]);
     } catch (err) {
       console.error('Refinement error:', err);
-      const errorMsg = err instanceof Error ? err.message : 'Refinement failed.';
-      setChatHistory((prev) => [...prev, { role: 'ai', message: `Error: ${errorMsg}` }]);
-      toast.error(errorMsg);
+      setChatHistory((prev) => [
+        ...prev,
+        { role: 'ai', message: `Error: ${err instanceof Error ? err.message : 'Unknown error'}` },
+      ]);
     } finally {
       setRefining(false);
     }
   }
 
-  // Field management
+  // ── Field operations ──
+
+  function updateField(key: string, updates: Partial<AgreementField>) {
+    setFields((prev) => prev.map((f) => (f.key === key ? { ...f, ...updates } : f)));
+  }
+
+  function removeField(key: string) {
+    setFields((prev) => prev.filter((f) => f.key !== key));
+    setTemplate((prev) => prev.replace(new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g'), ''));
+  }
+
   function addField() {
+    const idx = fields.length + 1;
+    const newKey = `custom_field_${idx}`;
     const newField: AgreementField = {
       id: generateId(),
-      key: '',
-      label: '',
+      key: newKey,
+      label: `Custom Field ${idx}`,
       type: 'text',
-      required: true,
+      required: false,
       fill_phase: 'reservation',
     };
     setFields((prev) => [...prev, newField]);
-    setEditingFieldId(newField.id);
+    setTemplate((prev) => prev + `\n{{${newKey}}}`);
+    toast.success('Field added to the end of the document. Click it to configure.');
   }
 
-  function updateField(id: string, updates: Partial<AgreementField>) {
-    setFields((prev) =>
-      prev.map((f) => (f.id === id ? { ...f, ...updates } : f)),
-    );
-  }
-
-  function removeField(id: string) {
-    setFields((prev) => prev.filter((f) => f.id !== id));
-    if (editingFieldId === id) setEditingFieldId(null);
-  }
-
-  // Auto-generate key from label
-  function labelToKey(label: string): string {
-    return label
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, '')
-      .replace(/\s+/g, '_')
-      .replace(/^_|_$/g, '')
-      .substring(0, 30);
-  }
-
-  // Insert variable into template at cursor position
-  function insertVariable(key: string) {
-    const textarea = templateRef.current;
-    if (!textarea) return;
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const insertion = `{{${key}}}`;
-    const newText = template.substring(0, start) + insertion + template.substring(end);
-    setTemplate(newText);
-    requestAnimationFrame(() => {
-      textarea.selectionStart = textarea.selectionEnd = start + insertion.length;
-      textarea.focus();
-    });
-  }
-
-  // Preview text
-  const previewText = template
-    ? fillTemplateWithExamples(
-        template,
-        Object.fromEntries(
-          fields.map((f) => [
-            f.key,
-            f.type === 'yes_no'
-              ? 'Yes'
-              : f.type === 'select' && f.options?.length
-                ? f.options[0]
-                : f.placeholder || `[${f.label}]`,
-          ]),
-        ),
-      )
-    : '';
-
-  function handleSave() {
-    if (!template.trim()) {
-      toast.error('Agreement template cannot be empty.');
-      return;
-    }
-    // Validate fields have keys
-    for (const f of fields) {
-      if (!f.key.trim()) {
-        toast.error(`Question "${f.label || 'Untitled'}" needs a variable key.`);
-        return;
-      }
-      if (!f.label.trim()) {
-        toast.error('All questions need a label.');
-        return;
+  const reservationFieldCount = fields.filter((f) => (f.fill_phase ?? 'reservation') === 'reservation').length;
+  const postEventFieldCount = fields.filter((f) => f.fill_phase === 'post_event').length;
+  // Count system variables used in the template
+  const systemFieldCount = useMemo(() => {
+    const systemKeys = new Set<string>(SYSTEM_VARIABLES.map((v) => v.key));
+    const segments = parseTemplate(template);
+    const usedKeys = new Set<string>();
+    for (const seg of segments) {
+      if (seg.type === 'placeholder' && seg.fieldKey && systemKeys.has(seg.fieldKey)) {
+        usedKeys.add(seg.fieldKey);
       }
     }
-    onSave(template, fields);
-    onOpenChange(false);
-  }
-
-  function renderFieldRow(field: AgreementField) {
-    return (
-      <div
-        key={field.id}
-        className="rounded-inner-card border border-stroke-light dark:border-stroke-dark bg-surface-light dark:bg-surface-dark p-3"
-      >
-        {editingFieldId === field.id ? (
-          /* Edit mode */
-          <div className="space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                  Question
-                </label>
-                <Input
-                  value={field.label}
-                  onChange={(e) => {
-                    const label = e.target.value;
-                    const updates: Partial<AgreementField> = { label };
-                    if (!field.key || field.key === labelToKey(field.label)) {
-                      updates.key = labelToKey(label);
-                    }
-                    updateField(field.id, updates);
-                  }}
-                  placeholder="e.g. Will alcohol be served?"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                  Type
-                </label>
-                <Select
-                  value={field.type}
-                  onValueChange={(v) =>
-                    updateField(field.id, { type: v as AgreementFieldType })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {FIELD_TYPE_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                  Variable key
-                </label>
-                <div className="flex items-center gap-1">
-                  <span className="text-meta text-text-muted-light dark:text-text-muted-dark">{'{{'}</span>
-                  <Input
-                    value={field.key}
-                    onChange={(e) =>
-                      updateField(field.id, {
-                        key: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''),
-                      })
-                    }
-                    placeholder="variable_name"
-                    className="font-mono text-body"
-                  />
-                  <span className="text-meta text-text-muted-light dark:text-text-muted-dark">{'}}'}</span>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <label className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                  When filled
-                </label>
-                <Select
-                  value={field.fill_phase ?? 'reservation'}
-                  onValueChange={(v) =>
-                    updateField(field.id, { fill_phase: v as AgreementFieldPhase })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="reservation">During reservation (member)</SelectItem>
-                    <SelectItem value="post_event">After event (board)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="flex items-end gap-3 pb-1">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <Switch
-                  checked={field.required}
-                  onCheckedChange={(v) =>
-                    updateField(field.id, { required: v })
-                  }
-                />
-                <span className="text-body text-text-secondary-light dark:text-text-secondary-dark">
-                  Required
-                </span>
-              </label>
-            </div>
-            {field.type === 'select' && (
-              <div className="space-y-1">
-                <label className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                  Options (comma-separated)
-                </label>
-                <Input
-                  value={field.options?.join(', ') ?? ''}
-                  onChange={(e) =>
-                    updateField(field.id, {
-                      options: e.target.value
-                        .split(',')
-                        .map((s) => s.trim())
-                        .filter(Boolean),
-                    })
-                  }
-                  placeholder="Option 1, Option 2, Option 3"
-                />
-              </div>
-            )}
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => removeField(field.id)}
-                className="text-red-500 hover:text-red-600"
-              >
-                <Trash2 className="h-3.5 w-3.5 mr-1" />
-                Remove
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => setEditingFieldId(null)}
-              >
-                Done
-              </Button>
-            </div>
-          </div>
-        ) : (
-          /* Display mode */
-          <div
-            className="flex items-center gap-3 cursor-pointer"
-            onClick={() => setEditingFieldId(field.id)}
-          >
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-body text-text-primary-light dark:text-text-primary-dark truncate">
-                  {field.label || 'Untitled question'}
-                </span>
-                <Badge variant="outline" className="text-[10px] shrink-0">
-                  {FIELD_TYPE_BADGE[field.type]}
-                </Badge>
-                {field.required && (
-                  <span className="text-red-500 text-meta">*</span>
-                )}
-              </div>
-              <span className="text-meta text-text-muted-light dark:text-text-muted-dark font-mono">
-                {`{{${field.key || '...'}}}`}
-              </span>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                removeField(field.id);
-              }}
-              className="shrink-0 text-text-muted-light dark:text-text-muted-dark hover:text-red-500"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        )}
-      </div>
-    );
-  }
+    return usedKeys.size;
+  }, [template]);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-secondary-500" />
-            {step === 1
-              ? 'Set Up Rental Agreement'
-              : step === 2
-                ? 'Review Agreement Setup'
-                : 'Preview Agreement'}
+          <DialogTitle className="text-page-title">
+            {step === 1 ? 'Upload Rental Agreement' : 'Review Your Rental Agreement'}
           </DialogTitle>
           <DialogDescription>
             {step === 1
-              ? 'Upload your rental agreement PDF or paste the text. AI will analyze it and set up the form automatically.'
-              : step === 2
-                ? 'Review and edit the questions and template that AI generated. Make any adjustments before saving.'
-                : 'Preview how the agreement will look with example data filled in.'}
+              ? 'Upload your rental agreement PDF or paste the text. AI will analyze it and identify all fields.'
+              : 'Click any colored field to edit it, change who fills it, or ask AI to modify it.'}
           </DialogDescription>
         </DialogHeader>
 
-        {/* Step indicators */}
-        <div className="flex items-center gap-2 py-2">
-          {[1, 2, 3].map((s) => (
-            <div key={s} className="flex items-center gap-2">
-              <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center text-meta font-medium transition-colors ${
-                  step === s
-                    ? 'bg-secondary-500 text-white'
-                    : step > s
-                      ? 'bg-secondary-200 dark:bg-secondary-800 text-secondary-700 dark:text-secondary-300'
-                      : 'bg-surface-light-2 dark:bg-surface-dark-2 text-text-muted-light dark:text-text-muted-dark'
-                }`}
-              >
-                {step > s ? <Check className="h-3.5 w-3.5" /> : s}
-              </div>
-              {s < 3 && (
-                <div
-                  className={`w-8 h-0.5 ${
-                    step > s
-                      ? 'bg-secondary-300 dark:bg-secondary-700'
-                      : 'bg-stroke-light dark:bg-stroke-dark'
-                  }`}
-                />
+        <div className="flex-1 overflow-hidden">
+          {/* ── Step 1: Upload/Paste ── */}
+          {step === 1 && (
+            <div className="space-y-4">
+              <Tabs defaultValue="upload">
+                <TabsList>
+                  <TabsTrigger value="upload">
+                    <Upload className="h-4 w-4 mr-1.5" />
+                    Upload PDF
+                  </TabsTrigger>
+                  <TabsTrigger value="paste">
+                    <FileText className="h-4 w-4 mr-1.5" />
+                    Paste Text
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="upload" className="mt-4">
+                  <div className="border-2 border-dashed border-stroke-light dark:border-stroke-dark rounded-panel p-8 text-center">
+                    <Upload className="h-8 w-8 mx-auto mb-3 text-text-muted-light dark:text-text-muted-dark" />
+                    <p className="text-body text-text-secondary-light dark:text-text-secondary-dark mb-3">
+                      Upload your rental agreement PDF
+                    </p>
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      className="hidden"
+                      id="agreement-pdf-upload"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handlePdfUpload(file);
+                      }}
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={() => document.getElementById('agreement-pdf-upload')?.click()}
+                      disabled={extractingPdf}
+                    >
+                      {extractingPdf ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                          Extracting text...
+                        </>
+                      ) : (
+                        'Choose PDF File'
+                      )}
+                    </Button>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="paste" className="mt-4">
+                  <Textarea
+                    placeholder="Paste the full rental agreement text here..."
+                    value={rawText}
+                    onChange={(e) => setRawText(e.target.value)}
+                    className="min-h-[300px] font-mono text-sm"
+                  />
+                </TabsContent>
+              </Tabs>
+
+              {rawText && (
+                <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-inner-card p-3">
+                  <p className="text-body text-green-800 dark:text-green-200">
+                    <Check className="h-4 w-4 inline mr-1.5" />
+                    Text loaded ({rawText.length.toLocaleString()} characters). Ready for AI analysis.
+                  </p>
+                </div>
               )}
             </div>
-          ))}
-          <span className="text-meta text-text-muted-light dark:text-text-muted-dark ml-2">
-            {step === 1 ? 'Upload' : step === 2 ? 'Configure' : 'Preview'}
-          </span>
-        </div>
+          )}
 
-        {/* ── STEP 1: Upload / Paste ── */}
-        {step === 1 && (
-          <div className="space-y-4 py-2">
-            <Tabs defaultValue="upload">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="upload" className="flex items-center gap-1.5">
-                  <Upload className="h-3.5 w-3.5" />
-                  Upload PDF
-                </TabsTrigger>
-                <TabsTrigger value="paste" className="flex items-center gap-1.5">
-                  <FileText className="h-3.5 w-3.5" />
-                  Paste Text
-                </TabsTrigger>
-              </TabsList>
+          {/* ── Step 2: Interactive Document Preview ── */}
+          {step === 2 && (
+            <div className="flex flex-col gap-3" style={{ height: 'calc(90vh - 220px)', minHeight: 0 }}>
+              {/* Legend */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 text-meta">
+                  <span className="text-text-muted-light dark:text-text-muted-dark mr-1">Fields:</span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className={`w-2 h-2 rounded-full ${PHASE_CONFIG.reservation.dotClass}`} />
+                    <span className="text-text-secondary-light dark:text-text-secondary-dark">
+                      Member ({reservationFieldCount})
+                    </span>
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className={`w-2 h-2 rounded-full ${PHASE_CONFIG.system.dotClass}`} />
+                    <span className="text-text-secondary-light dark:text-text-secondary-dark">
+                      Auto-filled ({systemFieldCount})
+                    </span>
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className={`w-2 h-2 rounded-full ${PHASE_CONFIG.post_event.dotClass}`} />
+                    <span className="text-text-secondary-light dark:text-text-secondary-dark">
+                      Post-event ({postEventFieldCount})
+                    </span>
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => setShowFieldList(!showFieldList)}
+                  >
+                    {showFieldList ? (
+                      <>
+                        <X className="h-3 w-3 mr-1" />
+                        Hide fields
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="h-3 w-3 mr-1" />
+                        All fields ({fields.length})
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={addField}
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add field
+                  </Button>
+                </div>
+              </div>
 
-              <TabsContent value="upload" className="space-y-3 pt-2">
-                <div className="border-2 border-dashed border-stroke-light dark:border-stroke-dark rounded-panel p-6 text-center">
-                  <Upload className="h-8 w-8 mx-auto text-text-muted-light dark:text-text-muted-dark mb-2" />
-                  <p className="text-body text-text-secondary-light dark:text-text-secondary-dark mb-3">
-                    Upload your rental agreement PDF
-                  </p>
-                  <input
-                    type="file"
-                    accept=".pdf"
-                    className="hidden"
-                    id="pdf-upload"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handlePdfUpload(file);
+              {/* Main content area */}
+              <div className="flex-1 min-h-0 overflow-hidden flex gap-3">
+                {/* Document preview */}
+                <ScrollArea className={`flex-1 ${showFieldList ? '' : 'w-full'}`}>
+                  <div className="pr-2">
+                    <DocumentPreview
+                      template={template}
+                      fields={fields}
+                      onUpdateField={updateField}
+                      onRemoveField={removeField}
+                      onAiRefine={(instruction) => handleRefine(instruction)}
+                      isRefining={refining}
+                    />
+                  </div>
+                </ScrollArea>
+
+                {/* Field list sidebar */}
+                {showFieldList && (
+                  <div className="w-64 shrink-0 border-l border-stroke-light dark:border-stroke-dark pl-3">
+                    <ScrollArea className="h-full">
+                      <div className="space-y-1 pr-2">
+                        <p className="text-label font-semibold text-text-primary-light dark:text-text-primary-dark mb-2">
+                          All Fields
+                        </p>
+                        {fields.map((field) => {
+                          const config = PHASE_CONFIG[field.fill_phase ?? 'reservation'];
+                          return (
+                            <div
+                              key={field.id}
+                              className="flex items-center gap-2 py-1 px-2 rounded text-xs group"
+                            >
+                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${config.dotClass}`} />
+                              <span className="flex-1 truncate text-text-primary-light dark:text-text-primary-dark">
+                                {field.label}
+                              </span>
+                              {field.required && (
+                                <span className="text-red-400 text-[10px]">req</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                )}
+              </div>
+
+              {/* AI Chat bar */}
+              <div className="border-t border-stroke-light dark:border-stroke-dark pt-3">
+                {chatHistory.length > 0 && (
+                  <div className="space-y-1.5 max-h-[100px] overflow-y-auto mb-2 px-1">
+                    {chatHistory.map((msg, i) => (
+                      <div
+                        key={i}
+                        className={`flex gap-2 text-xs ${msg.role === 'user' ? 'justify-end' : ''}`}
+                      >
+                        {msg.role === 'ai' && (
+                          <Bot className="h-3.5 w-3.5 mt-0.5 text-blue-500 shrink-0" />
+                        )}
+                        <span
+                          className={
+                            msg.role === 'user'
+                              ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2.5 py-1 rounded-lg max-w-[80%]'
+                              : 'text-text-secondary-light dark:text-text-secondary-dark max-w-[80%]'
+                          }
+                        >
+                          {msg.message}
+                        </span>
+                        {msg.role === 'user' && (
+                          <User className="h-3.5 w-3.5 mt-0.5 text-text-muted-light dark:text-text-muted-dark shrink-0" />
+                        )}
+                      </div>
+                    ))}
+                    <div ref={chatEndRef} />
+                  </div>
+                )}
+
+                <div className="flex gap-2 items-center">
+                  <Sparkles className="h-4 w-4 text-text-muted-light dark:text-text-muted-dark shrink-0" />
+                  <Input
+                    value={refinementInput}
+                    onChange={(e) => setRefinementInput(e.target.value)}
+                    placeholder="Ask AI to make changes... e.g. &quot;Add a damage deposit clause&quot;"
+                    className="flex-1 h-8 text-sm"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey && !refining) {
+                        e.preventDefault();
+                        handleRefine();
+                      }
                     }}
                   />
                   <Button
                     variant="outline"
-                    onClick={() => document.getElementById('pdf-upload')?.click()}
-                    disabled={extractingPdf}
+                    size="sm"
+                    className="h-8"
+                    onClick={() => handleRefine()}
+                    disabled={refining || !refinementInput.trim()}
                   >
-                    {extractingPdf ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Extracting text...
-                      </>
+                    {refining ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      'Choose PDF File'
+                      <Send className="h-4 w-4" />
                     )}
                   </Button>
                 </div>
-                {rawText && (
-                  <div className="rounded-inner-card bg-surface-light-2 dark:bg-surface-dark-2 p-3">
-                    <p className="text-meta text-text-muted-light dark:text-text-muted-dark mb-1">
-                      Extracted text preview:
-                    </p>
-                    <p className="text-body text-text-secondary-light dark:text-text-secondary-dark line-clamp-4 whitespace-pre-line">
-                      {rawText.substring(0, 500)}...
-                    </p>
-                  </div>
-                )}
-              </TabsContent>
-
-              <TabsContent value="paste" className="space-y-3 pt-2">
-                <Textarea
-                  placeholder="Paste your rental agreement text here..."
-                  value={rawText}
-                  onChange={(e) => setRawText(e.target.value)}
-                  rows={12}
-                  className="resize-none text-body"
-                />
-              </TabsContent>
-            </Tabs>
-          </div>
-        )}
-
-        {/* ── STEP 2: AI Review / Edit ── */}
-        {step === 2 && (
-          <div className="space-y-4 py-2">
-            {/* AI Chat / Refinement */}
-            <div className="rounded-inner-card border border-stroke-light dark:border-stroke-dark overflow-hidden">
-              {/* Chat messages */}
-              <div className="max-h-[160px] overflow-y-auto p-3 space-y-2">
-                {/* Initial AI summary */}
-                {aiSummary && (
-                  <div className="flex items-start gap-2">
-                    <Bot className="h-4 w-4 text-secondary-500 shrink-0 mt-0.5" />
-                    <p className="text-body text-text-secondary-light dark:text-text-secondary-dark">
-                      {aiSummary}
-                    </p>
-                  </div>
-                )}
-                {/* Conversation history */}
-                {chatHistory.map((msg, i) => (
-                  <div key={i} className="flex items-start gap-2">
-                    {msg.role === 'user' ? (
-                      <User className="h-4 w-4 text-primary-500 shrink-0 mt-0.5" />
-                    ) : (
-                      <Bot className="h-4 w-4 text-secondary-500 shrink-0 mt-0.5" />
-                    )}
-                    <p className={`text-body ${
-                      msg.role === 'user'
-                        ? 'text-text-primary-light dark:text-text-primary-dark'
-                        : 'text-text-secondary-light dark:text-text-secondary-dark'
-                    }`}>
-                      {msg.message}
-                    </p>
-                  </div>
-                ))}
-                {refining && (
-                  <div className="flex items-center gap-2">
-                    <Bot className="h-4 w-4 text-secondary-500 shrink-0" />
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-text-muted-light dark:text-text-muted-dark" />
-                    <span className="text-meta text-text-muted-light dark:text-text-muted-dark">Thinking...</span>
-                  </div>
-                )}
-                <div ref={chatEndRef} />
-              </div>
-              {/* Refinement input */}
-              <div className="flex items-center gap-2 border-t border-stroke-light dark:border-stroke-dark px-3 py-2">
-                <Input
-                  value={refinementInput}
-                  onChange={(e) => setRefinementInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !refining) { e.preventDefault(); handleRefine(); } }}
-                  placeholder="Tell the AI what to change..."
-                  className="text-body flex-1"
-                  disabled={refining}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleRefine}
-                  disabled={refining || !refinementInput.trim()}
-                  className="shrink-0"
-                >
-                  {refining ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                </Button>
               </div>
             </div>
-
-            {/* Custom Questions - grouped by phase */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <h3 className="text-label text-text-primary-light dark:text-text-primary-dark">
-                  Custom Questions
-                </h3>
-                <Button variant="outline" size="sm" onClick={addField}>
-                  <Plus className="h-3.5 w-3.5 mr-1" />
-                  Add Question
-                </Button>
-              </div>
-              <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                Click a question to edit it, or use the trash icon to remove it.
-              </p>
-
-              {fields.length === 0 ? (
-                <div className="rounded-inner-card bg-surface-light-2 dark:bg-surface-dark-2 p-4 text-center">
-                  <p className="text-body text-text-muted-light dark:text-text-muted-dark">
-                    No custom questions. The agreement uses only system variables.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* Reservation fields */}
-                  {(() => {
-                    const { reservationFields, postEventFields } = partitionFieldsByPhase(fields);
-                    return (
-                      <>
-                        {reservationFields.length > 0 && (
-                          <div className="space-y-2">
-                            <p className="text-meta font-medium text-text-secondary-light dark:text-text-secondary-dark">
-                              During Reservation ({reservationFields.length})
-                            </p>
-                            {reservationFields.map((field) => renderFieldRow(field))}
-                          </div>
-                        )}
-                        {postEventFields.length > 0 && (
-                          <div className="space-y-2">
-                            <p className="text-meta font-medium text-amber-600 dark:text-amber-400">
-                              Post-Event Inspection ({postEventFields.length})
-                            </p>
-                            {postEventFields.map((field) => renderFieldRow(field))}
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()}
-                </div>
-              )}
-            </div>
-
-            {/* System Variables Info */}
-            <div className="space-y-1.5">
-              <h3 className="text-label text-text-primary-light dark:text-text-primary-dark">
-                System Variables (auto-filled)
-              </h3>
-              <div className="flex flex-wrap gap-1">
-                {SYSTEM_VARIABLES.map((v) => (
-                  <span
-                    key={v.key}
-                    className="px-2 py-0.5 text-[11px] rounded border border-secondary-200 dark:border-secondary-800 bg-secondary-50 dark:bg-secondary-950/30 text-secondary-700 dark:text-secondary-300 font-mono"
-                  >
-                    {`{{${v.key}}}`}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Agreement Template */}
-            <div className="space-y-2">
-              <h3 className="text-label text-text-primary-light dark:text-text-primary-dark">
-                Agreement Template
-              </h3>
-
-              {/* Variable insertion toolbar */}
-              <div className="space-y-1">
-                <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                  Click a variable to insert it at the cursor:
-                </p>
-                <div className="flex flex-wrap gap-1">
-                  {SYSTEM_VARIABLES.map((v) => (
-                    <button
-                      key={v.key}
-                      type="button"
-                      onClick={() => insertVariable(v.key)}
-                      className="px-1.5 py-0.5 text-[11px] rounded border border-stroke-light dark:border-stroke-dark
-                        hover:bg-secondary-400/10 hover:border-secondary-400/50 transition-colors font-mono"
-                    >
-                      {v.label}
-                    </button>
-                  ))}
-                  {fields.map((f) =>
-                    f.key ? (
-                      <button
-                        key={f.id}
-                        type="button"
-                        onClick={() => insertVariable(f.key)}
-                        className="px-1.5 py-0.5 text-[11px] rounded border border-mint/30
-                          hover:bg-mint/10 hover:border-mint/50 transition-colors font-mono text-mint"
-                      >
-                        {f.label || f.key}
-                      </button>
-                    ) : null,
-                  )}
-                </div>
-              </div>
-
-              <Textarea
-                ref={templateRef}
-                value={template}
-                onChange={(e) => setTemplate(e.target.value)}
-                rows={12}
-                className="resize-none font-mono text-[13px] leading-relaxed"
-                placeholder="Agreement template text with {{placeholders}}..."
-              />
-            </div>
-          </div>
-        )}
-
-        {/* ── STEP 3: Preview ── */}
-        {step === 3 && (
-          <div className="space-y-4 py-2">
-            <div className="flex items-start gap-2 rounded-inner-card bg-surface-light-2 dark:bg-surface-dark-2 p-3">
-              <AlertCircle className="h-4 w-4 text-text-muted-light dark:text-text-muted-dark shrink-0 mt-0.5" />
-              <p className="text-meta text-text-muted-light dark:text-text-muted-dark">
-                This preview shows the agreement with example values filled in.
-                Actual values will come from the member's reservation details and form answers.
-              </p>
-            </div>
-
-            <ScrollArea className="h-[350px] rounded-inner-card border border-stroke-light dark:border-stroke-dark p-4">
-              <div className="whitespace-pre-line text-body text-text-primary-light dark:text-text-primary-dark leading-relaxed">
-                {previewText}
-              </div>
-            </ScrollArea>
-
-            {fields.length > 0 && (() => {
-              const { reservationFields, postEventFields } = partitionFieldsByPhase(fields);
-              return (
-                <div className="space-y-3">
-                  {reservationFields.length > 0 && (
-                    <div className="space-y-1">
-                      <h4 className="text-label text-text-secondary-light dark:text-text-secondary-dark">
-                        Questions asked during reservation:
-                      </h4>
-                      <ul className="space-y-1">
-                        {reservationFields.map((f) => (
-                          <li
-                            key={f.id}
-                            className="flex items-center gap-2 text-body text-text-secondary-light dark:text-text-secondary-dark"
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full bg-secondary-400 shrink-0" />
-                            {f.label}
-                            {f.required && <span className="text-red-500 text-meta">*</span>}
-                            <Badge variant="outline" className="text-[10px]">
-                              {FIELD_TYPE_BADGE[f.type]}
-                            </Badge>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {postEventFields.length > 0 && (
-                    <div className="space-y-1">
-                      <h4 className="text-label text-amber-600 dark:text-amber-400">
-                        Completed after event (board only):
-                      </h4>
-                      <ul className="space-y-1">
-                        {postEventFields.map((f) => (
-                          <li
-                            key={f.id}
-                            className="flex items-center gap-2 text-body text-text-secondary-light dark:text-text-secondary-dark"
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-                            {f.label}
-                            {f.required && <span className="text-red-500 text-meta">*</span>}
-                            <Badge variant="outline" className="text-[10px]">
-                              {FIELD_TYPE_BADGE[f.type]}
-                            </Badge>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
-        )}
-
-        {/* ── FOOTER ── */}
-        <DialogFooter className="gap-2 sm:gap-0">
-          {step === 1 && (
-            <>
-              <Button variant="outline" onClick={() => handleOpenChange(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleAnalyze} disabled={!rawText.trim() || analyzing}>
-                {analyzing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Analyzing...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    Analyze with AI
-                  </>
-                )}
-              </Button>
-            </>
           )}
-          {step === 2 && (
-            <>
+        </div>
+
+        <DialogFooter className="flex justify-between">
+          <div>
+            {step === 2 && (
               <Button variant="outline" onClick={() => setStep(1)}>
                 <ChevronLeft className="h-4 w-4 mr-1" />
                 Back
               </Button>
-              <Button onClick={() => setStep(3)} disabled={!template.trim()}>
-                Preview
-                <ChevronRight className="h-4 w-4 ml-1" />
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => handleOpenChange(false)}>
+              Cancel
+            </Button>
+            {step === 1 && (
+              <Button onClick={handleAnalyze} disabled={analyzing || !rawText.trim()}>
+                {analyzing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                    Analyzing...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4 mr-1.5" />
+                    Analyze with AI
+                  </>
+                )}
               </Button>
-            </>
-          )}
-          {step === 3 && (
-            <>
-              <Button variant="outline" onClick={() => setStep(2)}>
-                <ChevronLeft className="h-4 w-4 mr-1" />
-                Back to Edit
-              </Button>
-              <Button onClick={handleSave}>
-                <Check className="h-4 w-4 mr-1" />
+            )}
+            {step === 2 && (
+              <Button
+                onClick={() => {
+                  onSave(template, fields);
+                  handleOpenChange(false);
+                }}
+                disabled={!template.trim() || fields.length === 0}
+              >
+                <Check className="h-4 w-4 mr-1.5" />
                 Save Agreement
               </Button>
-            </>
-          )}
+            )}
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
