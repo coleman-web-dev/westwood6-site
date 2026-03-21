@@ -24,6 +24,8 @@ interface PayInvoiceButtonProps {
   hasSubscription?: boolean;
   /** Unit's current preferred billing day (1-28) */
   preferredBillingDay?: number | null;
+  /** Whether this invoice is tied to a recurring assessment (vs one-off fine/special) */
+  isRecurringInvoice?: boolean;
 }
 
 function calcFee(amount: number, settings?: ConvenienceFeeSettings): number {
@@ -121,13 +123,14 @@ export function PayInvoiceButton({
   disabled,
   hasSubscription,
   preferredBillingDay,
+  isRecurringInvoice,
 }: PayInvoiceButtonProps) {
   const { community } = useCommunity();
   const [loading, setLoading] = useState<'card' | 'ach' | 'any' | null>(null);
   const [showAch, setShowAch] = useState(false);
 
-  // Autopay opt-in state
-  const showAutopayOption = !hasSubscription;
+  // Only show autopay option on recurring assessment invoices when no subscription exists
+  const showAutopayOption = !hasSubscription && isRecurringInvoice;
   const [enableAutopay, setEnableAutopay] = useState(false);
   const defaultDay = preferredBillingDay
     ? String(Math.min(preferredBillingDay, 28))

@@ -764,6 +764,7 @@ export function InvoiceList({
                     amount={invoice.status === 'partial' ? invoice.amount - invoice.amount_paid : invoice.amount}
                     hasSubscription={subscriptionActive}
                     preferredBillingDay={preferredBillingDay}
+                    isRecurringInvoice={!!invoice.assessment_id}
                   />
                 </div>
               )}
