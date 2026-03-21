@@ -2,14 +2,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { LeaseNotificationRule } from '@/lib/types/database';
 
+// Vercel crons send GET requests
+export async function GET(req: NextRequest) {
+  return handler(req);
+}
+
+export async function POST(req: NextRequest) {
+  return handler(req);
+}
+
 /**
- * POST /api/cron/lease-notifications
  * Daily cron: finds units with leases approaching expiry and queues
  * notification emails to board members. Uses per-unit notification rules
  * (e.g. 30 days before, 60 days before).
  * Protected by CRON_SECRET header.
  */
-export async function POST(req: NextRequest) {
+async function handler(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
 

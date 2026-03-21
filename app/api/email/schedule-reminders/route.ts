@@ -2,14 +2,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { queuePaymentReminder } from '@/lib/email/queue';
 
+// Vercel crons send GET requests
+export async function GET(req: NextRequest) {
+  return handler(req);
+}
+
+export async function POST(req: NextRequest) {
+  return handler(req);
+}
+
 /**
- * POST /api/email/schedule-reminders
  * Cron endpoint: finds invoices needing reminders and queues emails.
  * Uses configurable reminder_days_before and reminder_days_after from community settings.
  * Protected by CRON_SECRET header.
  * Accepts optional { community_id } body for targeted manual trigger.
  */
-export async function POST(req: NextRequest) {
+async function handler(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
 

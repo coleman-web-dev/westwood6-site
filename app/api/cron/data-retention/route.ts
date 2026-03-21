@@ -1,15 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
+// Vercel crons send GET requests
+export async function GET(req: NextRequest) {
+  return handler(req);
+}
+
+export async function POST(req: NextRequest) {
+  return handler(req);
+}
+
 /**
- * POST /api/cron/data-retention
  * Monthly cron: cleans up expired data per the data retention policy.
  * - Sent email queue entries older than 90 days
  * - Read notifications older than 90 days
  * - Denied signup requests older than 90 days
  * - Audit logs older than 2 years
  */
-export async function POST(req: NextRequest) {
+async function handler(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
 

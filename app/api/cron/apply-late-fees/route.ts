@@ -3,11 +3,19 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { postLateFeeApplied } from '@/lib/utils/accounting-entries';
 import type { LateFeeSettings } from '@/lib/types/database';
 
+// Vercel crons send GET requests
+export async function GET(req: NextRequest) {
+  return handler(req);
+}
+
+export async function POST(req: NextRequest) {
+  return handler(req);
+}
+
 /**
- * POST /api/cron/apply-late-fees
  * Daily cron: applies late fees to overdue/partial invoices past the grace period.
  */
-export async function POST(req: NextRequest) {
+async function handler(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
 

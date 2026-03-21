@@ -48,12 +48,20 @@ function renderTemplate(templateId: string, data: Record<string, unknown>): Reac
   }
 }
 
+// Vercel crons send GET requests
+export async function GET(req: NextRequest) {
+  return handler(req);
+}
+
+export async function POST(req: NextRequest) {
+  return handler(req);
+}
+
 /**
- * POST /api/email/process-queue
  * Cron endpoint: processes queued emails in batches.
  * Protected by CRON_SECRET header.
  */
-export async function POST(req: NextRequest) {
+async function handler(req: NextRequest) {
   // Verify cron secret
   const authHeader = req.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;

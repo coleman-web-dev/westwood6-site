@@ -5,12 +5,20 @@ import type { CommunityTheme } from '@/lib/types/database';
 
 const DEFAULT_REMINDER_DAYS = [60, 30, 7];
 
+// Vercel crons send GET requests
+export async function GET(req: NextRequest) {
+  return handler(req);
+}
+
+export async function POST(req: NextRequest) {
+  return handler(req);
+}
+
 /**
- * POST /api/cron/vendor-insurance-reminders
  * Cron endpoint: finds vendors with expiring insurance and queues reminder emails to board members.
  * Runs daily. Protected by CRON_SECRET header.
  */
-export async function POST(req: NextRequest) {
+async function handler(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
 

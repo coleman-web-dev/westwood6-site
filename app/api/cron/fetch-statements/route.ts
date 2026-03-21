@@ -2,13 +2,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { fetchAndProcessStatements } from '@/lib/utils/plaid-statements';
 
+// Vercel crons send GET requests
+export async function GET(req: NextRequest) {
+  return handler(req);
+}
+
+export async function POST(req: NextRequest) {
+  return handler(req);
+}
+
 /**
- * POST /api/cron/fetch-statements
  * Monthly cron (5th of each month): fetches bank statements from Plaid
  * for all active connections with Statements consent, processes them
  * with AI, and auto-applies categorizations.
  */
-export async function POST(req: NextRequest) {
+async function handler(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
 
