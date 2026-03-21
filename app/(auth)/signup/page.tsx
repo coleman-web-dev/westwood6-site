@@ -77,6 +77,16 @@ function SignupForm() {
       return;
     }
 
+    // Notify board members via notification bell
+    void supabase.rpc('create_board_notifications', {
+      p_community_id: community.id,
+      p_type: 'signup_request',
+      p_title: 'New access request',
+      p_body: `${firstName.trim()} ${lastName.trim()} (${email}) has requested access to the community.`,
+      p_reference_id: null,
+      p_reference_type: 'signup_request',
+    });
+
     setSuccess(true);
     setLoading(false);
   }

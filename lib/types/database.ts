@@ -803,7 +803,8 @@ export type NotificationType =
   | 'arc_request_denied'
   | 'maintenance_request_updated'
   | 'maintenance_request_completed'
-  | 'deposit_returned';
+  | 'deposit_returned'
+  | 'signup_request';
 
 export interface Notification {
   id: string;

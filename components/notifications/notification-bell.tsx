@@ -12,7 +12,7 @@ import {
   PopoverTrigger,
 } from '@/components/shared/ui/popover';
 import { ScrollArea } from '@/components/shared/ui/scroll-area';
-import { BellIcon, FileSignature, CalendarCheck, CheckCheck, Vote, Users, ShieldAlert, ClipboardList, Wrench, CreditCard, Receipt, CircleCheck, CircleX, Wallet, MessageSquare } from 'lucide-react';
+import { BellIcon, FileSignature, CalendarCheck, CheckCheck, Vote, Users, ShieldAlert, ClipboardList, Wrench, CreditCard, Receipt, CircleCheck, CircleX, Wallet, MessageSquare, UserPlus } from 'lucide-react';
 import { SignedAgreementViewer } from '@/components/amenities/signed-agreement-viewer';
 import type { Notification, NotificationType } from '@/lib/types/database';
 
@@ -39,6 +39,7 @@ const TYPE_ICON: Record<NotificationType, React.ReactNode> = {
   maintenance_request_updated: <Wrench className="h-4 w-4 text-amber-500" />,
   maintenance_request_completed: <Wrench className="h-4 w-4 text-green-500" />,
   deposit_returned: <Wallet className="h-4 w-4 text-green-500" />,
+  signup_request: <UserPlus className="h-4 w-4 text-secondary-500" />,
   general: <BellIcon className="h-4 w-4 text-text-muted-light dark:text-text-muted-dark" />,
 };
 
@@ -161,6 +162,13 @@ export function NotificationBell() {
     if (n.type === 'deposit_returned') {
       setOpen(false);
       router.push(`/${community.slug}/amenities`);
+      return;
+    }
+
+    // Navigate to Settings > Requests for signup request notifications
+    if (n.type === 'signup_request' || n.reference_type === 'signup_request') {
+      setOpen(false);
+      router.push(`/${community.slug}/settings?tab=requests`);
       return;
     }
 
