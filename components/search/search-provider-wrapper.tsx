@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useRegisterActions, useKBar, VisualState } from '@shipixen/kbar';
+import { useRegisterActions } from '@shipixen/kbar';
 import { createClient } from '@/lib/supabase/client';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { searchLinks } from '@/data/config/searchLinks';
@@ -29,22 +29,16 @@ interface UnitRow {
 
 export function SearchProviderWrapper({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { query } = useKBar();
   const { community, actualIsBoard, viewMode } = useCommunity();
   const isAdminView = actualIsBoard && viewMode === 'admin';
   const basePath = `/${community.slug}`;
 
-  // Close KBar then navigate via Next.js router for instant client-side
-  // transition. Using window.location.href caused a full reload and
-  // required double-click on some items. Wrapped in useCallback so action
-  // perform closures always reference the latest router/query.
+  // KBar's internal execute() already calls query.toggle() after perform(),
+  // so we must NOT manually close KBar here — doing so conflicts with the
+  // built-in toggle and causes KBar to re-open instead of closing.
   const navigate = useCallback((path: string) => {
-    query.setVisualState(VisualState.hidden);
-    // Allow KBar animation to complete before navigating
-    requestAnimationFrame(() => {
-      router.push(path);
-    });
-  }, [query, router]);
+    router.push(path);
+  }, [router]);
 
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [documents, setDocuments] = useState<DocType[]>([]);
