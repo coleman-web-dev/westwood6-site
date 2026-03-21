@@ -754,8 +754,27 @@ export interface Assessment {
   type: AssessmentType;
   installments: number | null;
   installment_start_date: string | null;
+  stripe_product_id: string | null;
+  stripe_price_id: string | null;
   created_by: string | null;
   created_at: string;
+}
+
+export interface UnitSubscription {
+  id: string;
+  unit_id: string;
+  community_id: string;
+  assessment_id: string | null;
+  stripe_subscription_id: string;
+  stripe_subscription_status: string;
+  stripe_price_id: string | null;
+  payment_frequency: string | null;
+  preferred_billing_day: number | null;
+  total_installments: number | null;
+  installments_paid: number;
+  cancel_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface SignedAgreement {

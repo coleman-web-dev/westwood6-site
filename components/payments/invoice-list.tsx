@@ -64,7 +64,7 @@ interface InvoiceListProps {
   allMembers?: { unit_id: string | null; user_id: string | null }[];
   assessments?: Assessment[];
   stripeEnabled?: boolean;
-  subscriptionActive?: boolean;
+  activeSubAssessmentIds?: Set<string>;
   preferredBillingDay?: number | null;
 }
 
@@ -77,7 +77,7 @@ export function InvoiceList({
   allMembers,
   assessments,
   stripeEnabled,
-  subscriptionActive,
+  activeSubAssessmentIds,
   preferredBillingDay,
 }: InvoiceListProps) {
   const { isBoard, community, member, unit } = useCommunity();
@@ -678,7 +678,7 @@ export function InvoiceList({
                         Violation Fine
                       </Badge>
                     )}
-                    {subscriptionActive && (invoice.status === 'pending' || invoice.status === 'overdue') && (
+                    {invoice.assessment_id && activeSubAssessmentIds?.has(invoice.assessment_id) && (invoice.status === 'pending' || invoice.status === 'overdue') && (
                       <span className="text-meta text-green-600 dark:text-green-400 flex items-center gap-1">
                         <CreditCard className="h-3 w-3" />
                         Auto-pay
@@ -762,9 +762,17 @@ export function InvoiceList({
                     invoiceId={invoice.id}
                     communityId={community.id}
                     amount={invoice.status === 'partial' ? invoice.amount - invoice.amount_paid : invoice.amount}
-                    hasSubscription={subscriptionActive}
+                    hasSubscription={invoice.assessment_id ? activeSubAssessmentIds?.has(invoice.assessment_id) : false}
                     preferredBillingDay={preferredBillingDay}
-                    isRecurringInvoice={!!invoice.assessment_id}
+                    isRecurringInvoice={(() => {
+                      if (!invoice.assessment_id) return false;
+                      const assessment = assessments?.find(a => a.id === invoice.assessment_id);
+                      if (!assessment) return false;
+                      // Regular assessments are always autopay-eligible
+                      if (assessment.type === 'regular') return true;
+                      // Special assessments only if they have multiple installments
+                      return assessment.type === 'special' && (assessment.installments ?? 0) > 1;
+                    })()}
                   />
                 </div>
               )}

@@ -401,72 +401,136 @@ export async function POST(req: NextRequest) {
             const stripeCustomerId = typeof session.customer === 'string'
               ? session.customer
               : session.customer.id;
+            const assessmentType = session.metadata.assessment_type || 'regular';
+            const assessmentId = session.metadata.assessment_id || invoice.assessment_id;
+            const totalInstallments = session.metadata.total_installments
+              ? parseInt(session.metadata.total_installments, 10)
+              : null;
 
-            // Guard: skip if unit already has a subscription
-            const { data: autopayUnit } = await supabase
-              .from('units')
-              .select('id, stripe_subscription_id, payment_frequency')
-              .eq('id', invoice.unit_id)
-              .single();
+            // Guard: check if this assessment already has an active subscription for this unit
+            const { data: existingSub } = assessmentId
+              ? await supabase
+                  .from('unit_subscriptions')
+                  .select('id')
+                  .eq('unit_id', invoice.unit_id)
+                  .eq('assessment_id', assessmentId)
+                  .in('stripe_subscription_status', ['active', 'trialing'])
+                  .limit(1)
+                  .maybeSingle()
+              : { data: null };
 
-            if (autopayUnit && !autopayUnit.stripe_subscription_id) {
-              // Look up stripe_accounts for prices and connect config
+            if (existingSub) {
+              console.log('Unit already has subscription for this assessment, skipping:', invoice.unit_id, assessmentId);
+            } else {
+              const { data: autopayUnit } = await supabase
+                .from('units')
+                .select('id, payment_frequency')
+                .eq('id', invoice.unit_id)
+                .single();
+
               const { data: autopayStripeAccount } = await supabase
                 .from('stripe_accounts')
                 .select('*')
                 .eq('community_id', communityId)
                 .single();
 
-              if (autopayStripeAccount) {
-                const stripePrices = (autopayStripeAccount.stripe_prices as Record<string, string>) || {};
-                let productId = autopayStripeAccount.stripe_product_id;
+              if (autopayUnit && autopayStripeAccount) {
+                let targetPriceId: string | undefined;
+                let subscriptionAssessmentId = assessmentId;
 
-                // Create product and prices on the fly if they don't exist
-                if (!productId || !stripePrices.monthly) {
-                  const { data: assessment } = await supabase
+                if (assessmentType === 'special' && assessmentId) {
+                  // --- Special assessment: create per-assessment product/price ---
+                  const { data: specialAssessment } = await supabase
                     .from('assessments')
-                    .select('title, annual_amount')
-                    .eq('community_id', communityId)
-                    .eq('is_active', true)
+                    .select('id, title, annual_amount, installments, stripe_product_id, stripe_price_id')
+                    .eq('id', assessmentId)
                     .single();
 
-                  if (assessment) {
-                    if (!productId) {
-                      const product = await stripe.products.create({
-                        name: assessment.title,
-                        metadata: { community_id: communityId },
-                      });
-                      productId = product.id;
-                    }
+                  if (specialAssessment && specialAssessment.installments && specialAssessment.installments > 1) {
+                    const installmentAmount = Math.round(specialAssessment.annual_amount / specialAssessment.installments);
 
-                    let pricesChanged = false;
-                    for (const [freq, config] of Object.entries(FREQUENCY_CONFIG)) {
-                      if (stripePrices[freq]) continue;
-                      const amount = Math.round(assessment.annual_amount / config.divisor);
+                    if (specialAssessment.stripe_price_id) {
+                      targetPriceId = specialAssessment.stripe_price_id;
+                    } else {
+                      // Create Stripe product for this special assessment
+                      let spProductId = specialAssessment.stripe_product_id;
+                      if (!spProductId) {
+                        const product = await stripe.products.create({
+                          name: specialAssessment.title,
+                          metadata: { community_id: communityId, assessment_id: assessmentId, type: 'special' },
+                        });
+                        spProductId = product.id;
+                      }
+
+                      // Create monthly price for the installment amount
                       const price = await stripe.prices.create({
-                        product: productId,
-                        unit_amount: amount,
+                        product: spProductId,
+                        unit_amount: installmentAmount,
                         currency: 'usd',
-                        recurring: { interval: config.interval, interval_count: config.interval_count },
-                        metadata: { frequency: freq, community_id: communityId },
+                        recurring: { interval: 'month', interval_count: 1 },
+                        metadata: { assessment_id: assessmentId, community_id: communityId, type: 'special' },
                       });
-                      stripePrices[freq] = price.id;
-                      pricesChanged = true;
-                    }
+                      targetPriceId = price.id;
 
-                    // Save back to stripe_accounts
-                    const updateFields: Record<string, unknown> = { updated_at: new Date().toISOString() };
-                    if (!autopayStripeAccount.stripe_product_id) updateFields.stripe_product_id = productId;
-                    if (!autopayStripeAccount.stripe_default_price_id) updateFields.stripe_default_price_id = stripePrices.monthly || null;
-                    if (pricesChanged) updateFields.stripe_prices = stripePrices;
-                    if (Object.keys(updateFields).length > 1) {
-                      await supabase.from('stripe_accounts').update(updateFields).eq('id', autopayStripeAccount.id);
+                      // Save back to assessment
+                      await supabase.from('assessments').update({
+                        stripe_product_id: spProductId,
+                        stripe_price_id: price.id,
+                      }).eq('id', assessmentId);
                     }
                   }
-                }
+                } else {
+                  // --- Regular assessment: use community-level prices ---
+                  const stripePrices = (autopayStripeAccount.stripe_prices as Record<string, string>) || {};
+                  let productId = autopayStripeAccount.stripe_product_id;
 
-                const unitFreq = (autopayUnit.payment_frequency as PaymentFrequency) || 'monthly';
-                const targetPriceId = stripePrices[unitFreq] || stripePrices.monthly;
+                  if (!productId || !stripePrices.monthly) {
+                    const { data: assessment } = await supabase
+                      .from('assessments')
+                      .select('id, title, annual_amount')
+                      .eq('community_id', communityId)
+                      .eq('is_active', true)
+                      .eq('type', 'regular')
+                      .single();
+
+                    if (assessment) {
+                      subscriptionAssessmentId = assessment.id;
+                      if (!productId) {
+                        const product = await stripe.products.create({
+                          name: assessment.title,
+                          metadata: { community_id: communityId },
+                        });
+                        productId = product.id;
+                      }
+
+                      let pricesChanged = false;
+                      for (const [freq, config] of Object.entries(FREQUENCY_CONFIG)) {
+                        if (stripePrices[freq]) continue;
+                        const amount = Math.round(assessment.annual_amount / config.divisor);
+                        const price = await stripe.prices.create({
+                          product: productId,
+                          unit_amount: amount,
+                          currency: 'usd',
+                          recurring: { interval: config.interval, interval_count: config.interval_count },
+                          metadata: { frequency: freq, community_id: communityId },
+                        });
+                        stripePrices[freq] = price.id;
+                        pricesChanged = true;
+                      }
+
+                      const updateFields: Record<string, unknown> = { updated_at: new Date().toISOString() };
+                      if (!autopayStripeAccount.stripe_product_id) updateFields.stripe_product_id = productId;
+                      if (!autopayStripeAccount.stripe_default_price_id) updateFields.stripe_default_price_id = stripePrices.monthly || null;
+                      if (pricesChanged) updateFields.stripe_prices = stripePrices;
+                      if (Object.keys(updateFields).length > 1) {
+                        await supabase.from('stripe_accounts').update(updateFields).eq('id', autopayStripeAccount.id);
+                      }
+                    }
+                  }
+
+                  const unitFreq = (autopayUnit.payment_frequency as PaymentFrequency) || 'monthly';
+                  targetPriceId = stripePrices[unitFreq] || stripePrices.monthly;
+                }
 
                 if (targetPriceId) {
                   // Retrieve payment method from the PaymentIntent
@@ -482,15 +546,25 @@ export async function POST(req: NextRequest) {
                       : pi.payment_method?.id || undefined;
                   }
 
-                  // Set as customer's default payment method for invoices
                   if (paymentMethodId) {
                     await stripe.customers.update(stripeCustomerId, {
                       invoice_settings: { default_payment_method: paymentMethodId },
                     });
                   }
 
-                  // Compute billing cycle anchor
-                  const billingCycleAnchor = computeNextBillingAnchor(autopayBillingDay, unitFreq);
+                  // Compute billing cycle anchor and cancel_at for special assessments
+                  const unitFreq = (autopayUnit.payment_frequency as PaymentFrequency) || 'monthly';
+                  const billingCycleAnchor = computeNextBillingAnchor(autopayBillingDay, assessmentType === 'special' ? 'monthly' : unitFreq);
+
+                  // For special assessments, auto-cancel after remaining installments
+                  // The first installment was just paid via checkout, so remaining = total - 1
+                  let cancelAt: number | undefined;
+                  if (assessmentType === 'special' && totalInstallments && totalInstallments > 1) {
+                    const remainingInstallments = totalInstallments - 1;
+                    const cancelDate = new Date(billingCycleAnchor * 1000);
+                    cancelDate.setUTCMonth(cancelDate.getUTCMonth() + remainingInstallments);
+                    cancelAt = Math.floor(cancelDate.getTime() / 1000);
+                  }
 
                   const isAutopayConnect = autopayStripeAccount.mode === 'connect' && autopayStripeAccount.stripe_account_id;
 
@@ -500,10 +574,13 @@ export async function POST(req: NextRequest) {
                     billing_cycle_anchor: billingCycleAnchor,
                     proration_behavior: 'none',
                     ...(paymentMethodId ? { default_payment_method: paymentMethodId } : {}),
+                    ...(cancelAt ? { cancel_at: cancelAt } : {}),
                     metadata: {
                       unit_id: autopayUnit.id,
                       community_id: communityId,
-                      payment_frequency: unitFreq,
+                      assessment_id: subscriptionAssessmentId || '',
+                      assessment_type: assessmentType,
+                      payment_frequency: assessmentType === 'special' ? 'monthly' : unitFreq,
                     },
                     ...(isAutopayConnect ? {
                       application_fee_percent: autopayStripeAccount.application_fee_percent,
@@ -511,14 +588,31 @@ export async function POST(req: NextRequest) {
                     } : {}),
                   });
 
-                  // Update unit with subscription info
-                  await supabase.from('units').update({
+                  // Insert into unit_subscriptions table
+                  await supabase.from('unit_subscriptions').insert({
+                    unit_id: autopayUnit.id,
+                    community_id: communityId,
+                    assessment_id: subscriptionAssessmentId || null,
                     stripe_subscription_id: subscription.id,
                     stripe_subscription_status: subscription.status,
+                    stripe_price_id: targetPriceId,
+                    payment_frequency: assessmentType === 'special' ? 'monthly' : unitFreq,
                     preferred_billing_day: autopayBillingDay,
-                  }).eq('id', autopayUnit.id);
+                    total_installments: totalInstallments,
+                    installments_paid: 1, // first installment was just paid via checkout
+                    cancel_at: cancelAt ? new Date(cancelAt * 1000).toISOString() : null,
+                  });
 
-                  // Notify unit members about autopay enrollment
+                  // Also update units table for backward compat (regular dues only)
+                  if (assessmentType === 'regular') {
+                    await supabase.from('units').update({
+                      stripe_subscription_id: subscription.id,
+                      stripe_subscription_status: subscription.status,
+                      preferred_billing_day: autopayBillingDay,
+                    }).eq('id', autopayUnit.id);
+                  }
+
+                  // Notify unit members
                   const { data: unitMembers } = await supabase
                     .from('members')
                     .select('id')
@@ -529,11 +623,16 @@ export async function POST(req: NextRequest) {
                     const ordSuffix = ['th', 'st', 'nd', 'rd'];
                     const v = autopayBillingDay % 100;
                     const ord = autopayBillingDay + (ordSuffix[(v - 20) % 10] || ordSuffix[v] || ordSuffix[0]);
+
+                    const notifBody = assessmentType === 'special' && totalInstallments
+                      ? `Auto-pay is set up for your special assessment. ${totalInstallments - 1} remaining payments will be billed on the ${ord} of each month.`
+                      : `Your auto-pay is set up. Future charges will be billed on the ${ord} of each month.`;
+
                     void supabase.rpc('create_member_notifications', {
                       p_community_id: communityId,
                       p_type: 'general',
                       p_title: 'Auto-pay enabled',
-                      p_body: `Your auto-pay is set up. Future charges will be billed on the ${ord} of each month.`,
+                      p_body: notifBody,
                       p_reference_id: null,
                       p_reference_type: 'payment',
                       p_member_ids: unitMembers.map((m: { id: string }) => m.id),
@@ -545,19 +644,22 @@ export async function POST(req: NextRequest) {
                     action: 'autopay_enrolled',
                     targetType: 'unit',
                     targetId: autopayUnit.id,
-                    metadata: { billing_day: autopayBillingDay, frequency: unitFreq, subscription_id: subscription.id },
+                    metadata: {
+                      billing_day: autopayBillingDay,
+                      frequency: assessmentType === 'special' ? 'monthly' : unitFreq,
+                      subscription_id: subscription.id,
+                      assessment_type: assessmentType,
+                      total_installments: totalInstallments,
+                    },
                   });
 
-                  console.log('Autopay subscription created for unit:', autopayUnit.id, 'subscription:', subscription.id);
+                  console.log(`Autopay subscription created (${assessmentType}) for unit:`, autopayUnit.id, 'subscription:', subscription.id);
                 } else {
                   console.warn('No Stripe price found for autopay enrollment, skipping. Unit:', autopayUnit.id);
                 }
               }
-            } else if (autopayUnit?.stripe_subscription_id) {
-              console.log('Unit already has subscription, skipping autopay enrollment:', autopayUnit.id);
             }
           } catch (autopayErr) {
-            // Log but don't fail the webhook — the payment itself was successful
             console.error('Failed to create autopay subscription:', autopayErr);
           }
         }
@@ -592,31 +694,59 @@ export async function POST(req: NextRequest) {
           ? subDetails.subscription
           : subDetails.subscription.id;
 
-        // Look up the unit by stripe_subscription_id
-        const { data: unit } = await supabase
-          .from('units')
-          .select('id, community_id')
+        // Look up the subscription in unit_subscriptions first, fall back to units table
+        let unitId: string | undefined;
+        let unitCommunityId: string | undefined;
+        let subAssessmentId: string | null = null;
+        let unitSubRow: { id: string; total_installments: number | null; installments_paid: number } | null = null;
+
+        const { data: unitSub } = await supabase
+          .from('unit_subscriptions')
+          .select('id, unit_id, community_id, assessment_id, total_installments, installments_paid')
           .eq('stripe_subscription_id', subscriptionId)
           .single();
 
-        if (!unit) {
+        if (unitSub) {
+          unitId = unitSub.unit_id;
+          unitCommunityId = unitSub.community_id;
+          subAssessmentId = unitSub.assessment_id;
+          unitSubRow = { id: unitSub.id, total_installments: unitSub.total_installments, installments_paid: unitSub.installments_paid };
+        } else {
+          // Backward compat: look up via units table
+          const { data: unit } = await supabase
+            .from('units')
+            .select('id, community_id')
+            .eq('stripe_subscription_id', subscriptionId)
+            .single();
+
+          if (unit) {
+            unitId = unit.id;
+            unitCommunityId = unit.community_id;
+          }
+        }
+
+        if (!unitId || !unitCommunityId) {
           console.log('No unit found for subscription:', subscriptionId);
           break;
         }
 
-        // Find the matching DuesIQ invoice:
-        // Same unit_id, status is 'pending' or 'overdue', closest due_date to today
-        const { data: duesiqInvoice } = await supabase
+        // Find the matching DuesIQ invoice, scoped by assessment_id if available
+        let invoiceQuery = supabase
           .from('invoices')
           .select('*')
-          .eq('unit_id', unit.id)
+          .eq('unit_id', unitId)
           .in('status', ['pending', 'overdue'])
           .order('due_date', { ascending: true })
-          .limit(1)
-          .single();
+          .limit(1);
+
+        if (subAssessmentId) {
+          invoiceQuery = invoiceQuery.eq('assessment_id', subAssessmentId);
+        }
+
+        const { data: duesiqInvoice } = await invoiceQuery.single();
 
         if (!duesiqInvoice) {
-          console.log('No pending DuesIQ invoice found for unit:', unit.id);
+          console.log('No pending DuesIQ invoice found for unit:', unitId, 'assessment:', subAssessmentId);
           break;
         }
 
@@ -635,14 +765,14 @@ export async function POST(req: NextRequest) {
         // Create payment record
         await supabase.from('payments').insert({
           invoice_id: duesiqInvoice.id,
-          unit_id: unit.id,
+          unit_id: unitId,
           amount: amountPaid,
           stripe_payment_intent: stripeInvoice.id,
           paid_by: 'stripe',
         });
 
         // Post accounting journal entries (silently skips if not set up)
-        await postPaymentReceived(unit.community_id, duesiqInvoice.id, unit.id, Math.min(amountPaid, duesiqInvoice.amount), duesiqInvoice.title);
+        await postPaymentReceived(unitCommunityId, duesiqInvoice.id, unitId, Math.min(amountPaid, duesiqInvoice.amount), duesiqInvoice.title);
 
         // Handle overpayment: credit excess to unit wallet
         if (totalPaid > duesiqInvoice.amount) {
@@ -651,21 +781,21 @@ export async function POST(req: NextRequest) {
           const { data: wallet } = await supabase
             .from('unit_wallets')
             .select('balance')
-            .eq('unit_id', unit.id)
+            .eq('unit_id', unitId)
             .single();
 
           const newBalance = (wallet?.balance ?? 0) + excess;
 
           await supabase.from('unit_wallets').upsert({
-            unit_id: unit.id,
-            community_id: unit.community_id,
+            unit_id: unitId,
+            community_id: unitCommunityId,
             balance: newBalance,
             updated_at: new Date().toISOString(),
           }, { onConflict: 'unit_id' });
 
           await supabase.from('wallet_transactions').insert({
-            unit_id: unit.id,
-            community_id: unit.community_id,
+            unit_id: unitId,
+            community_id: unitCommunityId,
             amount: excess,
             type: 'overpayment',
             reference_id: duesiqInvoice.id,
@@ -673,14 +803,33 @@ export async function POST(req: NextRequest) {
           });
 
           // Post overpayment accounting entry
-          await postOverpaymentWalletCredit(unit.community_id, duesiqInvoice.id, unit.id, excess);
+          await postOverpaymentWalletCredit(unitCommunityId, duesiqInvoice.id, unitId, excess);
+        }
+
+        // Track installment progress on unit_subscriptions
+        if (unitSubRow) {
+          const newInstallmentsPaid = unitSubRow.installments_paid + 1;
+          await supabase.from('unit_subscriptions').update({
+            installments_paid: newInstallmentsPaid,
+            updated_at: new Date().toISOString(),
+          }).eq('id', unitSubRow.id);
+
+          // Safety net: if all installments paid, cancel the subscription
+          if (unitSubRow.total_installments && newInstallmentsPaid >= unitSubRow.total_installments) {
+            try {
+              await stripe.subscriptions.cancel(subscriptionId);
+              console.log('Special assessment subscription completed and cancelled:', subscriptionId);
+            } catch (cancelErr) {
+              console.warn('Failed to cancel completed subscription (may already be cancelled):', cancelErr);
+            }
+          }
         }
 
         // Queue payment confirmation email
         const { data: community } = await supabase
           .from('communities')
           .select('slug')
-          .eq('id', unit.community_id)
+          .eq('id', unitCommunityId)
           .single();
 
         if (community?.slug) {
@@ -689,9 +838,9 @@ export async function POST(req: NextRequest) {
             ? `$${(amountPaid / 100).toFixed(2)} auto-paid. $${((duesiqInvoice.amount_paid + amountPaid - duesiqInvoice.amount) / 100).toFixed(2)} credited to your account.`
             : `$${(amountPaid / 100).toFixed(2)} auto-paid`;
           await queuePaymentConfirmation(
-            unit.community_id,
+            unitCommunityId,
             community.slug,
-            unit.id,
+            unitId,
             duesiqInvoice.title,
             amountPaid,
             new Date().toISOString(),
@@ -700,14 +849,14 @@ export async function POST(req: NextRequest) {
         }
 
         await logAuditEvent({
-          communityId: unit.community_id,
+          communityId: unitCommunityId,
           action: 'payment_received',
           targetType: 'invoice',
           targetId: duesiqInvoice.id,
           metadata: { amount: amountPaid, method: 'stripe_subscription', title: duesiqInvoice.title },
         });
 
-        console.log('Subscription invoice paid for unit:', unit.id, 'invoice:', duesiqInvoice.id);
+        console.log('Subscription invoice paid for unit:', unitId, 'invoice:', duesiqInvoice.id);
         break;
       }
 
@@ -717,63 +866,96 @@ export async function POST(req: NextRequest) {
         const failedSubDetails = stripeInvoice.parent?.subscription_details;
         if (!failedSubDetails?.subscription) break;
 
-        const subscriptionId = typeof failedSubDetails.subscription === 'string'
+        const failedSubscriptionId = typeof failedSubDetails.subscription === 'string'
           ? failedSubDetails.subscription
           : failedSubDetails.subscription.id;
 
-        const { data: unit } = await supabase
-          .from('units')
-          .select('id, community_id')
-          .eq('stripe_subscription_id', subscriptionId)
+        // Look up unit via unit_subscriptions first, fall back to units table
+        let failedUnitId: string | undefined;
+        let failedCommunityId: string | undefined;
+        let failedAssessmentId: string | null = null;
+
+        const { data: failedUnitSub } = await supabase
+          .from('unit_subscriptions')
+          .select('id, unit_id, community_id, assessment_id')
+          .eq('stripe_subscription_id', failedSubscriptionId)
           .single();
 
-        if (!unit) break;
+        if (failedUnitSub) {
+          failedUnitId = failedUnitSub.unit_id;
+          failedCommunityId = failedUnitSub.community_id;
+          failedAssessmentId = failedUnitSub.assessment_id;
 
-        // Find matching pending invoice and mark overdue
-        const { data: duesiqInvoice } = await supabase
-          .from('invoices')
-          .select('id')
-          .eq('unit_id', unit.id)
-          .eq('status', 'pending')
-          .order('due_date', { ascending: true })
-          .limit(1)
-          .single();
+          // Update subscription status in unit_subscriptions
+          await supabase.from('unit_subscriptions').update({
+            stripe_subscription_status: 'past_due',
+            updated_at: new Date().toISOString(),
+          }).eq('id', failedUnitSub.id);
+        } else {
+          const { data: failedUnit } = await supabase
+            .from('units')
+            .select('id, community_id')
+            .eq('stripe_subscription_id', failedSubscriptionId)
+            .single();
 
-        if (duesiqInvoice) {
-          await supabase.from('invoices').update({ status: 'overdue' }).eq('id', duesiqInvoice.id);
+          if (failedUnit) {
+            failedUnitId = failedUnit.id;
+            failedCommunityId = failedUnit.community_id;
+          }
         }
 
-        // Update subscription status on unit
-        await supabase.from('units').update({ stripe_subscription_status: 'past_due' }).eq('id', unit.id);
+        if (!failedUnitId || !failedCommunityId) break;
+
+        // Find matching pending invoice and mark overdue
+        let failedInvoiceQuery = supabase
+          .from('invoices')
+          .select('id')
+          .eq('unit_id', failedUnitId)
+          .eq('status', 'pending')
+          .order('due_date', { ascending: true })
+          .limit(1);
+
+        if (failedAssessmentId) {
+          failedInvoiceQuery = failedInvoiceQuery.eq('assessment_id', failedAssessmentId);
+        }
+
+        const { data: failedDuesiqInvoice } = await failedInvoiceQuery.single();
+
+        if (failedDuesiqInvoice) {
+          await supabase.from('invoices').update({ status: 'overdue' }).eq('id', failedDuesiqInvoice.id);
+        }
+
+        // Update subscription status on units table (backward compat)
+        await supabase.from('units').update({ stripe_subscription_status: 'past_due' }).eq('stripe_subscription_id', failedSubscriptionId);
 
         await logAuditEvent({
-          communityId: unit.community_id,
+          communityId: failedCommunityId,
           action: 'payment_failed',
           targetType: 'invoice',
-          targetId: duesiqInvoice?.id,
-          metadata: { unit_id: unit.id, method: 'stripe_subscription' },
+          targetId: failedDuesiqInvoice?.id,
+          metadata: { unit_id: failedUnitId, method: 'stripe_subscription' },
         });
 
         // Notify unit members about payment failure
-        const { data: unitMembers } = await supabase
+        const { data: failedUnitMembers } = await supabase
           .from('members')
           .select('id')
-          .eq('unit_id', unit.id)
+          .eq('unit_id', failedUnitId)
           .eq('is_approved', true);
 
-        if (unitMembers && unitMembers.length > 0) {
+        if (failedUnitMembers && failedUnitMembers.length > 0) {
           void supabase.rpc('create_member_notifications', {
-            p_community_id: unit.community_id,
+            p_community_id: failedCommunityId,
             p_type: 'payment_failed',
             p_title: 'Payment failed',
             p_body: 'Your automatic payment could not be processed. Please update your payment method or make a manual payment.',
-            p_reference_id: duesiqInvoice?.id ?? null,
+            p_reference_id: failedDuesiqInvoice?.id ?? null,
             p_reference_type: 'invoice',
-            p_member_ids: unitMembers.map((m: { id: string }) => m.id),
+            p_member_ids: failedUnitMembers.map((m: { id: string }) => m.id),
           });
         }
 
-        console.log('Subscription payment failed for unit:', unit.id);
+        console.log('Subscription payment failed for unit:', failedUnitId);
         break;
       }
 
@@ -781,6 +963,13 @@ export async function POST(req: NextRequest) {
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription;
 
+        // Update unit_subscriptions table
+        await supabase.from('unit_subscriptions').update({
+          stripe_subscription_status: subscription.status,
+          updated_at: new Date().toISOString(),
+        }).eq('stripe_subscription_id', subscription.id);
+
+        // Backward compat: also update units table
         await supabase.from('units').update({
           stripe_subscription_status: subscription.status,
         }).eq('stripe_subscription_id', subscription.id);
@@ -793,6 +982,13 @@ export async function POST(req: NextRequest) {
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription;
 
+        // Update unit_subscriptions table
+        await supabase.from('unit_subscriptions').update({
+          stripe_subscription_status: 'canceled',
+          updated_at: new Date().toISOString(),
+        }).eq('stripe_subscription_id', subscription.id);
+
+        // Backward compat: clear units table subscription fields
         await supabase.from('units').update({
           stripe_subscription_id: null,
           stripe_subscription_status: null,

@@ -67,6 +67,7 @@ export default function PaymentsPage() {
   const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
   const [sendingReminders, setSendingReminders] = useState(false);
   const [preferredBillingDay, setPreferredBillingDay] = useState<number | null>(null);
+  const [activeSubAssessmentIds, setActiveSubAssessmentIds] = useState<Set<string>>(new Set());
 
   const fetchData = useCallback(async () => {
     const supabase = createClient();
@@ -133,17 +134,15 @@ export default function PaymentsPage() {
 
     const { data: paymentData } = await paymentQuery;
 
-    // Fetch assessments (board only)
+    // Fetch assessments (all users need this for autopay eligibility checks)
     let fetchedAssessments: Assessment[] = [];
-    if (isBoard) {
-      const { data: assessmentData } = await supabase
-        .from('assessments')
-        .select('*')
-        .eq('community_id', community.id)
-        .order('created_at', { ascending: false });
+    const { data: assessmentData } = await supabase
+      .from('assessments')
+      .select('*')
+      .eq('community_id', community.id)
+      .order('created_at', { ascending: false });
 
-      fetchedAssessments = (assessmentData as Assessment[]) ?? [];
-    }
+    fetchedAssessments = (assessmentData as Assessment[]) ?? [];
 
     // Fetch wallet balance for current unit
     if (unit) {
@@ -156,20 +155,33 @@ export default function PaymentsPage() {
       setWalletBalance(walletData?.balance ?? 0);
     }
 
-    // Fetch subscription status for current unit
+    // Fetch subscription status for current unit (from unit_subscriptions table)
     if (unit) {
       const { data: unitData } = await supabase
         .from('units')
-        .select('stripe_subscription_id, stripe_subscription_status, preferred_billing_day')
+        .select('preferred_billing_day')
         .eq('id', unit.id)
         .single();
 
-      if (unitData?.stripe_subscription_id) {
-        setSubscriptionStatus(unitData.stripe_subscription_status || 'active');
+      setPreferredBillingDay(unitData?.preferred_billing_day ?? null);
+
+      // Fetch all active subscriptions for this unit
+      const { data: unitSubs } = await supabase
+        .from('unit_subscriptions')
+        .select('assessment_id, stripe_subscription_status')
+        .eq('unit_id', unit.id)
+        .in('stripe_subscription_status', ['active', 'trialing']);
+
+      const subAssessmentIds = new Set<string>();
+      if (unitSubs) {
+        for (const sub of unitSubs) {
+          if (sub.assessment_id) subAssessmentIds.add(sub.assessment_id);
+        }
+        setSubscriptionStatus(unitSubs.length > 0 ? 'active' : null);
       } else {
         setSubscriptionStatus(null);
       }
-      setPreferredBillingDay(unitData?.preferred_billing_day ?? null);
+      setActiveSubAssessmentIds(subAssessmentIds);
     }
 
     // Check if Stripe is enabled for this community
@@ -442,9 +454,9 @@ export default function PaymentsPage() {
             unitOwnerMap={isBoard ? unitOwnerMap : undefined}
             units={isBoard ? allUnits : undefined}
             allMembers={isBoard ? allMembers : undefined}
-            assessments={isBoard ? assessments : undefined}
+            assessments={assessments}
             stripeEnabled={stripeEnabled}
-            subscriptionActive={subscriptionStatus === 'active'}
+            activeSubAssessmentIds={activeSubAssessmentIds}
             preferredBillingDay={preferredBillingDay}
           />
         </TabsContent>

@@ -29,6 +29,8 @@ export function makeAssessment(overrides: Record<string, unknown> = {}) {
     default_frequency: 'monthly' as const,
     created_by: MEMBER_1_ID,
     created_at: '2026-01-01T00:00:00Z',
+    stripe_product_id: null,
+    stripe_price_id: null,
     ...overrides,
   };
 }
@@ -41,9 +43,15 @@ export function makeUnit(overrides: Record<string, unknown> = {}) {
     unit_number: '101',
     address: '101 Westwood Dr',
     status: 'active' as const,
-    payment_frequency: null as string | null,
+    payment_frequency: null as 'monthly' | 'quarterly' | 'semi_annual' | 'annual' | null,
     stripe_subscription_id: null,
     stripe_subscription_status: null,
+    preferred_billing_day: null,
+    is_leased: false,
+    lease_document_path: null,
+    lease_start_date: null,
+    lease_expiration_date: null,
+    lease_notification_rules: [],
     created_at: '2026-01-01T00:00:00Z',
     ...overrides,
   };

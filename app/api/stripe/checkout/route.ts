@@ -225,6 +225,23 @@ export async function POST(req: NextRequest) {
     if (enableAutopay) {
       sessionMetadata.autopay = 'true';
       sessionMetadata.billing_day = String(billingDay);
+
+      // Look up the assessment to determine type (regular vs special)
+      if (invoice.assessment_id) {
+        const { data: assessment } = await supabase
+          .from('assessments')
+          .select('id, type, installments, installment_start_date')
+          .eq('id', invoice.assessment_id)
+          .single();
+
+        if (assessment) {
+          sessionMetadata.assessment_id = assessment.id;
+          sessionMetadata.assessment_type = assessment.type;
+          if (assessment.type === 'special' && assessment.installments) {
+            sessionMetadata.total_installments = String(assessment.installments);
+          }
+        }
+      }
     }
 
     // Build payment_intent_data — add setup_future_usage when autopay is enabled
