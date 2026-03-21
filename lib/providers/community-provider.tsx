@@ -27,6 +27,8 @@ interface CommunityContextValue {
   isSuperAdmin: boolean;
   actualIsBoard: boolean;
   isHeadOfHousehold: boolean;
+  /** true for tenant member_role — restricted financial visibility */
+  isTenant: boolean;
   /** true for owner/member roles (not tenant/minor) — can view/manage household data */
   canManageHousehold: boolean;
   visibleCards: DashboardCardId[];
@@ -111,6 +113,7 @@ export function CommunityProvider({
       isManager: viewMode === 'admin' ? (systemRole === 'manager' || systemRole === 'super_admin') : false,
       isSuperAdmin: viewMode === 'admin' ? systemRole === 'super_admin' : false,
       isHeadOfHousehold: member?.member_role === 'owner' && member?.parent_member_id === null,
+      isTenant: member?.member_role === 'tenant',
       canManageHousehold: member?.member_role === 'owner' || member?.member_role === 'member',
       visibleCards,
       viewMode,

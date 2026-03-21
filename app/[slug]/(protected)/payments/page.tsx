@@ -18,6 +18,7 @@ import { CreateAssessmentDialog } from '@/components/payments/create-assessment-
 import { CreateSpecialAssessmentDialog } from '@/components/payments/create-special-assessment-dialog';
 import { FrequencySelector } from '@/components/payments/frequency-selector';
 import { ManagePaymentMethodButton } from '@/components/payments/manage-payment-method-button';
+import { AccountStatusCard } from '@/components/payments/account-status-card';
 import { UnitPicker } from '@/components/shared/unit-picker';
 import { BillingDatePicker } from '@/components/payments/billing-date-picker';
 import {
@@ -35,7 +36,7 @@ import { toast } from 'sonner';
 import type { Invoice, Payment, Unit, Assessment } from '@/lib/types/database';
 
 export default function PaymentsPage() {
-  const { community, member, unit, isBoard } = useCommunity();
+  const { community, member, unit, isBoard, isTenant } = useCommunity();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -281,6 +282,21 @@ export default function PaymentsPage() {
   function handleWalletUpdated() {
     setRefreshKey((k) => k + 1);
     fetchData();
+  }
+
+  // Tenants see only account status, no financial details
+  if (isTenant) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-page-title text-text-primary-light dark:text-text-primary-dark">
+          Payments
+        </h1>
+        <AccountStatusCard />
+        <p className="text-body text-text-secondary-light dark:text-text-secondary-dark">
+          For detailed account information, please contact the property owner or the board.
+        </p>
+      </div>
+    );
   }
 
   return (
