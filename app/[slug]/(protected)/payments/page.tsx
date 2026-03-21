@@ -398,10 +398,10 @@ export default function PaymentsPage() {
           </p>
         </div>
 
-        {/* Wallet card */}
-        {unit && (
+        {/* Wallet card — show selected unit's wallet when board picks a unit */}
+        {(activeUnitFilter || unit) && (
           <WalletCard
-            unitId={unit.id}
+            unitId={activeUnitFilter || unit!.id}
             isBoard={isBoard}
             onManageClick={() => setWalletDialogOpen(true)}
             refreshKey={refreshKey}
@@ -494,9 +494,9 @@ export default function PaymentsPage() {
       />
 
       {/* Manage wallet dialog (board only) */}
-      {unit && (
+      {(activeUnitFilter || unit) && (
         <ManageWalletDialog
-          unitId={unit.id}
+          unitId={activeUnitFilter || unit!.id}
           currentBalance={walletBalance}
           open={walletDialogOpen}
           onOpenChange={setWalletDialogOpen}
