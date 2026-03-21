@@ -202,7 +202,7 @@ export function PayInvoiceButton({
             className="text-green-600 border-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-950"
           >
             <CreditCard className="h-4 w-4 mr-1.5" />
-            {loading === 'card' ? 'Redirecting...' : `Pay with Card $${(cardTotal / 100).toFixed(2)}`}
+            {loading === 'card' ? 'Redirecting...' : 'Pay with Card'}
           </Button>
           <Button
             variant="outline"
@@ -212,7 +212,7 @@ export function PayInvoiceButton({
             className="text-green-600 border-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-950"
           >
             <Landmark className="h-4 w-4 mr-1.5" />
-            {loading === 'ach' ? 'Redirecting...' : `Pay via ACH $${(achTotal / 100).toFixed(2)}`}
+            {loading === 'ach' ? 'Redirecting...' : 'Pay via ACH'}
           </Button>
         </div>
         {(cardFee > 0 || achFee > 0) && (
