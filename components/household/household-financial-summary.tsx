@@ -161,7 +161,13 @@ export function HouseholdFinancialSummary({ unitId, communityId }: HouseholdFina
           </p>
         </div>
         <div className="rounded-inner-card bg-surface-light-2 dark:bg-surface-dark-2 p-3">
-          <span className="text-meta text-text-muted-light dark:text-text-muted-dark">Outstanding</span>
+          <span className="text-meta text-text-muted-light dark:text-text-muted-dark">
+            {outstandingInvoices.length === 1
+              ? `Due ${new Date(outstandingInvoices[0].due_date + 'T00:00:00').toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}`
+              : outstandingInvoices.length > 1
+                ? `Due ${new Date([...outstandingInvoices].sort((a, b) => a.due_date.localeCompare(b.due_date))[0].due_date + 'T00:00:00').toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}`
+                : 'Outstanding'}
+          </span>
           <p className={`text-metric-xl tabular-nums ${outstandingAmount > 0 ? 'text-red-600 dark:text-red-400' : 'text-text-primary-light dark:text-text-primary-dark'}`}>
             ${(outstandingAmount / 100).toFixed(2)}
           </p>

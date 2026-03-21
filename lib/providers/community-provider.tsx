@@ -108,8 +108,8 @@ export function CommunityProvider({
       unit,
       householdMembers,
       actualIsBoard,
-      // isBoard is true if the user has ANY admin permission (backward-compatible)
-      isBoard: viewMode === 'admin' ? hasAnyPermission(resolvedPermissions) : false,
+      // isBoard is true if the user has a board-level system_role
+      isBoard: viewMode === 'admin' ? actualIsBoard : false,
       isManager: viewMode === 'admin' ? (systemRole === 'manager' || systemRole === 'super_admin') : false,
       isSuperAdmin: viewMode === 'admin' ? systemRole === 'super_admin' : false,
       isHeadOfHousehold: member?.member_role === 'owner' && member?.parent_member_id === null,
