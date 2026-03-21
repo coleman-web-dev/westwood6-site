@@ -21,7 +21,8 @@ export function EstoppelCertificateEmail({
     >
       <Text style={headingStyle}>Estoppel Certificate</Text>
       <Text style={textStyle}>
-        The estoppel certificate you requested has been completed and is attached to this email as a PDF.
+        The estoppel certificate you requested has been completed and is attached to this email.
+        You will find the certificate along with the account ledger for the property attached as PDFs.
       </Text>
 
       <Section style={detailsBoxStyle}>

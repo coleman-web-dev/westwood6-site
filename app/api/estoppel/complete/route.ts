@@ -4,9 +4,10 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendEmailDirect } from '@/lib/email/resend';
 import { generateEstoppelPdf, estoppelPdfFilename } from '@/lib/utils/generate-estoppel-pdf';
+import { generateLedgerPdf, ledgerPdfFilename } from '@/lib/utils/generate-ledger-pdf';
 import { EstoppelCertificateEmail } from '@/lib/email/templates/estoppel-certificate';
 import { logAuditEvent } from '@/lib/audit';
-import type { EstoppelSettings } from '@/lib/types/database';
+import type { EstoppelSettings, Invoice, Payment, WalletTransaction, LedgerEntry } from '@/lib/types/database';
 
 /**
  * POST /api/estoppel/complete
@@ -105,6 +106,123 @@ export async function POST(req: NextRequest) {
     const pdfArrayBuffer = await pdfBlob.arrayBuffer();
     const pdfBuffer = Buffer.from(pdfArrayBuffer);
 
+    // ── Generate ledger PDF attachment ──
+    let ledgerBuffer: Buffer | null = null;
+    let ledgerFilename = '';
+
+    if (estoppelRequest.unit_id) {
+      const [invoiceResult, paymentResult, walletResult, unitResult, ownerResult] = await Promise.all([
+        supabase
+          .from('invoices')
+          .select('*')
+          .eq('unit_id', estoppelRequest.unit_id)
+          .neq('status', 'voided')
+          .order('due_date', { ascending: true }),
+        supabase
+          .from('payments')
+          .select('*')
+          .eq('unit_id', estoppelRequest.unit_id)
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('wallet_transactions')
+          .select('*')
+          .eq('unit_id', estoppelRequest.unit_id)
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('units')
+          .select('unit_number, address')
+          .eq('id', estoppelRequest.unit_id)
+          .single(),
+        supabase
+          .from('members')
+          .select('first_name, last_name')
+          .eq('unit_id', estoppelRequest.unit_id)
+          .eq('member_role', 'owner')
+          .limit(1)
+          .single(),
+      ]);
+
+      const invoices = (invoiceResult.data as Invoice[]) ?? [];
+      const payments = (paymentResult.data as Payment[]) ?? [];
+      const walletTxs = (walletResult.data as WalletTransaction[]) ?? [];
+      const unitData = unitResult.data;
+      const ownerData = ownerResult.data;
+
+      const ledgerEntries: LedgerEntry[] = [];
+
+      for (const inv of invoices) {
+        ledgerEntries.push({
+          entry_date: inv.due_date,
+          entry_type: 'charge',
+          description: inv.title,
+          amount: inv.amount,
+          running_balance: 0,
+          reference_id: inv.id,
+          member_name: null,
+        });
+      }
+
+      for (const pmt of payments) {
+        ledgerEntries.push({
+          entry_date: pmt.created_at,
+          entry_type: 'payment',
+          description: 'Payment',
+          amount: -pmt.amount,
+          running_balance: 0,
+          reference_id: pmt.id,
+          member_name: null,
+        });
+      }
+
+      for (const tx of walletTxs) {
+        const isWalletOnly =
+          tx.type === 'manual_credit' &&
+          (tx.description?.includes('monthly invoicing conversion') ||
+            tx.description?.includes('imported from previous system') ||
+            tx.description?.includes('Wallet import correction'));
+        if (isWalletOnly) continue;
+
+        ledgerEntries.push({
+          entry_date: tx.created_at,
+          entry_type: tx.type,
+          description: tx.description ?? tx.type.replace(/_/g, ' '),
+          amount: -tx.amount,
+          running_balance: 0,
+          reference_id: tx.reference_id,
+          member_name: null,
+        });
+      }
+
+      ledgerEntries.sort((a, b) => a.entry_date.localeCompare(b.entry_date));
+
+      let running = 0;
+      for (const entry of ledgerEntries) {
+        running += entry.amount;
+        entry.running_balance = running;
+      }
+
+      if (ledgerEntries.length > 0) {
+        const unitLabel = unitData
+          ? `Unit ${unitData.unit_number}${unitData.address ? ' - ' + unitData.address : ''}`
+          : requesterFields.property_address || 'Unit';
+        const ownerName = ownerData
+          ? `${ownerData.first_name} ${ownerData.last_name}`
+          : requesterFields.owner_names || '';
+
+        const ledgerBlob = generateLedgerPdf({
+          communityName: community.name,
+          ownerName,
+          unitLabel,
+          entries: ledgerEntries,
+          generatedDate: completionDate,
+        });
+
+        const ledgerArrayBuffer = await ledgerBlob.arrayBuffer();
+        ledgerBuffer = Buffer.from(ledgerArrayBuffer);
+        ledgerFilename = ledgerPdfFilename({ unitLabel, communityName: community.name });
+      }
+    }
+
     // Store PDF in Supabase Storage
     const filename = estoppelPdfFilename({
       propertyAddress: requesterFields.property_address,
@@ -133,13 +251,20 @@ export async function POST(req: NextRequest) {
     });
     const emailHtml = await render(emailElement);
 
-    // Send email with PDF attachment
+    // Send email with PDF attachments
     const propertyAddr = requesterFields.property_address || 'Property';
+    const emailAttachments: Array<{ filename: string; content: Buffer }> = [
+      { filename, content: pdfBuffer },
+    ];
+    if (ledgerBuffer && ledgerFilename) {
+      emailAttachments.push({ filename: ledgerFilename, content: ledgerBuffer });
+    }
+
     await sendEmailDirect({
       to: estoppelRequest.delivery_email,
       subject: `Estoppel Certificate for ${propertyAddr} - ${community.name}`,
       html: emailHtml,
-      attachments: [{ filename, content: pdfBuffer }],
+      attachments: emailAttachments,
     });
 
     // Update request status
