@@ -144,7 +144,8 @@ export function LandingPageSettings() {
             .select('first_name, last_name, board_title, system_role')
             .eq('community_id', community.id)
             .in('system_role', ['board', 'manager', 'super_admin'])
-            .eq('is_approved', true),
+            .eq('is_approved', true)
+            .not('unit_id', 'is', null),
           supabase
             .from('documents')
             .select('id, title, category, file_size')

@@ -104,6 +104,7 @@ export default async function CommunityLandingPage({ params }: Props) {
               .eq('community_id', c.id)
               .in('system_role', ['board', 'manager', 'super_admin'])
               .eq('is_approved', true)
+              .not('unit_id', 'is', null)
           : Promise.resolve({ data: [] }),
 
         enabledSectionIds.has('documents')

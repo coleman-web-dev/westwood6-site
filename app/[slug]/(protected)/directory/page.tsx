@@ -78,6 +78,7 @@ export default function DirectoryPage() {
         .select('*, unit:units(unit_number, address)')
         .eq('community_id', community.id)
         .eq('is_approved', true)
+        .not('unit_id', 'is', null)
         .order('last_name', { ascending: true });
 
       if (!isBoard) {

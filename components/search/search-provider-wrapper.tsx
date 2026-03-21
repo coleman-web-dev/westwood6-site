@@ -67,12 +67,13 @@ export function SearchProviderWrapper({ children }: { children: React.ReactNode 
       .limit(20)
       .then(({ data }) => setDocuments((data as DocType[]) || []));
 
-    // Fetch members with their unit info
+    // Fetch members with their unit info (exclude platform admins with no unit)
     supabase
       .from('members')
       .select('id, unit_id, first_name, last_name, email, phone, member_role, system_role, units(unit_number, address)')
       .eq('community_id', community.id)
       .eq('is_approved', true)
+      .not('unit_id', 'is', null)
       .order('last_name', { ascending: true })
       .then(({ data }) => setMembers((data as MemberRow[]) || []));
 
