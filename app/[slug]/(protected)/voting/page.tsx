@@ -19,17 +19,6 @@ export default function VotingPage() {
   const { community, isBoard, isTenant } = useCommunity();
   const votingEnabled = community.theme?.voting_enabled === true;
 
-  // Tenants cannot access voting
-  if (isTenant) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <Vote className="h-12 w-12 text-text-muted-light dark:text-text-muted-dark mb-4" />
-        <p className="text-section-title text-text-primary-light dark:text-text-primary-dark">Access Restricted</p>
-        <p className="text-body text-text-secondary-light dark:text-text-secondary-dark mt-1">Voting is available to homeowners only.</p>
-      </div>
-    );
-  }
-
   const [ballots, setBallots] = useState<Ballot[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -54,6 +43,17 @@ export default function VotingPage() {
     if (votingEnabled) fetchBallots();
     else setLoading(false);
   }, [votingEnabled, fetchBallots]);
+
+  // Tenants cannot access voting
+  if (isTenant) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <Vote className="h-12 w-12 text-text-muted-light dark:text-text-muted-dark mb-4" />
+        <p className="text-section-title text-text-primary-light dark:text-text-primary-dark">Access Restricted</p>
+        <p className="text-body text-text-secondary-light dark:text-text-secondary-dark mt-1">Voting is available to homeowners only.</p>
+      </div>
+    );
+  }
 
   if (!votingEnabled) {
     return (
