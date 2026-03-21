@@ -227,6 +227,7 @@ export interface Member {
   mailing_state: string | null;
   mailing_zip: string | null;
   use_unit_address: boolean;
+  setup_completed_at: string | null;
   created_at: string;
 }
 

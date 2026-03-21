@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { useCommunity } from '@/lib/providers/community-provider';
 import { AppSidebar } from '@/components/dashboard/app-sidebar';
 import { DashboardTopbar } from '@/components/dashboard/dashboard-topbar';
@@ -13,8 +14,22 @@ export default function ProtectedLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { member, community } = useCommunity();
+  const { member, community, actualIsBoard } = useCommunity();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const pathname = usePathname();
+  const router = useRouter();
+
+  // Redirect first-time members to setup wizard
+  useEffect(() => {
+    if (
+      member &&
+      !member.setup_completed_at &&
+      !actualIsBoard &&
+      !pathname.endsWith('/member-setup')
+    ) {
+      router.replace(`/${community.slug}/member-setup`);
+    }
+  }, [member, actualIsBoard, pathname, community.slug, router]);
 
   if (!member) {
     return (

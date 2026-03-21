@@ -44,6 +44,7 @@ export default async function CommunityLayout({ children, params }: Props) {
       board_title: null,
       role_template_id: null,
       parent_member_id: null,
+      setup_completed_at: new Date().toISOString(),
       created_at: new Date().toISOString(),
     } as Member;
 
